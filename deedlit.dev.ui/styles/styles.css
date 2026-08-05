@@ -433,6 +433,13 @@ html[data-theme="dark"] {
   box-sizing: border-box;
 }
 
+/* Canvas fallback beneath the body mesh: without it, anything the gradient
+   doesn't reach (touch-browser repaint gaps, overscroll rubber-banding) shows
+   the UA's white canvas. */
+html {
+  background-color: var(--bg-0);
+}
+
 body {
   min-height: 100vh;
   margin: 0;
