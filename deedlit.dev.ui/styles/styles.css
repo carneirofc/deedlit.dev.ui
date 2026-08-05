@@ -442,6 +442,9 @@ body {
     radial-gradient(1250px 840px at 110% -18%, color-mix(in oklab, var(--accent-pink) 28%, transparent), transparent 69%),
     radial-gradient(1200px 700px at 50% 115%, color-mix(in oklab, var(--accent-lime) 15%, transparent), transparent 72%),
     linear-gradient(155deg, var(--bg-0) 0%, var(--bg-1) 46%, var(--bg-2) 100%);
+  /* Fixed on pointer devices only: touch browsers (iOS Safari especially)
+     either ignore fixed attachment or repaint the whole mesh on every scroll
+     frame, so they fall back to scroll via the media query below. */
   background-attachment: fixed;
   font-family: var(--font-display), sans-serif;
   font-size: var(--ui-font-md);
@@ -454,6 +457,15 @@ body {
   -webkit-font-smoothing: antialiased;
   position: relative;
   transition: background 260ms ease, color 220ms ease;
+}
+
+/* Touch devices: let the mesh scroll with the page instead of forcing a
+   full-viewport repaint per scroll frame (and iOS treats fixed as scroll
+   anyway — this just makes the fallback deliberate). */
+@media (hover: none), (pointer: coarse) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 body,
@@ -669,7 +681,7 @@ textarea {
   position: relative;
   transition:
     color 160ms ease, background-color 160ms ease, border-color 160ms ease,
-    box-shadow 160ms ease, transform 120ms cubic-bezier(.2, .8, .3, 1.2), filter 160ms ease;
+    box-shadow 160ms ease, transform 120ms cubic-bezier(.2, .8, .3, 1), filter 160ms ease;
 }
 .ob-btn:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -737,7 +749,7 @@ textarea {
   cursor: pointer;
   transition:
     color 160ms ease, background-color 160ms ease, border-color 160ms ease,
-    box-shadow 160ms ease, transform 120ms cubic-bezier(.2, .8, .3, 1.2);
+    box-shadow 160ms ease, transform 120ms cubic-bezier(.2, .8, .3, 1);
 }
 .cyber-icon-btn:hover:not(:disabled) {
   border-color: var(--panel-border-strong);
@@ -1046,7 +1058,7 @@ textarea {
  * Synced from the design system: lift + neon edge on hover, press
  * settle on active, image zoom for gallery tiles. */
 .product-card {
-  transition: transform 180ms cubic-bezier(.2, .8, .3, 1.2), border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  transition: transform 180ms cubic-bezier(.2, .8, .3, 1), border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
 .product-card:hover {
   transform: translateY(-2px);
@@ -1059,7 +1071,7 @@ textarea {
 }
 
 .gallery-tile {
-  transition: transform 180ms cubic-bezier(.2, .8, .3, 1.2), border-color 180ms ease, box-shadow 180ms ease;
+  transition: transform 180ms cubic-bezier(.2, .8, .3, 1), border-color 180ms ease, box-shadow 180ms ease;
 }
 .gallery-tile:hover {
   transform: translateY(-2px);
