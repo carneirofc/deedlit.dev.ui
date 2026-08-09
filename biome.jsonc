@@ -1,0 +1,169 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+
+  // One config for the whole monorepo. Biome replaced ESLint: `deedlit.dev`
+  // ran `next lint`, which Next 16 removed, and comfyhelper had its own
+  // eslint-config-next flat config. Neither package needs a linter config of
+  // its own now — do not add one back.
+
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+
+  "files": {
+    "ignoreUnknown": true,
+    // Folder ignores intentionally have no trailing `/**` — Biome >= 2.2
+    // treats the bare path as the folder, and the old form is itself linted
+    // (suspicious/useBiomeIgnoreFolder).
+    "includes": [
+      "**",
+      "!**/.next",
+      "!**/out",
+      "!**/build",
+      "!**/dist",
+      "!**/storybook-static",
+      "!**/next-env.d.ts",
+      "!**/playwright-report",
+      "!**/test-results",
+      "!**/coverage",
+      "!deedlit.dev.comfyhelper/lib/generated",
+      "!deedlit.dev.comfyhelper/library",
+      "!**/*.min.js",
+      "!package-lock.json"
+    ]
+  },
+
+  // Configured and usable (`npm run format`), but deliberately NOT applied to
+  // the tree: it rewrites ~230 of 318 files. That belongs in its own commit,
+  // not smuggled in alongside a behaviour change. Values match .editorconfig.
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+
+  // Tailwind v4 uses @source/@theme/@utility/@apply, which Biome's CSS parser
+  // rejects unless this is on. Without it every globals.css is a parse error.
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "none",
+      "arrowParentheses": "always"
+    }
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+
+      // Biome's a11y set is far wider than the six jsx-a11y rules
+      // eslint-config-next enabled, and those six were warnings. Demoting the
+      // extras keeps the migration from silently raising the bar to where CI
+      // cannot pass; they stay visible as warnings and are the backlog.
+      "a11y": {
+        "useButtonType": "warn",
+        "noSvgWithoutTitle": "warn",
+        "noStaticElementInteractions": "warn",
+        "noLabelWithoutControl": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn",
+        "useValidAnchor": "warn",
+        "useFocusableInteractive": "warn",
+        "useAnchorContent": "warn",
+        "noRedundantAlt": "warn"
+      },
+
+      "correctness": {
+        // Was react-hooks/exhaustive-deps, a warning under eslint-config-next.
+        // Same severity here, so the migration changes nothing.
+        "useExhaustiveDependencies": "warn"
+      },
+
+      "style": {
+        // Not enforced by the previous config; flags existing deliberate
+        // assertions rather than new defects.
+        "noNonNullAssertion": "warn"
+      },
+
+      "suspicious": {
+        // Every current hit was reviewed and is keyed by position on purpose:
+        // fixed-length placeholder slots, static text lists that are never
+        // reordered, or `${item}-${index}` where the item already discriminates.
+        // Left visible so a genuinely unstable key still gets noticed.
+        "noArrayIndexKey": "warn"
+      }
+    },
+
+    // Biome infers these from package.json, but pinning them means a
+    // dependency change cannot silently switch off the Next/React rules that
+    // replaced eslint-config-next.
+    "domains": {
+      "next": "recommended",
+      "react": "recommended",
+      "test": "recommended"
+    }
+  },
+
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        // Off on purpose: reordering imports across the repo is a formatting
+        // change in disguise, and the same reasoning as the formatter applies.
+        "organizeImports": "off"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // Module augmentation (e.g. src/types/next-auth.d.ts) legitimately
+      // widens third-party types.
+      "includes": ["**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      // Storybook names stories after the state they show, so `export const
+      // Error` shadows the global by design and is never called as one.
+      "includes": ["**/*.stories.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noShadowRestrictedNames": "off"
+          }
+        }
+      }
+    },
+    {
+      // Build and tooling scripts are CommonJS by necessity, not by drift.
+      "includes": ["**/scripts/**", "**/*.config.{js,mjs,ts}", "**/postcss.config.js"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noCommonJs": "off"
+          }
+        }
+      }
+    }
+  ]
+}

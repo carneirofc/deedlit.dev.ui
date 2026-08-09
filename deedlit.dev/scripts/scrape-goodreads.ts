@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium, type Browser } from 'playwright';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -39,7 +39,7 @@ async function scrapeGoodreadsBook(url: string, stats: ScrapeStats): Promise<Boo
   const bookId = generateBookId(url);
   info(`Starting scrape for ${bookId}`, { url }, { prefix: 'SCRAPER' });
   
-  let browser;
+  let browser: Browser | undefined;
   try {
     debug('Launching browser (headed mode for better compatibility)...', {}, { prefix: 'BROWSER' });
     browser = await chromium.launch({ 
@@ -323,9 +323,8 @@ async function scrapeGoodreadsBook(url: string, stats: ScrapeStats): Promise<Boo
           // Parse shelves from the page
           // Format: "fantasy 1,459 people" or "dark-fantasy 99 people"
           const shelfPattern = /([a-z0-9-]+)\s+([\d,]+)\s+people/gi;
-          let match;
-          
-          while ((match = shelfPattern.exec(bodyText)) !== null) {
+
+          for (const match of bodyText.matchAll(shelfPattern)) {
             const shelfName = match[1].toLowerCase().trim();
             const count = parseInt(match[2].replace(/,/g, ''));
             
