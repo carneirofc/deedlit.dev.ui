@@ -1,5 +1,8 @@
 # Generated-Image Library Stack
 
+Manages a local library of ComfyUI / Automatic1111 outputs: parse the metadata
+embedded in each file, filter by prompt/tags/parameters, and find similar images.
+
 Extends comfyhelper into a generated-image library with metadata extraction,
 graph relationship exploration, vector similarity search, optional external
 LLM/vision enrichment, REST APIs, and an MCP tool surface for external agents.

@@ -1,0 +1,1503 @@
+{
+  "configuration" : { },
+  "description" : "C4 model of the deedlit.dev monorepo: the public landing site plus ComfyHelper, a self-hosted generated-image library backed by a mesh of FastAPI services (database-per-service, HTTP-only).",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedDate" : "2026-07-14T22:01:27Z",
+  "model" : {
+    "deploymentNodes" : [ {
+      "children" : [ {
+        "containerInstances" : [ {
+          "containerId" : "8",
+          "environment" : "Local (Docker Compose)",
+          "id" : "60",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.webNode.40bc565c-0d99-4de2-9ccf-28d17d30ffb7"
+          },
+          "relationships" : [ {
+            "description" : "Reads via",
+            "destinationId" : "63",
+            "id" : "64",
+            "linkedRelationshipId" : "31",
+            "sourceId" : "60",
+            "technology" : "HTTPS / JSON"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "9",
+          "environment" : "Local (Docker Compose)",
+          "id" : "61",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.webNode.885a2a8b-1db6-4630-9140-7c717707a397"
+          },
+          "relationships" : [ {
+            "description" : "Reads & dispatches via",
+            "destinationId" : "63",
+            "id" : "65",
+            "linkedRelationshipId" : "32",
+            "sourceId" : "61",
+            "technology" : "HTTPS / JSON"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "npm workspace (Next.js)",
+        "environment" : "Local (Docker Compose)",
+        "id" : "59",
+        "instances" : "1",
+        "name" : "Web apps",
+        "properties" : {
+          "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.webNode"
+        },
+        "tags" : "Element,Deployment Node"
+      }, {
+        "children" : [ {
+          "containerInstances" : [ {
+            "containerId" : "17",
+            "environment" : "Local (Docker Compose)",
+            "id" : "86",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.gpuSvc.f10ef0f6-431f-4ffa-8e50-2245e781424b"
+            },
+            "tags" : "Container Instance"
+          } ],
+          "description" : "NVIDIA container runtime",
+          "environment" : "Local (Docker Compose)",
+          "id" : "85",
+          "instances" : "1",
+          "name" : "GPU (profile: vision | full)",
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.gpuSvc"
+          },
+          "tags" : "Element,Deployment Node"
+        } ],
+        "containerInstances" : [ {
+          "containerId" : "10",
+          "environment" : "Local (Docker Compose)",
+          "id" : "63",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.ddd50d1f-8e94-4f39-bb2d-87df928b6bd2"
+          },
+          "relationships" : [ {
+            "description" : "Aggregates records, ratings, notes, collections",
+            "destinationId" : "66",
+            "id" : "67",
+            "linkedRelationshipId" : "33",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Similar / semantic search",
+            "destinationId" : "68",
+            "id" : "69",
+            "linkedRelationshipId" : "34",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Neighbors / lineage",
+            "destinationId" : "70",
+            "id" : "71",
+            "linkedRelationshipId" : "35",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Dispatches ingest / reindex / delete jobs",
+            "destinationId" : "72",
+            "id" : "73",
+            "linkedRelationshipId" : "36",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          }, {
+            "description" : "On-demand extract",
+            "destinationId" : "77",
+            "id" : "78",
+            "linkedRelationshipId" : "37",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          }, {
+            "description" : "On-demand label",
+            "destinationId" : "80",
+            "id" : "81",
+            "linkedRelationshipId" : "38",
+            "sourceId" : "63",
+            "technology" : "HTTP"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "11",
+          "environment" : "Local (Docker Compose)",
+          "id" : "66",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.3df44c03-e0ec-49bb-8331-e71c8b6dbce4"
+          },
+          "relationships" : [ {
+            "description" : "Reads / writes",
+            "destinationId" : "89",
+            "id" : "90",
+            "linkedRelationshipId" : "52",
+            "sourceId" : "66",
+            "technology" : "SQL (asyncpg)"
+          }, {
+            "description" : "Stores / serves blobs",
+            "destinationId" : "93",
+            "id" : "94",
+            "linkedRelationshipId" : "53",
+            "sourceId" : "66",
+            "technology" : "S3"
+          }, {
+            "description" : "Caches image bytes",
+            "destinationId" : "97",
+            "id" : "98",
+            "linkedRelationshipId" : "54",
+            "sourceId" : "66",
+            "technology" : "RESP"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "12",
+          "environment" : "Local (Docker Compose)",
+          "id" : "68",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.a4075166-cff1-41d1-bf49-f6e3165e4c80"
+          },
+          "relationships" : [ {
+            "description" : "Reads / writes vectors",
+            "destinationId" : "100",
+            "id" : "101",
+            "linkedRelationshipId" : "55",
+            "sourceId" : "68",
+            "technology" : "HTTP/gRPC"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "13",
+          "environment" : "Local (Docker Compose)",
+          "id" : "70",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.a14abb7c-13bc-40a9-8ee5-4b6d602a1615"
+          },
+          "relationships" : [ {
+            "description" : "Reads / writes graph",
+            "destinationId" : "91",
+            "id" : "92",
+            "linkedRelationshipId" : "56",
+            "sourceId" : "70",
+            "technology" : "Bolt / Cypher"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "14",
+          "environment" : "Local (Docker Compose)",
+          "id" : "72",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.b5af47c5-5243-461c-867a-d487aa24c829"
+          },
+          "relationships" : [ {
+            "description" : "Writes record + thumbnail (durability boundary, first)",
+            "destinationId" : "66",
+            "id" : "74",
+            "linkedRelationshipId" : "43",
+            "sourceId" : "72",
+            "technology" : "HTTP POST"
+          }, {
+            "description" : "Upsert dense + sparse point",
+            "destinationId" : "68",
+            "id" : "75",
+            "linkedRelationshipId" : "44",
+            "sourceId" : "72",
+            "technology" : "HTTP POST"
+          }, {
+            "description" : "Upsert reference / tag / lineage edges",
+            "destinationId" : "70",
+            "id" : "76",
+            "linkedRelationshipId" : "45",
+            "sourceId" : "72",
+            "technology" : "HTTP POST"
+          }, {
+            "description" : "Extract embedded metadata",
+            "destinationId" : "77",
+            "id" : "79",
+            "linkedRelationshipId" : "41",
+            "sourceId" : "72",
+            "technology" : "HTTP POST /extract"
+          }, {
+            "description" : "Embed image (dense) + text (sparse)",
+            "destinationId" : "86",
+            "id" : "87",
+            "linkedRelationshipId" : "42",
+            "sourceId" : "72",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Publishes / consumes per-stage DAG messages",
+            "destinationId" : "95",
+            "id" : "96",
+            "linkedRelationshipId" : "46",
+            "sourceId" : "72",
+            "technology" : "AMQP"
+          }, {
+            "description" : "Scans folders, reads bytes",
+            "destinationId" : "105",
+            "id" : "106",
+            "linkedRelationshipId" : "39",
+            "sourceId" : "72",
+            "technology" : "filesystem (ro)"
+          } ],
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "15",
+          "environment" : "Local (Docker Compose)",
+          "id" : "77",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.1a3f81c9-ee7f-430b-a005-ff54335416d1"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "16",
+          "environment" : "Local (Docker Compose)",
+          "id" : "80",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode.2bcb69e1-c6d9-401d-b920-b5d2c38d6b8e"
+          },
+          "relationships" : [ {
+            "description" : "Patch description / safety / tags",
+            "destinationId" : "66",
+            "id" : "82",
+            "linkedRelationshipId" : "49",
+            "sourceId" : "80",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Re-embed on text change",
+            "destinationId" : "68",
+            "id" : "83",
+            "linkedRelationshipId" : "50",
+            "sourceId" : "80",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Re-index on tag change",
+            "destinationId" : "70",
+            "id" : "84",
+            "linkedRelationshipId" : "51",
+            "sourceId" : "80",
+            "technology" : "HTTP"
+          }, {
+            "description" : "Describe / safety / tags",
+            "destinationId" : "103",
+            "id" : "104",
+            "linkedRelationshipId" : "47",
+            "sourceId" : "80",
+            "technology" : "OpenAI /v1 (HTTP)"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "uv per-package venv; OTLP tracing to Alloy",
+        "environment" : "Local (Docker Compose)",
+        "id" : "62",
+        "instances" : "1",
+        "name" : "FastAPI services",
+        "properties" : {
+          "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.svcNode"
+        },
+        "tags" : "Element,Deployment Node"
+      }, {
+        "children" : [ {
+          "containerInstances" : [ {
+            "containerId" : "20",
+            "environment" : "Local (Docker Compose)",
+            "id" : "100",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.gpuData.08071286-c502-4274-8315-65fcd6855b27"
+            },
+            "tags" : "Container Instance"
+          } ],
+          "description" : "NVIDIA container runtime — HNSW index build",
+          "environment" : "Local (Docker Compose)",
+          "id" : "99",
+          "instances" : "1",
+          "name" : "GPU (device reservation)",
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.gpuData"
+          },
+          "tags" : "Element,Deployment Node"
+        } ],
+        "containerInstances" : [ {
+          "containerId" : "18",
+          "environment" : "Local (Docker Compose)",
+          "id" : "89",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.f006b973-93ca-45ed-b2aa-7b1ed9435495"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "21",
+          "environment" : "Local (Docker Compose)",
+          "id" : "91",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.bd07e65b-830e-4dc4-ba0a-0977be072f3b"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "19",
+          "environment" : "Local (Docker Compose)",
+          "id" : "93",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.a992f39d-2b4a-4cd3-a5df-8dc402d4749d"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "22",
+          "environment" : "Local (Docker Compose)",
+          "id" : "95",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.c43c9c14-ed69-4e32-8167-73e23bd799e9"
+          },
+          "tags" : "Container Instance"
+        }, {
+          "containerId" : "23",
+          "environment" : "Local (Docker Compose)",
+          "id" : "97",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode.9d820405-4828-43e4-b109-789f52e39214"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Persistent Docker volumes",
+        "environment" : "Local (Docker Compose)",
+        "id" : "88",
+        "instances" : "1",
+        "name" : "Datastores",
+        "properties" : {
+          "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host.dataNode"
+        },
+        "tags" : "Element,Deployment Node"
+      } ],
+      "description" : "Linux host running the 'deedlit' Compose project (docker compose up).",
+      "environment" : "Local (Docker Compose)",
+      "id" : "58",
+      "instances" : "1",
+      "name" : "Docker host",
+      "properties" : {
+        "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.host"
+      },
+      "tags" : "Element,Deployment Node"
+    }, {
+      "description" : "Reached from containers via host.docker.internal / bind mount.",
+      "environment" : "Local (Docker Compose)",
+      "id" : "102",
+      "instances" : "1",
+      "name" : "Host machine (outside Docker)",
+      "properties" : {
+        "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.hostMachine"
+      },
+      "softwareSystemInstances" : [ {
+        "environment" : "Local (Docker Compose)",
+        "id" : "103",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.hostMachine.1a93505a-20cc-49b5-acb6-b0a7701dfc93"
+        },
+        "softwareSystemId" : "5",
+        "tags" : "Software System Instance"
+      }, {
+        "environment" : "Local (Docker Compose)",
+        "id" : "105",
+        "instanceId" : 1,
+        "properties" : {
+          "structurizr.dsl.identifier" : "9a7ac610-4da0-4dae-a40b-f713b3f4ab8c.hostMachine.88f11c39-98c6-43d9-8bd4-6134928f6d78"
+        },
+        "softwareSystemId" : "4",
+        "tags" : "Software System Instance"
+      } ],
+      "tags" : "Element,Deployment Node"
+    } ],
+    "people" : [ {
+      "description" : "Generates images locally, then browses, searches and curates the library.",
+      "id" : "1",
+      "name" : "Self-hoster",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "relationships" : [ {
+        "description" : "Browses the site & services hub",
+        "destinationId" : "8",
+        "id" : "24",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Browses the site & services hub",
+        "destinationId" : "6",
+        "id" : "25",
+        "linkedRelationshipId" : "24",
+        "sourceId" : "1",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Searches & curates the library",
+        "destinationId" : "9",
+        "id" : "26",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Automated agent that drives the library through the MCP tool surface.",
+      "id" : "2",
+      "name" : "External AI agent",
+      "properties" : {
+        "structurizr.dsl.identifier" : "agent"
+      },
+      "relationships" : [ {
+        "description" : "Calls MCP tools",
+        "destinationId" : "10",
+        "id" : "27",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "MCP / JSON-RPC"
+      }, {
+        "description" : "Calls MCP tools",
+        "destinationId" : "6",
+        "id" : "28",
+        "linkedRelationshipId" : "27",
+        "sourceId" : "2",
+        "technology" : "MCP / JSON-RPC"
+      } ],
+      "tags" : "Element,Person,External"
+    } ],
+    "softwareSystems" : [ {
+      "description" : "Local image generators; write generated images with embedded prompt/params/workflow metadata into the library folder.",
+      "documentation" : { },
+      "id" : "3",
+      "name" : "ComfyUI / Automatic1111",
+      "properties" : {
+        "structurizr.dsl.identifier" : "comfy"
+      },
+      "relationships" : [ {
+        "description" : "Writes generated images + metadata",
+        "destinationId" : "4",
+        "id" : "57",
+        "sourceId" : "3",
+        "tags" : "Relationship",
+        "technology" : "filesystem"
+      } ],
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Local filesystem of generated outputs. Bind-mounted read-only into ingest containers at /library.",
+      "documentation" : { },
+      "id" : "4",
+      "name" : "Image library folder",
+      "properties" : {
+        "structurizr.dsl.identifier" : "library"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Local OpenAI-compatible vision LLM. Reached from containers via host.docker.internal.",
+      "documentation" : { },
+      "id" : "5",
+      "name" : "llama-server (llama.cpp)",
+      "properties" : {
+        "structurizr.dsl.identifier" : "llama"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "containers" : [ {
+        "description" : "Shared React component library. Build-time only — compiled into the two web apps, not a runtime service.",
+        "documentation" : { },
+        "id" : "7",
+        "name" : "@carneirofc/ui",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.ui"
+        },
+        "relationships" : [ {
+          "description" : "Provides components to",
+          "destinationId" : "8",
+          "id" : "29",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "build-time"
+        }, {
+          "description" : "Provides components to",
+          "destinationId" : "9",
+          "id" : "30",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "build-time"
+        } ],
+        "tags" : "Element,Container,Library",
+        "technology" : "TypeScript / React (build-time)"
+      }, {
+        "description" : "Public landing site: home / services hub, image gallery, reference book shelf. Port 3001.",
+        "documentation" : { },
+        "id" : "8",
+        "name" : "deedlit.dev",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.dev"
+        },
+        "relationships" : [ {
+          "description" : "Reads via",
+          "destinationId" : "10",
+          "id" : "31",
+          "sourceId" : "8",
+          "tags" : "Relationship",
+          "technology" : "HTTPS / JSON"
+        } ],
+        "tags" : "Element,Container,Web App",
+        "technology" : "Next.js"
+      }, {
+        "description" : "Image-library browser: hybrid search, tag/safety filters, Neo4j graph filter, admin/ingest pages. Talks only to the gateway. Port 3000.",
+        "documentation" : { },
+        "id" : "9",
+        "name" : "ComfyHelper UI",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.comfyhelper"
+        },
+        "relationships" : [ {
+          "description" : "Reads & dispatches via",
+          "destinationId" : "10",
+          "id" : "32",
+          "sourceId" : "9",
+          "tags" : "Relationship",
+          "technology" : "HTTPS / JSON"
+        } ],
+        "tags" : "Element,Container,Web App",
+        "technology" : "Next.js"
+      }, {
+        "description" : "Gateway / BFF: aggregate detail pages, host the MCP tool surface, dispatch ingest jobs. Owns no datastore; the single reader that fans across services. Port 8088.",
+        "documentation" : { },
+        "id" : "10",
+        "name" : "deedlit.api",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.api"
+        },
+        "relationships" : [ {
+          "description" : "Aggregates records, ratings, notes, collections",
+          "destinationId" : "11",
+          "id" : "33",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Similar / semantic search",
+          "destinationId" : "12",
+          "id" : "34",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Neighbors / lineage",
+          "destinationId" : "13",
+          "id" : "35",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Dispatches ingest / reindex / delete jobs",
+          "destinationId" : "14",
+          "id" : "36",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "On-demand extract",
+          "destinationId" : "15",
+          "id" : "37",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "On-demand label",
+          "destinationId" : "16",
+          "id" : "38",
+          "sourceId" : "10",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        } ],
+        "tags" : "Element,Container,Service",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Canonical truth: images, tags, params, references, ratings, notes, collections; thumbnails + cached embeddings. Sole writer of Postgres + RustFS. Port 8001.",
+        "documentation" : { },
+        "id" : "11",
+        "name" : "deedlit.catalog",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.catalog"
+        },
+        "relationships" : [ {
+          "description" : "Reads / writes",
+          "destinationId" : "18",
+          "id" : "52",
+          "sourceId" : "11",
+          "tags" : "Relationship",
+          "technology" : "SQL (asyncpg)"
+        }, {
+          "description" : "Stores / serves blobs",
+          "destinationId" : "19",
+          "id" : "53",
+          "sourceId" : "11",
+          "tags" : "Relationship",
+          "technology" : "S3"
+        }, {
+          "description" : "Caches image bytes",
+          "destinationId" : "23",
+          "id" : "54",
+          "sourceId" : "11",
+          "tags" : "Relationship",
+          "technology" : "RESP"
+        } ],
+        "tags" : "Element,Container,Service,Owner",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Dense (CLIP) + sparse (SPLADE) named vectors, RRF hybrid query. Sole writer of Qdrant; rebuildable projection of catalog. Port 8002.",
+        "documentation" : { },
+        "id" : "12",
+        "name" : "deedlit.search",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.search"
+        },
+        "relationships" : [ {
+          "description" : "Reads / writes vectors",
+          "destinationId" : "20",
+          "id" : "55",
+          "sourceId" : "12",
+          "tags" : "Relationship",
+          "technology" : "HTTP/gRPC"
+        } ],
+        "tags" : "Element,Container,Service,Owner",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Shared-asset, tag co-occurrence and lineage edges. Sole writer of Neo4j; rebuildable projection of catalog. Port 8003.",
+        "documentation" : { },
+        "id" : "13",
+        "name" : "deedlit.graph",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.graph"
+        },
+        "relationships" : [ {
+          "description" : "Reads / writes graph",
+          "destinationId" : "21",
+          "id" : "56",
+          "sourceId" : "13",
+          "tags" : "Relationship",
+          "technology" : "Bolt / Cypher"
+        } ],
+        "tags" : "Element,Container,Service,Owner",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Scan folder, sha256 / phash / dims / thumbnail; call metadata + vision; fan out writes. The only multi-service writer. Queue-driven per-stage DAG. Port 8004 (+ workers).",
+        "documentation" : { },
+        "id" : "14",
+        "name" : "deedlit.ingest",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.ingest"
+        },
+        "relationships" : [ {
+          "description" : "Scans folders, reads bytes",
+          "destinationId" : "4",
+          "id" : "39",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "filesystem (ro)"
+        }, {
+          "description" : "Extract embedded metadata",
+          "destinationId" : "15",
+          "id" : "41",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "HTTP POST /extract"
+        }, {
+          "description" : "Embed image (dense) + text (sparse)",
+          "destinationId" : "17",
+          "id" : "42",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Writes record + thumbnail (durability boundary, first)",
+          "destinationId" : "11",
+          "id" : "43",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "HTTP POST"
+        }, {
+          "description" : "Upsert dense + sparse point",
+          "destinationId" : "12",
+          "id" : "44",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "HTTP POST"
+        }, {
+          "description" : "Upsert reference / tag / lineage edges",
+          "destinationId" : "13",
+          "id" : "45",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "HTTP POST"
+        }, {
+          "description" : "Publishes / consumes per-stage DAG messages",
+          "destinationId" : "22",
+          "id" : "46",
+          "sourceId" : "14",
+          "tags" : "Relationship",
+          "technology" : "AMQP"
+        } ],
+        "tags" : "Element,Container,Service",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Bytes to embedded parse: prompt / negative / tags / params + resolved reference graph. No datastore. Port 8005.",
+        "documentation" : { },
+        "id" : "15",
+        "name" : "deedlit.metadata",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.metadata"
+        },
+        "tags" : "Element,Container,Service",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "Vision-LLM describe / safety / tags via a local llama-server. No datastore. Port 8006.",
+        "documentation" : { },
+        "id" : "16",
+        "name" : "deedlit.labelagent",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.labelagent"
+        },
+        "relationships" : [ {
+          "description" : "Describe / safety / tags",
+          "destinationId" : "5",
+          "id" : "47",
+          "sourceId" : "16",
+          "tags" : "Relationship",
+          "technology" : "OpenAI /v1 (HTTP)"
+        }, {
+          "description" : "Patch description / safety / tags",
+          "destinationId" : "11",
+          "id" : "49",
+          "sourceId" : "16",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Re-embed on text change",
+          "destinationId" : "12",
+          "id" : "50",
+          "sourceId" : "16",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        }, {
+          "description" : "Re-index on tag change",
+          "destinationId" : "13",
+          "id" : "51",
+          "sourceId" : "16",
+          "tags" : "Relationship",
+          "technology" : "HTTP"
+        } ],
+        "tags" : "Element,Container,Service",
+        "technology" : "FastAPI (Python)"
+      }, {
+        "description" : "CLIP dense (image/text, 1024-dim) + SPLADE sparse embeddings. GPU. No datastore. Port 8000.",
+        "documentation" : { },
+        "id" : "17",
+        "name" : "deedlit.vision",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.vision"
+        },
+        "tags" : "Element,Container,Service",
+        "technology" : "FastAPI (Python), GPU"
+      }, {
+        "description" : "Catalog canonical truth + ingest durability layer (inventories, task ledger, job history, settings). Port 5432.",
+        "documentation" : { },
+        "id" : "18",
+        "name" : "PostgreSQL",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.postgres"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "PostgreSQL 16"
+      }, {
+        "description" : "S3-compatible blob storage: thumbnails + cached embeddings. Ports 9000/9001.",
+        "documentation" : { },
+        "id" : "19",
+        "name" : "RustFS",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.rustfs"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "RustFS (S3)"
+      }, {
+        "description" : "Vector store: dense + sparse named vectors, HNSW (GPU index build). Ports 6333/6334.",
+        "documentation" : { },
+        "id" : "20",
+        "name" : "Qdrant",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.qdrant"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "Qdrant"
+      }, {
+        "description" : "Relationship graph: shared assets, tag co-occurrence, lineage. Ports 7474/7687.",
+        "documentation" : { },
+        "id" : "21",
+        "name" : "Neo4j",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.neo4j"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "Neo4j 5"
+      }, {
+        "description" : "Broker for the per-stage ingest DAG (choreography, no orchestrator). Ports 5672/15672.",
+        "documentation" : { },
+        "id" : "22",
+        "name" : "RabbitMQ",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.rabbitmq"
+        },
+        "tags" : "Element,Container,Queue",
+        "technology" : "RabbitMQ"
+      }, {
+        "description" : "Bounded LRU hot cache for image bytes in front of RustFS. Port 6379.",
+        "documentation" : { },
+        "id" : "23",
+        "name" : "Redis",
+        "properties" : {
+          "structurizr.dsl.identifier" : "deedlit.redis"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "Redis 7"
+      } ],
+      "description" : "Self-hosted generated-image library plus public landing site.",
+      "documentation" : { },
+      "id" : "6",
+      "name" : "deedlit.dev",
+      "properties" : {
+        "structurizr.dsl.identifier" : "deedlit"
+      },
+      "relationships" : [ {
+        "description" : "Scans folders, reads bytes",
+        "destinationId" : "4",
+        "id" : "40",
+        "linkedRelationshipId" : "39",
+        "sourceId" : "6",
+        "technology" : "filesystem (ro)"
+      }, {
+        "description" : "Describe / safety / tags",
+        "destinationId" : "5",
+        "id" : "48",
+        "linkedRelationshipId" : "47",
+        "sourceId" : "6",
+        "technology" : "OpenAI /v1 (HTTP)"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "deedlit.dev",
+  "properties" : {
+    "structurizr.inspection.error" : "10",
+    "structurizr.dsl" : "d29ya3NwYWNlICJkZWVkbGl0LmRldiIgIkM0IG1vZGVsIG9mIHRoZSBkZWVkbGl0LmRldiBtb25vcmVwbzogdGhlIHB1YmxpYyBsYW5kaW5nIHNpdGUgcGx1cyBDb21meUhlbHBlciwgYSBzZWxmLWhvc3RlZCBnZW5lcmF0ZWQtaW1hZ2UgbGlicmFyeSBiYWNrZWQgYnkgYSBtZXNoIG9mIEZhc3RBUEkgc2VydmljZXMgKGRhdGFiYXNlLXBlci1zZXJ2aWNlLCBIVFRQLW9ubHkpLiIgewoKICAgICFpZGVudGlmaWVycyBoaWVyYXJjaGljYWwKCiAgICBtb2RlbCB7CiAgICAgICAgIyAtLS0gUGVvcGxlIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIHVzZXIgPSBwZXJzb24gIlNlbGYtaG9zdGVyIiAiR2VuZXJhdGVzIGltYWdlcyBsb2NhbGx5LCB0aGVuIGJyb3dzZXMsIHNlYXJjaGVzIGFuZCBjdXJhdGVzIHRoZSBsaWJyYXJ5LiIKICAgICAgICBhZ2VudCA9IHBlcnNvbiAiRXh0ZXJuYWwgQUkgYWdlbnQiICJBdXRvbWF0ZWQgYWdlbnQgdGhhdCBkcml2ZXMgdGhlIGxpYnJhcnkgdGhyb3VnaCB0aGUgTUNQIHRvb2wgc3VyZmFjZS4iICJFeHRlcm5hbCIKCiAgICAgICAgIyAtLS0gRXh0ZXJuYWwgc3lzdGVtcyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgY29tZnkgPSBzb2Z0d2FyZVN5c3RlbSAiQ29tZnlVSSAvIEF1dG9tYXRpYzExMTEiICJMb2NhbCBpbWFnZSBnZW5lcmF0b3JzOyB3cml0ZSBnZW5lcmF0ZWQgaW1hZ2VzIHdpdGggZW1iZWRkZWQgcHJvbXB0L3BhcmFtcy93b3JrZmxvdyBtZXRhZGF0YSBpbnRvIHRoZSBsaWJyYXJ5IGZvbGRlci4iIHsKICAgICAgICAgICAgdGFncyAiRXh0ZXJuYWwiCiAgICAgICAgfQogICAgICAgIGxpYnJhcnkgPSBzb2Z0d2FyZVN5c3RlbSAiSW1hZ2UgbGlicmFyeSBmb2xkZXIiICJMb2NhbCBmaWxlc3lzdGVtIG9mIGdlbmVyYXRlZCBvdXRwdXRzLiBCaW5kLW1vdW50ZWQgcmVhZC1vbmx5IGludG8gaW5nZXN0IGNvbnRhaW5lcnMgYXQgL2xpYnJhcnkuIiB7CiAgICAgICAgICAgIHRhZ3MgIkV4dGVybmFsIgogICAgICAgIH0KICAgICAgICBsbGFtYSA9IHNvZnR3YXJlU3lzdGVtICJsbGFtYS1zZXJ2ZXIgKGxsYW1hLmNwcCkiICJMb2NhbCBPcGVuQUktY29tcGF0aWJsZSB2aXNpb24gTExNLiBSZWFjaGVkIGZyb20gY29udGFpbmVycyB2aWEgaG9zdC5kb2NrZXIuaW50ZXJuYWwuIiB7CiAgICAgICAgICAgIHRhZ3MgIkV4dGVybmFsIgogICAgICAgIH0KCiAgICAgICAgIyAtLS0gVGhlIHN5c3RlbSAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIGRlZWRsaXQgPSBzb2Z0d2FyZVN5c3RlbSAiZGVlZGxpdC5kZXYiICJTZWxmLWhvc3RlZCBnZW5lcmF0ZWQtaW1hZ2UgbGlicmFyeSBwbHVzIHB1YmxpYyBsYW5kaW5nIHNpdGUuIiB7CgogICAgICAgICAgICAjIFdlYiBhcHBzIChucG0gd29ya3NwYWNlKSAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgICAgICB1aSA9IGNvbnRhaW5lciAiQGNhcm5laXJvZmMvdWkiICJTaGFyZWQgUmVhY3QgY29tcG9uZW50IGxpYnJhcnkuIEJ1aWxkLXRpbWUgb25seSDigJQgY29tcGlsZWQgaW50byB0aGUgdHdvIHdlYiBhcHBzLCBub3QgYSBydW50aW1lIHNlcnZpY2UuIiAiVHlwZVNjcmlwdCAvIFJlYWN0IChidWlsZC10aW1lKSIgewogICAgICAgICAgICAgICAgdGFncyAiTGlicmFyeSIKICAgICAgICAgICAgfQogICAgICAgICAgICBkZXYgPSBjb250YWluZXIgImRlZWRsaXQuZGV2IiAiUHVibGljIGxhbmRpbmcgc2l0ZTogaG9tZSAvIHNlcnZpY2VzIGh1YiwgaW1hZ2UgZ2FsbGVyeSwgcmVmZXJlbmNlIGJvb2sgc2hlbGYuIFBvcnQgMzAwMS4iICJOZXh0LmpzIiB7CiAgICAgICAgICAgICAgICB0YWdzICJXZWIgQXBwIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGNvbWZ5aGVscGVyID0gY29udGFpbmVyICJDb21meUhlbHBlciBVSSIgIkltYWdlLWxpYnJhcnkgYnJvd3NlcjogaHlicmlkIHNlYXJjaCwgdGFnL3NhZmV0eSBmaWx0ZXJzLCBOZW80aiBncmFwaCBmaWx0ZXIsIGFkbWluL2luZ2VzdCBwYWdlcy4gVGFsa3Mgb25seSB0byB0aGUgZ2F0ZXdheS4gUG9ydCAzMDAwLiIgIk5leHQuanMiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIldlYiBBcHAiCiAgICAgICAgICAgIH0KCiAgICAgICAgICAgICMgU2VydmljZXMgKEZhc3RBUEksIHV2IHBlci1wYWNrYWdlIHZlbnYpIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgICAgIGFwaSA9IGNvbnRhaW5lciAiZGVlZGxpdC5hcGkiICJHYXRld2F5IC8gQkZGOiBhZ2dyZWdhdGUgZGV0YWlsIHBhZ2VzLCBob3N0IHRoZSBNQ1AgdG9vbCBzdXJmYWNlLCBkaXNwYXRjaCBpbmdlc3Qgam9icy4gT3ducyBubyBkYXRhc3RvcmU7IHRoZSBzaW5nbGUgcmVhZGVyIHRoYXQgZmFucyBhY3Jvc3Mgc2VydmljZXMuIFBvcnQgODA4OC4iICJGYXN0QVBJIChQeXRob24pIiB7CiAgICAgICAgICAgICAgICB0YWdzICJTZXJ2aWNlIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGNhdGFsb2cgPSBjb250YWluZXIgImRlZWRsaXQuY2F0YWxvZyIgIkNhbm9uaWNhbCB0cnV0aDogaW1hZ2VzLCB0YWdzLCBwYXJhbXMsIHJlZmVyZW5jZXMsIHJhdGluZ3MsIG5vdGVzLCBjb2xsZWN0aW9uczsgdGh1bWJuYWlscyArIGNhY2hlZCBlbWJlZGRpbmdzLiBTb2xlIHdyaXRlciBvZiBQb3N0Z3JlcyArIFJ1c3RGUy4gUG9ydCA4MDAxLiIgIkZhc3RBUEkgKFB5dGhvbikiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIlNlcnZpY2UiICJPd25lciIKICAgICAgICAgICAgfQogICAgICAgICAgICBzZWFyY2ggPSBjb250YWluZXIgImRlZWRsaXQuc2VhcmNoIiAiRGVuc2UgKENMSVApICsgc3BhcnNlIChTUExBREUpIG5hbWVkIHZlY3RvcnMsIFJSRiBoeWJyaWQgcXVlcnkuIFNvbGUgd3JpdGVyIG9mIFFkcmFudDsgcmVidWlsZGFibGUgcHJvamVjdGlvbiBvZiBjYXRhbG9nLiBQb3J0IDgwMDIuIiAiRmFzdEFQSSAoUHl0aG9uKSIgewogICAgICAgICAgICAgICAgdGFncyAiU2VydmljZSIgIk93bmVyIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGdyYXBoID0gY29udGFpbmVyICJkZWVkbGl0LmdyYXBoIiAiU2hhcmVkLWFzc2V0LCB0YWcgY28tb2NjdXJyZW5jZSBhbmQgbGluZWFnZSBlZGdlcy4gU29sZSB3cml0ZXIgb2YgTmVvNGo7IHJlYnVpbGRhYmxlIHByb2plY3Rpb24gb2YgY2F0YWxvZy4gUG9ydCA4MDAzLiIgIkZhc3RBUEkgKFB5dGhvbikiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIlNlcnZpY2UiICJPd25lciIKICAgICAgICAgICAgfQogICAgICAgICAgICBpbmdlc3QgPSBjb250YWluZXIgImRlZWRsaXQuaW5nZXN0IiAiU2NhbiBmb2xkZXIsIHNoYTI1NiAvIHBoYXNoIC8gZGltcyAvIHRodW1ibmFpbDsgY2FsbCBtZXRhZGF0YSArIHZpc2lvbjsgZmFuIG91dCB3cml0ZXMuIFRoZSBvbmx5IG11bHRpLXNlcnZpY2Ugd3JpdGVyLiBRdWV1ZS1kcml2ZW4gcGVyLXN0YWdlIERBRy4gUG9ydCA4MDA0ICgrIHdvcmtlcnMpLiIgIkZhc3RBUEkgKFB5dGhvbikiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIlNlcnZpY2UiCiAgICAgICAgICAgIH0KICAgICAgICAgICAgbWV0YWRhdGEgPSBjb250YWluZXIgImRlZWRsaXQubWV0YWRhdGEiICJCeXRlcyB0byBlbWJlZGRlZCBwYXJzZTogcHJvbXB0IC8gbmVnYXRpdmUgLyB0YWdzIC8gcGFyYW1zICsgcmVzb2x2ZWQgcmVmZXJlbmNlIGdyYXBoLiBObyBkYXRhc3RvcmUuIFBvcnQgODAwNS4iICJGYXN0QVBJIChQeXRob24pIiB7CiAgICAgICAgICAgICAgICB0YWdzICJTZXJ2aWNlIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGxhYmVsYWdlbnQgPSBjb250YWluZXIgImRlZWRsaXQubGFiZWxhZ2VudCIgIlZpc2lvbi1MTE0gZGVzY3JpYmUgLyBzYWZldHkgLyB0YWdzIHZpYSBhIGxvY2FsIGxsYW1hLXNlcnZlci4gTm8gZGF0YXN0b3JlLiBQb3J0IDgwMDYuIiAiRmFzdEFQSSAoUHl0aG9uKSIgewogICAgICAgICAgICAgICAgdGFncyAiU2VydmljZSIKICAgICAgICAgICAgfQogICAgICAgICAgICB2aXNpb24gPSBjb250YWluZXIgImRlZWRsaXQudmlzaW9uIiAiQ0xJUCBkZW5zZSAoaW1hZ2UvdGV4dCwgMTAyNC1kaW0pICsgU1BMQURFIHNwYXJzZSBlbWJlZGRpbmdzLiBHUFUuIE5vIGRhdGFzdG9yZS4gUG9ydCA4MDAwLiIgIkZhc3RBUEkgKFB5dGhvbiksIEdQVSIgewogICAgICAgICAgICAgICAgdGFncyAiU2VydmljZSIKICAgICAgICAgICAgfQoKICAgICAgICAgICAgIyBEYXRhc3RvcmVzICYgaW5mcmEgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICAgICAgICAgICAgcG9zdGdyZXMgPSBjb250YWluZXIgIlBvc3RncmVTUUwiICJDYXRhbG9nIGNhbm9uaWNhbCB0cnV0aCArIGluZ2VzdCBkdXJhYmlsaXR5IGxheWVyIChpbnZlbnRvcmllcywgdGFzayBsZWRnZXIsIGpvYiBoaXN0b3J5LCBzZXR0aW5ncykuIFBvcnQgNTQzMi4iICJQb3N0Z3JlU1FMIDE2IiB7CiAgICAgICAgICAgICAgICB0YWdzICJEYXRhYmFzZSIKICAgICAgICAgICAgfQogICAgICAgICAgICBydXN0ZnMgPSBjb250YWluZXIgIlJ1c3RGUyIgIlMzLWNvbXBhdGlibGUgYmxvYiBzdG9yYWdlOiB0aHVtYm5haWxzICsgY2FjaGVkIGVtYmVkZGluZ3MuIFBvcnRzIDkwMDAvOTAwMS4iICJSdXN0RlMgKFMzKSIgewogICAgICAgICAgICAgICAgdGFncyAiRGF0YWJhc2UiCiAgICAgICAgICAgIH0KICAgICAgICAgICAgcWRyYW50ID0gY29udGFpbmVyICJRZHJhbnQiICJWZWN0b3Igc3RvcmU6IGRlbnNlICsgc3BhcnNlIG5hbWVkIHZlY3RvcnMsIEhOU1cgKEdQVSBpbmRleCBidWlsZCkuIFBvcnRzIDYzMzMvNjMzNC4iICJRZHJhbnQiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIkRhdGFiYXNlIgogICAgICAgICAgICB9CiAgICAgICAgICAgIG5lbzRqID0gY29udGFpbmVyICJOZW80aiIgIlJlbGF0aW9uc2hpcCBncmFwaDogc2hhcmVkIGFzc2V0cywgdGFnIGNvLW9jY3VycmVuY2UsIGxpbmVhZ2UuIFBvcnRzIDc0NzQvNzY4Ny4iICJOZW80aiA1IiB7CiAgICAgICAgICAgICAgICB0YWdzICJEYXRhYmFzZSIKICAgICAgICAgICAgfQogICAgICAgICAgICByYWJiaXRtcSA9IGNvbnRhaW5lciAiUmFiYml0TVEiICJCcm9rZXIgZm9yIHRoZSBwZXItc3RhZ2UgaW5nZXN0IERBRyAoY2hvcmVvZ3JhcGh5LCBubyBvcmNoZXN0cmF0b3IpLiBQb3J0cyA1NjcyLzE1NjcyLiIgIlJhYmJpdE1RIiB7CiAgICAgICAgICAgICAgICB0YWdzICJRdWV1ZSIKICAgICAgICAgICAgfQogICAgICAgICAgICByZWRpcyA9IGNvbnRhaW5lciAiUmVkaXMiICJCb3VuZGVkIExSVSBob3QgY2FjaGUgZm9yIGltYWdlIGJ5dGVzIGluIGZyb250IG9mIFJ1c3RGUy4gUG9ydCA2Mzc5LiIgIlJlZGlzIDciIHsKICAgICAgICAgICAgICAgIHRhZ3MgIkRhdGFiYXNlIgogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICAjIC0tLSBSZWxhdGlvbnNoaXBzIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAgICAgIyBQZW9wbGUgLT4gd2ViIGFwcHMgLyBNQ1AKICAgICAgICB1c2VyIC0+IGRlZWRsaXQuZGV2ICJCcm93c2VzIHRoZSBzaXRlICYgc2VydmljZXMgaHViIiAiSFRUUFMiCiAgICAgICAgdXNlciAtPiBkZWVkbGl0LmNvbWZ5aGVscGVyICJTZWFyY2hlcyAmIGN1cmF0ZXMgdGhlIGxpYnJhcnkiICJIVFRQUyIKICAgICAgICBhZ2VudCAtPiBkZWVkbGl0LmFwaSAiQ2FsbHMgTUNQIHRvb2xzIiAiTUNQIC8gSlNPTi1SUEMiCgogICAgICAgICMgU2hhcmVkIFVJIGlzIGNvbXBpbGVkIGludG8gdGhlIHdlYiBhcHBzCiAgICAgICAgZGVlZGxpdC51aSAtPiBkZWVkbGl0LmRldiAiUHJvdmlkZXMgY29tcG9uZW50cyB0byIgImJ1aWxkLXRpbWUiCiAgICAgICAgZGVlZGxpdC51aSAtPiBkZWVkbGl0LmNvbWZ5aGVscGVyICJQcm92aWRlcyBjb21wb25lbnRzIHRvIiAiYnVpbGQtdGltZSIKCiAgICAgICAgIyBGcm9udGVuZHMgdGFsayBvbmx5IHRvIHRoZSBCRkYKICAgICAgICBkZWVkbGl0LmRldiAtPiBkZWVkbGl0LmFwaSAiUmVhZHMgdmlhIiAiSFRUUFMgLyBKU09OIgogICAgICAgIGRlZWRsaXQuY29tZnloZWxwZXIgLT4gZGVlZGxpdC5hcGkgIlJlYWRzICYgZGlzcGF0Y2hlcyB2aWEiICJIVFRQUyAvIEpTT04iCgogICAgICAgICMgR2F0ZXdheSBmYW4tb3V0ICh0aGUgb25seSByZWFkZXIgYWNyb3NzIHNlcnZpY2VzKQogICAgICAgIGRlZWRsaXQuYXBpIC0+IGRlZWRsaXQuY2F0YWxvZyAiQWdncmVnYXRlcyByZWNvcmRzLCByYXRpbmdzLCBub3RlcywgY29sbGVjdGlvbnMiICJIVFRQIgogICAgICAgIGRlZWRsaXQuYXBpIC0+IGRlZWRsaXQuc2VhcmNoICJTaW1pbGFyIC8gc2VtYW50aWMgc2VhcmNoIiAiSFRUUCIKICAgICAgICBkZWVkbGl0LmFwaSAtPiBkZWVkbGl0LmdyYXBoICJOZWlnaGJvcnMgLyBsaW5lYWdlIiAiSFRUUCIKICAgICAgICBkZWVkbGl0LmFwaSAtPiBkZWVkbGl0LmluZ2VzdCAiRGlzcGF0Y2hlcyBpbmdlc3QgLyByZWluZGV4IC8gZGVsZXRlIGpvYnMiICJIVFRQIgogICAgICAgIGRlZWRsaXQuYXBpIC0+IGRlZWRsaXQubWV0YWRhdGEgIk9uLWRlbWFuZCBleHRyYWN0IiAiSFRUUCIKICAgICAgICBkZWVkbGl0LmFwaSAtPiBkZWVkbGl0LmxhYmVsYWdlbnQgIk9uLWRlbWFuZCBsYWJlbCIgIkhUVFAiCgogICAgICAgICMgSW5nZXN0IERBRyAodGhlIG9ubHkgbXVsdGktc2VydmljZSB3cml0ZXIpCiAgICAgICAgZGVlZGxpdC5pbmdlc3QgLT4gbGlicmFyeSAiU2NhbnMgZm9sZGVycywgcmVhZHMgYnl0ZXMiICJmaWxlc3lzdGVtIChybykiCiAgICAgICAgZGVlZGxpdC5pbmdlc3QgLT4gZGVlZGxpdC5tZXRhZGF0YSAiRXh0cmFjdCBlbWJlZGRlZCBtZXRhZGF0YSIgIkhUVFAgUE9TVCAvZXh0cmFjdCIKICAgICAgICBkZWVkbGl0LmluZ2VzdCAtPiBkZWVkbGl0LnZpc2lvbiAiRW1iZWQgaW1hZ2UgKGRlbnNlKSArIHRleHQgKHNwYXJzZSkiICJIVFRQIgogICAgICAgIGRlZWRsaXQuaW5nZXN0IC0+IGRlZWRsaXQuY2F0YWxvZyAiV3JpdGVzIHJlY29yZCArIHRodW1ibmFpbCAoZHVyYWJpbGl0eSBib3VuZGFyeSwgZmlyc3QpIiAiSFRUUCBQT1NUIgogICAgICAgIGRlZWRsaXQuaW5nZXN0IC0+IGRlZWRsaXQuc2VhcmNoICJVcHNlcnQgZGVuc2UgKyBzcGFyc2UgcG9pbnQiICJIVFRQIFBPU1QiCiAgICAgICAgZGVlZGxpdC5pbmdlc3QgLT4gZGVlZGxpdC5ncmFwaCAiVXBzZXJ0IHJlZmVyZW5jZSAvIHRhZyAvIGxpbmVhZ2UgZWRnZXMiICJIVFRQIFBPU1QiCiAgICAgICAgZGVlZGxpdC5pbmdlc3QgLT4gZGVlZGxpdC5yYWJiaXRtcSAiUHVibGlzaGVzIC8gY29uc3VtZXMgcGVyLXN0YWdlIERBRyBtZXNzYWdlcyIgIkFNUVAiCgogICAgICAgICMgTGFiZWxsaW5nCiAgICAgICAgZGVlZGxpdC5sYWJlbGFnZW50IC0+IGxsYW1hICJEZXNjcmliZSAvIHNhZmV0eSAvIHRhZ3MiICJPcGVuQUkgL3YxIChIVFRQKSIKICAgICAgICBkZWVkbGl0LmxhYmVsYWdlbnQgLT4gZGVlZGxpdC5jYXRhbG9nICJQYXRjaCBkZXNjcmlwdGlvbiAvIHNhZmV0eSAvIHRhZ3MiICJIVFRQIgogICAgICAgIGRlZWRsaXQubGFiZWxhZ2VudCAtPiBkZWVkbGl0LnNlYXJjaCAiUmUtZW1iZWQgb24gdGV4dCBjaGFuZ2UiICJIVFRQIgogICAgICAgIGRlZWRsaXQubGFiZWxhZ2VudCAtPiBkZWVkbGl0LmdyYXBoICJSZS1pbmRleCBvbiB0YWcgY2hhbmdlIiAiSFRUUCIKCiAgICAgICAgIyBPd25lcnMgLT4gdGhlaXIgc3RvcmVzIChvd25lcnMgbmV2ZXIgY2FsbCBlYWNoIG90aGVyKQogICAgICAgIGRlZWRsaXQuY2F0YWxvZyAtPiBkZWVkbGl0LnBvc3RncmVzICJSZWFkcyAvIHdyaXRlcyIgIlNRTCAoYXN5bmNwZykiCiAgICAgICAgZGVlZGxpdC5jYXRhbG9nIC0+IGRlZWRsaXQucnVzdGZzICJTdG9yZXMgLyBzZXJ2ZXMgYmxvYnMiICJTMyIKICAgICAgICBkZWVkbGl0LmNhdGFsb2cgLT4gZGVlZGxpdC5yZWRpcyAiQ2FjaGVzIGltYWdlIGJ5dGVzIiAiUkVTUCIKICAgICAgICBkZWVkbGl0LnNlYXJjaCAtPiBkZWVkbGl0LnFkcmFudCAiUmVhZHMgLyB3cml0ZXMgdmVjdG9ycyIgIkhUVFAvZ1JQQyIKICAgICAgICBkZWVkbGl0LmdyYXBoIC0+IGRlZWRsaXQubmVvNGogIlJlYWRzIC8gd3JpdGVzIGdyYXBoIiAiQm9sdCAvIEN5cGhlciIKCiAgICAgICAgIyBFeHRlcm5hbCBwcm9kdWNlcgogICAgICAgIGNvbWZ5IC0+IGxpYnJhcnkgIldyaXRlcyBnZW5lcmF0ZWQgaW1hZ2VzICsgbWV0YWRhdGEiICJmaWxlc3lzdGVtIgoKICAgICAgICAjIC0tLSBEZXBsb3ltZW50OiBsb2NhbCBEb2NrZXIgQ29tcG9zZSAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICAgICAgICBkZXBsb3ltZW50RW52aXJvbm1lbnQgIkxvY2FsIChEb2NrZXIgQ29tcG9zZSkiIHsKICAgICAgICAgICAgaG9zdCA9IGRlcGxveW1lbnROb2RlICJEb2NrZXIgaG9zdCIgIkxpbnV4IGhvc3QgcnVubmluZyB0aGUgJ2RlZWRsaXQnIENvbXBvc2UgcHJvamVjdCAoZG9ja2VyIGNvbXBvc2UgdXApLiIgewoKICAgICAgICAgICAgICAgIHdlYk5vZGUgPSBkZXBsb3ltZW50Tm9kZSAiV2ViIGFwcHMiICJucG0gd29ya3NwYWNlIChOZXh0LmpzKSIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQuZGV2CiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5jb21meWhlbHBlcgogICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgIHN2Y05vZGUgPSBkZXBsb3ltZW50Tm9kZSAiRmFzdEFQSSBzZXJ2aWNlcyIgInV2IHBlci1wYWNrYWdlIHZlbnY7IE9UTFAgdHJhY2luZyB0byBBbGxveSIgewogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQuYXBpCiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5jYXRhbG9nCiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5zZWFyY2gKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSBkZWVkbGl0LmdyYXBoCiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5pbmdlc3QKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSBkZWVkbGl0Lm1ldGFkYXRhCiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5sYWJlbGFnZW50CgogICAgICAgICAgICAgICAgICAgIGdwdVN2YyA9IGRlcGxveW1lbnROb2RlICJHUFUgKHByb2ZpbGU6IHZpc2lvbiB8IGZ1bGwpIiAiTlZJRElBIGNvbnRhaW5lciBydW50aW1lIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQudmlzaW9uCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgIGRhdGFOb2RlID0gZGVwbG95bWVudE5vZGUgIkRhdGFzdG9yZXMiICJQZXJzaXN0ZW50IERvY2tlciB2b2x1bWVzIiB7CiAgICAgICAgICAgICAgICAgICAgY29udGFpbmVySW5zdGFuY2UgZGVlZGxpdC5wb3N0Z3JlcwogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQubmVvNGoKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSBkZWVkbGl0LnJ1c3RmcwogICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQucmFiYml0bXEKICAgICAgICAgICAgICAgICAgICBjb250YWluZXJJbnN0YW5jZSBkZWVkbGl0LnJlZGlzCgogICAgICAgICAgICAgICAgICAgIGdwdURhdGEgPSBkZXBsb3ltZW50Tm9kZSAiR1BVIChkZXZpY2UgcmVzZXJ2YXRpb24pIiAiTlZJRElBIGNvbnRhaW5lciBydW50aW1lIOKAlCBITlNXIGluZGV4IGJ1aWxkIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIGNvbnRhaW5lckluc3RhbmNlIGRlZWRsaXQucWRyYW50CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CgogICAgICAgICAgICBob3N0TWFjaGluZSA9IGRlcGxveW1lbnROb2RlICJIb3N0IG1hY2hpbmUgKG91dHNpZGUgRG9ja2VyKSIgIlJlYWNoZWQgZnJvbSBjb250YWluZXJzIHZpYSBob3N0LmRvY2tlci5pbnRlcm5hbCAvIGJpbmQgbW91bnQuIiB7CiAgICAgICAgICAgICAgICBzb2Z0d2FyZVN5c3RlbUluc3RhbmNlIGxsYW1hCiAgICAgICAgICAgICAgICBzb2Z0d2FyZVN5c3RlbUluc3RhbmNlIGxpYnJhcnkKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KCiAgICB2aWV3cyB7CiAgICAgICAgc3lzdGVtQ29udGV4dCBkZWVkbGl0ICJTeXN0ZW1Db250ZXh0IiAiV2hvIGFuZCB3aGF0IGRlZWRsaXQuZGV2IHRhbGtzIHRvLiIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29udGFpbmVyIGRlZWRsaXQgIkNvbnRhaW5lcnMiICJXZWIgYXBwcywgRmFzdEFQSSBzZXJ2aWNlcyBhbmQgZGF0YXN0b3JlcyBpbnNpZGUgZGVlZGxpdC5kZXYuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkeW5hbWljIGRlZWRsaXQgIkluZ2VzdERBRyIgIkluZ2VzdGluZyBhIG5ldyBpbWFnZTogcXVldWUtZHJpdmVuIHBlci1zdGFnZSBEQUcuIENhdGFsb2cgaXMgdGhlIGR1cmFiaWxpdHkgYm91bmRhcnkgKHdyaXR0ZW4gZmlyc3QpOyBzZWFyY2gvZ3JhcGggYXJlIHJlYnVpbGRhYmxlIHByb2plY3Rpb25zLiIgewogICAgICAgICAgICBjb21meSAtPiBsaWJyYXJ5ICIxLiBXcml0ZXMgYSBnZW5lcmF0ZWQgaW1hZ2UgKyBlbWJlZGRlZCBtZXRhZGF0YSIKICAgICAgICAgICAgZGVlZGxpdC5pbmdlc3QgLT4gbGlicmFyeSAiMi4gU2NhbnMgZm9sZGVyOyBjb21wdXRlcyBzaGEyNTYgKGNyb3NzLXNlcnZpY2UgaWQpLCBwaGFzaCwgZGltcywgdGh1bWJuYWlsIgogICAgICAgICAgICBkZWVkbGl0LmluZ2VzdCAtPiBkZWVkbGl0Lm1ldGFkYXRhICIzLiBFeHRyYWN0IHByb21wdCAvIHRhZ3MgLyBwYXJhbXMgKyByZWZlcmVuY2UgZ3JhcGgiCiAgICAgICAgICAgIGRlZWRsaXQuaW5nZXN0IC0+IGRlZWRsaXQudmlzaW9uICI0LiBFbWJlZCBkZW5zZSAoQ0xJUCkgKyBzcGFyc2UgKFNQTEFERSkiCiAgICAgICAgICAgIGRlZWRsaXQuaW5nZXN0IC0+IGRlZWRsaXQuY2F0YWxvZyAiNS4gV3JpdGUgcmVjb3JkICsgdGh1bWJuYWlsIChyZW5kZXp2b3VzIC8gZHVyYWJpbGl0eSBmaXJzdCkiCiAgICAgICAgICAgIGRlZWRsaXQuaW5nZXN0IC0+IGRlZWRsaXQuc2VhcmNoICI2LiBVcHNlcnQgZGVuc2UgKyBzcGFyc2UgdmVjdG9yIHBvaW50IgogICAgICAgICAgICBkZWVkbGl0LmluZ2VzdCAtPiBkZWVkbGl0LmdyYXBoICI3LiBVcHNlcnQgcmVmZXJlbmNlIC8gdGFnIC8gbGluZWFnZSBlZGdlcyIKICAgICAgICAgICAgZGVlZGxpdC5sYWJlbGFnZW50IC0+IGxsYW1hICI4LiBEZXNjcmliZSAvIHNhZmV0eSAvIHRhZ3MiCiAgICAgICAgICAgIGRlZWRsaXQubGFiZWxhZ2VudCAtPiBkZWVkbGl0LmNhdGFsb2cgIjkuIFBhdGNoIGRlc2NyaXB0aW9uIC8gc2FmZXR5IC8gdGFncyIKICAgICAgICAgICAgZGVlZGxpdC5sYWJlbGFnZW50IC0+IGRlZWRsaXQuc2VhcmNoICIxMC4gUmUtZW1iZWQgb24gdGV4dCBjaGFuZ2UiCiAgICAgICAgICAgIGRlZWRsaXQubGFiZWxhZ2VudCAtPiBkZWVkbGl0LmdyYXBoICIxMS4gUmUtaW5kZXggb24gdGFnIGNoYW5nZSIKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgZHluYW1pYyBkZWVkbGl0ICJSZWFkRmxvdyIgIlNlcnZpbmcgYSBsaWJyYXJ5IGRldGFpbCAvIHNlYXJjaCByZXF1ZXN0IHRocm91Z2ggdGhlIGdhdGV3YXkuIiB7CiAgICAgICAgICAgIHVzZXIgLT4gZGVlZGxpdC5jb21meWhlbHBlciAiMS4gT3BlbnMgYW4gaW1hZ2UgLyBydW5zIGEgc2VhcmNoIgogICAgICAgICAgICBkZWVkbGl0LmNvbWZ5aGVscGVyIC0+IGRlZWRsaXQuYXBpICIyLiBSZXF1ZXN0IHZpYSB0aGUgQkZGIgogICAgICAgICAgICBkZWVkbGl0LmFwaSAtPiBkZWVkbGl0LmNhdGFsb2cgIjMuIEFnZ3JlZ2F0ZSB0aGUgY2Fub25pY2FsIHJlY29yZCIKICAgICAgICAgICAgZGVlZGxpdC5hcGkgLT4gZGVlZGxpdC5zZWFyY2ggIjQuIFNpbWlsYXIgLyBzZW1hbnRpYyByZXN1bHRzIgogICAgICAgICAgICBkZWVkbGl0LmFwaSAtPiBkZWVkbGl0LmdyYXBoICI1LiBOZWlnaGJvcnMgLyBsaW5lYWdlIgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkZXBsb3ltZW50IGRlZWRsaXQgIkxvY2FsIChEb2NrZXIgQ29tcG9zZSkiICJEZXBsb3ltZW50IiAiQ29udGFpbmVycyBtYXBwZWQgb250byB0aGUgRG9ja2VyIENvbXBvc2Ugc3RhY2s6IHBvcnRzLCBHUFUgbm9kZXMgYW5kIHRoZSBleHRlcm5hbCBob3N0IG1hY2hpbmUuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIHNoYXBlIFBlcnNvbgogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjMDg0MjdiCiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiRXh0ZXJuYWwiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzk5OTk5OQogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIldlYiBBcHAiIHsKICAgICAgICAgICAgICAgIHNoYXBlIFdlYkJyb3dzZXIKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzExNjhiZAogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlNlcnZpY2UiIHsKICAgICAgICAgICAgICAgIHNoYXBlIFJvdW5kZWRCb3gKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzQzOGRkNQogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIk93bmVyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICMyZTZkYTQKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJMaWJyYXJ5IiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDb21wb25lbnQKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzg1YmJmMAogICAgICAgICAgICAgICAgY29sb3IgIzAwMDAwMAogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkRhdGFiYXNlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDeWxpbmRlcgogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZjVhNjIzCiAgICAgICAgICAgICAgICBjb2xvciAjMDAwMDAwCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiUXVldWUiIHsKICAgICAgICAgICAgICAgIHNoYXBlIFBpcGUKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y1YTYyMwogICAgICAgICAgICAgICAgY29sb3IgIzAwMDAwMAogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQp9",
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.warning" : "0"
+  },
+  "views" : {
+    "configuration" : {
+      "styles" : {
+        "elements" : [ {
+          "background" : "#f5a623",
+          "color" : "#000000",
+          "shape" : "Cylinder",
+          "tag" : "Database"
+        }, {
+          "background" : "#999999",
+          "color" : "#ffffff",
+          "tag" : "External"
+        }, {
+          "background" : "#85bbf0",
+          "color" : "#000000",
+          "shape" : "Component",
+          "tag" : "Library"
+        }, {
+          "background" : "#2e6da4",
+          "color" : "#ffffff",
+          "tag" : "Owner"
+        }, {
+          "background" : "#08427b",
+          "color" : "#ffffff",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "background" : "#f5a623",
+          "color" : "#000000",
+          "shape" : "Pipe",
+          "tag" : "Queue"
+        }, {
+          "background" : "#438dd5",
+          "color" : "#ffffff",
+          "shape" : "RoundedBox",
+          "tag" : "Service"
+        }, {
+          "background" : "#1168bd",
+          "color" : "#ffffff",
+          "shape" : "WebBrowser",
+          "tag" : "Web App"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Web apps, FastAPI services and datastores inside deedlit.dev.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "18",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "19",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "21",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "22",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "23",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Containers",
+      "name" : "Container View: deedlit.dev",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "24"
+      }, {
+        "id" : "26"
+      }, {
+        "id" : "27"
+      }, {
+        "id" : "29"
+      }, {
+        "id" : "30"
+      }, {
+        "id" : "31"
+      }, {
+        "id" : "32"
+      }, {
+        "id" : "33"
+      }, {
+        "id" : "34"
+      }, {
+        "id" : "35"
+      }, {
+        "id" : "36"
+      }, {
+        "id" : "37"
+      }, {
+        "id" : "38"
+      }, {
+        "id" : "39"
+      }, {
+        "id" : "41"
+      }, {
+        "id" : "42"
+      }, {
+        "id" : "43"
+      }, {
+        "id" : "44"
+      }, {
+        "id" : "45"
+      }, {
+        "id" : "46"
+      }, {
+        "id" : "47"
+      }, {
+        "id" : "49"
+      }, {
+        "id" : "50"
+      }, {
+        "id" : "51"
+      }, {
+        "id" : "52"
+      }, {
+        "id" : "53"
+      }, {
+        "id" : "54"
+      }, {
+        "id" : "55"
+      }, {
+        "id" : "56"
+      } ],
+      "softwareSystemId" : "6"
+    } ],
+    "deploymentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Containers mapped onto the Docker Compose stack: ports, GPU nodes and the external host machine.",
+      "elements" : [ {
+        "id" : "58",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "59",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "60",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "61",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "62",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "63",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "66",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "68",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "70",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "72",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "77",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "80",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "85",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "86",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "88",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "89",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "91",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "93",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "95",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "97",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "99",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "100",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "102",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "103",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "105",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Local (Docker Compose)",
+      "key" : "Deployment",
+      "name" : "Deployment View: deedlit.dev - Local (Docker Compose)",
+      "order" : 5,
+      "relationships" : [ {
+        "id" : "101"
+      }, {
+        "id" : "104"
+      }, {
+        "id" : "106"
+      }, {
+        "id" : "64"
+      }, {
+        "id" : "65"
+      }, {
+        "id" : "67"
+      }, {
+        "id" : "69"
+      }, {
+        "id" : "71"
+      }, {
+        "id" : "73"
+      }, {
+        "id" : "74"
+      }, {
+        "id" : "75"
+      }, {
+        "id" : "76"
+      }, {
+        "id" : "78"
+      }, {
+        "id" : "79"
+      }, {
+        "id" : "81"
+      }, {
+        "id" : "82"
+      }, {
+        "id" : "83"
+      }, {
+        "id" : "84"
+      }, {
+        "id" : "87"
+      }, {
+        "id" : "90"
+      }, {
+        "id" : "92"
+      }, {
+        "id" : "94"
+      }, {
+        "id" : "96"
+      }, {
+        "id" : "98"
+      } ],
+      "softwareSystemId" : "6"
+    } ],
+    "dynamicViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Ingesting a new image: queue-driven per-stage DAG. Catalog is the durability boundary (written first); search/graph are rebuildable projections.",
+      "elementId" : "6",
+      "elements" : [ {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "IngestDAG",
+      "name" : "Dynamic View: deedlit.dev",
+      "order" : 3,
+      "relationships" : [ {
+        "description" : "1. Writes a generated image + embedded metadata",
+        "id" : "57",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Scans folder; computes sha256 (cross-service id), phash, dims, thumbnail",
+        "id" : "39",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Extract prompt / tags / params + reference graph",
+        "id" : "41",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. Embed dense (CLIP) + sparse (SPLADE)",
+        "id" : "42",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Write record + thumbnail (rendezvous / durability first)",
+        "id" : "43",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "6. Upsert dense + sparse vector point",
+        "id" : "44",
+        "order" : "6",
+        "response" : false
+      }, {
+        "description" : "7. Upsert reference / tag / lineage edges",
+        "id" : "45",
+        "order" : "7",
+        "response" : false
+      }, {
+        "description" : "8. Describe / safety / tags",
+        "id" : "47",
+        "order" : "8",
+        "response" : false
+      }, {
+        "description" : "9. Patch description / safety / tags",
+        "id" : "49",
+        "order" : "9",
+        "response" : false
+      }, {
+        "description" : "10. Re-embed on text change",
+        "id" : "50",
+        "order" : "10",
+        "response" : false
+      }, {
+        "description" : "11. Re-index on tag change",
+        "id" : "51",
+        "order" : "11",
+        "response" : false
+      } ]
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Serving a library detail / search request through the gateway.",
+      "elementId" : "6",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "ReadFlow",
+      "name" : "Dynamic View: deedlit.dev",
+      "order" : 4,
+      "relationships" : [ {
+        "description" : "1. Opens an image / runs a search",
+        "id" : "26",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Request via the BFF",
+        "id" : "32",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Aggregate the canonical record",
+        "id" : "33",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. Similar / semantic results",
+        "id" : "34",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Neighbors / lineage",
+        "id" : "35",
+        "order" : "5",
+        "response" : false
+      } ]
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Who and what deedlit.dev talks to.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "SystemContext",
+      "name" : "System Context View: deedlit.dev",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "25"
+      }, {
+        "id" : "28"
+      }, {
+        "id" : "40"
+      }, {
+        "id" : "48"
+      } ],
+      "softwareSystemId" : "6"
+    } ]
+  }
+}
