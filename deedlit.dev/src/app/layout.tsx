@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { IBM_Plex_Mono, Sora } from "next/font/google";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ThemeToggleButton } from "@/components/layout/ThemeToggleButton";
@@ -103,15 +104,24 @@ export const viewport: Viewport = {
   ]
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Stamped by src/proxy.ts. The theme script has to run inline and before
+  // paint to avoid a flash, so it takes the nonce rather than the CSP taking
+  // 'unsafe-inline'.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: themeInitScript is a
+            module-level string literal, never user input. It has to be inline and
+            synchronous to set the theme before first paint, and it carries the
+            per-request CSP nonce from src/proxy.ts so the strict policy still holds. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body
         className={`${display.variable} ${mono.variable} font-[var(--font-display)] antialiased`}

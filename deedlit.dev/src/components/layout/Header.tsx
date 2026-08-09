@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 
 const navLinks = [
   { href: "#top", label: "Home" },
-  { href: "#services", label: "Services" },
   { href: "#gallery", label: "Gallery" },
   { href: "#books", label: "Books" },
-  { href: "#contact", label: "Contact" }
+  { href: "#contact", label: "Contact" },
+  // A route, not a section anchor — the services portal is behind auth.
+  { href: "/portal", label: "Portal" }
 ];
 
 type Theme = "light" | "dark";
@@ -62,11 +63,12 @@ export function Header({ showMobileNav = true }: HeaderProps) {
       { rootMargin: "-20% 0px -70% 0px" }
     );
 
-    navLinks.forEach((link) => {
-      const id = link.href.replace("#", "");
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    });
+    navLinks
+      .filter((link) => link.href.startsWith("#"))
+      .forEach((link) => {
+        const element = document.getElementById(link.href.slice(1));
+        if (element) observer.observe(element);
+      });
 
     return () => observer.disconnect();
   }, []);
@@ -79,10 +81,13 @@ export function Header({ showMobileNav = true }: HeaderProps) {
   };
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    // Route links (e.g. /portal) navigate normally; only anchors are hijacked.
+    if (!href.startsWith("#")) return;
+
     e.preventDefault();
     const id = href.replace("#", "");
     const element = document.getElementById(id);
-    
+
     if (element) {
       const offset = 100;
       const elementPosition = element.getBoundingClientRect().top;
