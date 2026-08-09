@@ -1,0 +1,141 @@
+name: Portal image
+
+# Builds the deedlit.dev portal container and publishes it to GHCR.
+# The digest printed in the job summary is what goes into
+# `apps/portal/values-prd.yaml` in the deedlit.dev.infra repository.
+on:
+  push:
+    branches: [master]
+    paths:
+      - "deedlit.dev/**"
+      - "deedlit.dev.ui/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/portal.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/deedlit.dev-portal
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build shared UI
+        run: npm run build:ui
+
+      # Biome replaced ESLint (config: biome.jsonc at the repo root). Scoped to
+      # the two workspaces this image builds — comfyhelper still carries
+      # pre-existing violations and is not part of this pipeline.
+      - name: Lint
+        run: npx biome lint deedlit.dev deedlit.dev.ui
+
+      - name: Typecheck
+        run: npx tsc --noEmit --project deedlit.dev
+
+      # Fails the build on a known-vulnerable runtime dependency. Scoped twice
+      # over, so the gate only ever fires on something this image ships:
+      # `--omit=dev` because dev deps do not reach the runtime stage, and
+      # `--workspace deedlit.dev` because a root audit also covers comfyhelper,
+      # which is not installed into this image at all.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high --workspace deedlit.dev
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: deedlit.dev/Dockerfile
+          failure-threshold: warning
+
+  scan:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Builds locally without pushing, so a vulnerable image is never
+      # published and then retracted.
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deedlit.dev/Dockerfile
+          push: false
+          load: true
+          tags: portal:scan
+          cache-from: type=gha
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: portal:scan
+          format: table
+          severity: HIGH,CRITICAL
+          # Unfixed OS advisories are not actionable in a build gate — they
+          # come and go with the base image and have no upgrade to take.
+          ignore-unfixed: true
+          # Time-boxed exceptions only; see the file.
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
+
+  publish:
+    needs: [verify, scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The monorepo root: the app's `file:../deedlit.dev.ui` dependency
+          # cannot resolve from a narrower context.
+          context: .
+          file: deedlit.dev/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summarize
+        run: |
+          {
+            echo "### Portal image published"
+            echo
+            echo '```'
+            echo "${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+            echo '```'
+            echo
+            echo "Pin this digest in \`apps/portal/values-prd.yaml\` (deedlit.dev.infra)."
+          } >> "$GITHUB_STEP_SUMMARY"
