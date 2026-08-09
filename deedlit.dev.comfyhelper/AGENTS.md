@@ -18,7 +18,8 @@
 - Keep the app a gateway client — no datastore logic. New backend behavior belongs in the owning FastAPI service, exposed via `deedlit.api`.
 
 ## Verification
-- `npm run lint` · `npm run build` · `npm run test:e2e` (from repo root: `npm run dev:comfyhelper`).
+- `npm run lint` (Biome; root `biome.jsonc`) · `npm run build` · `npm run test:e2e` (from repo root: `npm run dev:comfyhelper`).
+- `npm run lint` reports **11 pre-existing errors** here, inherited from the ESLint→Biome migration; this package was already failing its ESLint gate before that. They are real but low-risk (`forEach` callbacks with implicit returns, two implicit-`any` `let`s, two assignments inside expressions, and two `noUnsafeOptionalChaining` hits that are actually guarded by `Array.isArray`). Clearing them is a standalone task — do not fold it into an unrelated change.
 
 ## Child Guides
 - None.
