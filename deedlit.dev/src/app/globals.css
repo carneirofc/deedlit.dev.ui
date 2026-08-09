@@ -1,4 +1,9 @@
 @import "tailwindcss";
+/* Shared visual system. Keep app-level globals thin for reuse.
+   Both @import rules stay above the @source rules below: CSS requires
+   @import to precede every other at-rule, and a later one is invalid. */
+@import "@carneirofc/ui/styles.css";
+
 /* Tailwind v4 source registration (replaces classic content globs). */
 @source "./**/*.{ts,tsx,js,jsx,mdx}";
 @source "../components/**/*.{ts,tsx,js,jsx,mdx}";
@@ -6,8 +11,6 @@
 @source "../lib/**/*.{ts,tsx,js,jsx}";
 @source "@carneirofc/ui";
 @source "../../../deedlit.dev.ui/src/**/*.{ts,tsx,js,jsx}";
-/* Shared visual system. Keep app-level globals thin for reuse. */
-@import "@carneirofc/ui/styles.css";
 
 /* Legacy app token aliases used by existing feature components. */
 :root {

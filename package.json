@@ -9,6 +9,11 @@
   ],
   "scripts": {
     "dev": "mprocs",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint . --write",
+    "format": "biome format .",
+    "format:write": "biome format . --write",
+    "check": "biome check .",
     "build:ui": "npm run build -w @carneirofc/ui",
     "build:dev": "npm run build:ui && npm run build -w deedlit.dev",
     "build:comfyhelper": "npm run build:ui && npm run build -w deedlit.dev.comfyhelper",
@@ -52,6 +57,7 @@
     "prod:all": "npm run prod:infra && npm run prod:build && npm run prod"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.7",
     "concurrently": "^10.0.3"
   }
 }

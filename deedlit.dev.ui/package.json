@@ -22,6 +22,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node ./scripts/fix-esm-imports.mjs",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint . --write",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
