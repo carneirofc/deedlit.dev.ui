@@ -9,7 +9,7 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - Toolchain not on the bare PATH: Node is via **fnm** (`fnm env --use-on-cd | Out-String | Invoke-Expression`), Python via **uv** (`uv run …`) — full details in [`docs/agents/toolchain.md`](docs/agents/toolchain.md).
 
 ## Package Ownership
-- `deedlit.dev/`: marketing site, home page, books, gallery presentation, services, static content, and PWA-related work.
+- `deedlit.dev/`: marketing site, home page, books, gallery presentation, static content, PWA-related work, and the authenticated `/portal` service dashboard (GitHub OAuth; deployed by `deedlit.dev.infra/apps/portal`).
 - `deedlit.dev.comfyhelper/`: generated-image library **UI** (Next.js) — talks to the `deedlit.api` gateway. See `deedlit.dev.comfyhelper/IMAGE_LIBRARY.md` for the backend architecture.
 - `deedlit.dev.ui/`: shared UI components, icons, tokens, CSS variables, and app-agnostic presentation primitives.
 - `deedlit.<service>/`: FastAPI image-library services (`api`, `catalog`, `search`, `graph`, `ingest`, `metadata`, `labelagent`, `vision`) — database-per-service, HTTP-only, `uv`-managed. Each owns its store and is the sole writer of it.
@@ -33,6 +33,9 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - Run landing app only: `npm run dev:dev`
 - Run comfyhelper only: `npm run dev:comfyhelper`
 - Build all workspaces: `npm run build`
+- Lint (JS/TS/CSS): `npm run lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `npm run lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
+- Format: `npm run format` reports, `npm run format:write` rewrites. The formatter is configured but has **not** been applied to the tree yet — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change.
+- `eslint-disable` comments still in `deedlit.dev.comfyhelper/` and `deedlit.dev.ui/` are inert. Biome uses `// biome-ignore <rule>: <reason>`, and the reason is required.
 
 ## Commit Convention
 
@@ -101,7 +104,7 @@ Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail 
 - [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.
 
 ### Web apps (npm workspace)
-- [`deedlit.dev/AGENTS.md`](deedlit.dev/AGENTS.md) — public Next.js site (:3001): home, books, gallery, services, PWA. Nests [`deedlit.dev/docs/AGENTS.md`](deedlit.dev/docs/AGENTS.md) (testing/setup guide).
+- [`deedlit.dev/AGENTS.md`](deedlit.dev/AGENTS.md) — public Next.js site (:3001): home, books, gallery, PWA, plus the authenticated `/portal` service dashboard. Nests [`deedlit.dev/docs/AGENTS.md`](deedlit.dev/docs/AGENTS.md) (testing/setup guide).
 - [`deedlit.dev.comfyhelper/AGENTS.md`](deedlit.dev.comfyhelper/AGENTS.md) — ComfyHelper image-library UI (:3000), gateway client only.
 - [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md) — shared `@carneirofc/ui` component library + tokens.
 
