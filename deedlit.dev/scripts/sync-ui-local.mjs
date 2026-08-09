@@ -4,7 +4,7 @@ import path from "node:path";
 const projectRoot = process.cwd();
 const uiRoot = path.resolve(projectRoot, "../deedlit.dev.ui");
 const localUiRoot = path.resolve(projectRoot, ".ui-local");
-:
+
 mkdirSync(localUiRoot, { recursive: true });
 
 cpSync(path.join(uiRoot, "dist"), path.join(localUiRoot, "dist"), {
