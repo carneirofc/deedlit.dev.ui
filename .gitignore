@@ -218,3 +218,6 @@ graphify-out/cache/semantic/f994b81605a3dbf0a7efdc92bf7d6a8848967eb416e91a181fac
 /.design-sync/learnings/
 /.design-sync/.cache/
 /.design-sync/node_modules
+
+# Structurizr Lite local index/logs
+/docs/architecture/.structurizr/

@@ -1,9 +1,13 @@
 # deedlit.dev — Monorepo
 
-The deedlit.dev landing site plus **ComfyHelper**, a generated-image library that
-ingests, searches, and explores ComfyUI / Automatic1111 outputs. The web apps are
-an npm workspace; the image-library backend is a mesh of standalone **FastAPI**
-services (database-per-service, HTTP-only) managed with `uv`.
+A self-hosted library for the images you generate locally with ComfyUI and
+Automatic1111, plus the deedlit.dev landing site. **ComfyHelper** ingests a folder
+of outputs, parses the metadata embedded in each file (prompt, tags, parameters,
+model/LoRA references), and lets you filter by those fields and find similar images
+through hybrid vector search.
+
+The web apps are an npm workspace; the image-library backend is a mesh of standalone
+**FastAPI** services (database-per-service, HTTP-only) managed with `uv`.
 
 ## Architecture
 
@@ -12,6 +16,19 @@ the sole writer of its datastore and they never call each other — `search` and
 `graph` are rebuildable projections of `catalog` (the canonical truth). See
 [`deedlit.dev.comfyhelper/IMAGE_LIBRARY.md`](./deedlit.dev.comfyhelper/IMAGE_LIBRARY.md)
 for the full design.
+
+For a layered [C4 model](https://c4model.com/) of the same architecture (System
+Context, Container, ingest/read Dynamic, and Docker Compose Deployment views), see
+the [Structurizr workspace](./docs/architecture/workspace.dsl). View it locally
+with [Structurizr Lite](https://structurizr.com/help/lite):
+
+```bash
+docker run -it --rm -p 8080:8080 \
+  -v "$PWD/docs/architecture:/usr/local/structurizr" structurizr/lite
+# then open http://localhost:8080
+```
+
+The inline Mermaid diagrams below stay as the quick at-a-glance view.
 
 ```mermaid
 flowchart LR
@@ -215,6 +232,7 @@ contracts/                ← OpenAPI design sketches per service surface
 id-scheme/                ← frozen cross-service id helper + test vectors
 docs/adr/                 ← architecture decision records
 docs/agents/              ← agent workflow docs (issue tracker, triage, domain)
+docs/architecture/        ← Structurizr C4 workspace (workspace.dsl)
 docker-compose.yml        ← the one compose file (datastores + services + o11y)
 mprocs.yaml               ← local dev orchestrator
 ```
