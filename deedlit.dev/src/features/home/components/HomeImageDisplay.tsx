@@ -19,8 +19,8 @@ export function HomeImageDisplay() {
         <a href="#books" className="chip focus-ring">
           Books
         </a>
-        <a href="#services" className="chip focus-ring">
-          Services
+        <a href="/portal" className="chip focus-ring">
+          Portal
         </a>
       </div>
     </section>

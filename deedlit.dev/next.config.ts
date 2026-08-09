@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Don't advertise the framework. Everything else security-header shaped
+  // lives in src/proxy.ts, where the per-request CSP nonce is generated.
+  poweredByHeader: false,
   transpilePackages: ["@carneirofc/ui"],
   turbopack: {
     resolveAlias: {

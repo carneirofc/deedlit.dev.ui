@@ -19,8 +19,10 @@ const navLinks = [
     icon: <HiOutlineHome aria-hidden="true" className="h-5 w-5" />,
   },
   {
-    href: "#services",
-    label: "Services",
+    // A real route, not a section anchor: the services portal is behind
+    // authentication and lives at /portal.
+    href: "/portal",
+    label: "Portal",
     icon: <HiOutlineComputerDesktop aria-hidden="true" className="h-5 w-5" />,
   },
   {
@@ -59,13 +61,16 @@ function NavIconLink({ href, label, isActive, icon, onNavigate }: NavIconLinkPro
   const active = isActive ? "app-sidebar-nav-item-active" : "";
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const id = href.replace("#", "");
-    const el = document.getElementById(id);
-    if (el) {
-      const offset = 100;
-      const pos = el.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo({ top: pos, behavior: "smooth" });
+    // Only section anchors get the smooth-scroll treatment; route links such
+    // as /portal must be left alone to navigate.
+    if (href.startsWith("#")) {
+      e.preventDefault();
+      const el = document.getElementById(href.slice(1));
+      if (el) {
+        const offset = 100;
+        const pos = el.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top: pos, behavior: "smooth" });
+      }
     }
     onNavigate?.();
   };
@@ -102,11 +107,12 @@ export function AppSidebar() {
       { rootMargin: "-20% 0px -70% 0px" }
     );
 
-    navLinks.forEach((link) => {
-      const id = link.href.replace("#", "");
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    });
+    navLinks
+      .filter((link) => link.href.startsWith("#"))
+      .forEach((link) => {
+        const element = document.getElementById(link.href.slice(1));
+        if (element) observer.observe(element);
+      });
 
     return () => observer.disconnect();
   }, []);

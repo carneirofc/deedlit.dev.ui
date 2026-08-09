@@ -1,1 +1,0 @@
-export { useServiceAccessibility } from "./useServiceAccessibility";

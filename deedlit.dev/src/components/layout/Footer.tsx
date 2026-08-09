@@ -16,8 +16,8 @@ export function Footer() {
           <a href="#books" className="focus-ring rounded-md hover:text-text">
             Books
           </a>
-          <a href="#services" className="focus-ring rounded-md hover:text-text">
-            Services
+          <a href="/portal" className="focus-ring rounded-md hover:text-text">
+            Portal
           </a>
           <a
             href="https://github.com/yourname/deedlit.dev"

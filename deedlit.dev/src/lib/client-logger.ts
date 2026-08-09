@@ -76,7 +76,7 @@ class ClientLogger {
     
     // Build styled console message
     let msg = `%c[${timestamp}] %c${icons[level]}`;
-    let styles = [LOG_STYLES.timestamp, LOG_STYLES[level]];
+    const styles = [LOG_STYLES.timestamp, LOG_STYLES[level]];
     
     if (prefix) {
       msg += ` %c[${prefix}]`;

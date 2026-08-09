@@ -1,19 +1,14 @@
 import {
   CyberPanel,
-  CyberSubpanel,
   InfoChip,
   PageHeader,
-  PanelSectionHeader,
   SectionLabel,
-  StatusBadge,
   SurfacePanel
 } from "@carneirofc/ui";
 import { BooksSection } from "@/features/books/components/BooksSection";
 import { books } from "@/features/books/data/books";
 import { GallerySection } from "@/features/gallery/components/GallerySection";
 import { getGalleryData } from "@/features/gallery/server/gallery-data";
-import { LocalServicesSection } from "@/features/services/components/LocalServicesSection";
-import { localServiceApps } from "@/features/services/data/local-services";
 import { UiShowcaseSection } from "@/features/showcase/components/UiShowcaseSection";
 
 export default async function HomePage() {
@@ -25,20 +20,15 @@ export default async function HomePage() {
         <PageHeader
           subtitle="deedlit.dev // personal space"
           title="Personal Archive Hub"
-          description="Browse local services, generated gallery assets, and a curated reading shelf in one unified interface."
+          description="Browse generated gallery assets and a curated reading shelf in one unified interface."
           pills={
             <div className="flex flex-wrap items-center gap-2">
-              <InfoChip>{localServiceApps.length} services</InfoChip>
               <InfoChip>{assets.length} gallery assets</InfoChip>
               <InfoChip>{books.length} books</InfoChip>
             </div>
           }
         />
       </CyberPanel>
-
-      <SurfacePanel id="services" tone="soft" padding="none" className="scroll-mt-20 overflow-hidden">
-        <LocalServicesSection apps={localServiceApps} />
-      </SurfacePanel>
 
       <SurfacePanel id="gallery" tone="soft" padding="none" className="scroll-mt-20 overflow-hidden">
         <GallerySection assets={assets} />

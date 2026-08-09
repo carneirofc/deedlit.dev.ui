@@ -1,74 +1,92 @@
 import type { LocalServiceApp } from "@/features/services/types";
 
+/**
+ * Development fallback for the service list.
+ *
+ * In the cluster the portal discovers these from Kubernetes Ingress objects
+ * (see `../server/discover.ts`). This copy exists so `npm run dev:dev` renders
+ * something realistic on a laptop, where there is no ServiceAccount token.
+ *
+ * These mirror the charts in `deedlit.dev.infra/apps/`. There are no
+ * `probeUrl`s: nothing here is reachable from outside the cluster, so every
+ * card renders with an "unknown" health state rather than a misleading red.
+ */
 export const localServiceApps: LocalServiceApp[] = [
   {
-    id: "gallery-admin",
-    name: "Gallery Admin",
-    host: "gallery.local.deedlit.dev",
-    url: "https://gallery.local.deedlit.dev",
-    description: "Review queue, tagging, and collection curation.",
+    id: "pgadmin",
+    name: "pgAdmin",
+    host: "pgadmin.deedlit.dev",
+    url: "https://pgadmin.deedlit.dev",
+    description: "PostgreSQL administration console.",
     status: "online",
-    category: "archive",
-    icon: "gallery"
-  },
-  {
-    id: "prompt-lab",
-    name: "Prompt Lab",
-    host: "prompts.local.deedlit.dev",
-    url: "https://prompts.local.deedlit.dev",
-    description: "Prompt presets, variants, and parameter templates.",
-    status: "online",
-    category: "workflow",
-    icon: "prompt"
-  },
-  {
-    id: "metrics",
-    name: "Metrics",
-    host: "metrics.local.deedlit.dev",
-    url: "https://metrics.local.deedlit.dev",
-    description: "Resource and latency dashboards.",
-    status: "offline",
     category: "ops",
-    icon: "metrics"
+    icon: "database",
+    order: 10
   },
   {
-    id: "comfyui",
-    name: "ComfyUI",
-    host: "comfyui.local.deedlit.dev",
-    url: "https://comfyui.local.deedlit.dev",
-    description: "ComfyUI node editor and generation runtime.",
-    status: "online",
-    category: "workflow",
-    icon: "comfyui"
-  },
-  {
-    id: "seanime",
-    name: "Seanime",
-    host: "seanime.local.deedlit.dev",
-    url: "https://seanime.local.deedlit.dev",
-    description: "Local anime library and tracking app.",
-    status: "online",
-    category: "media",
-    icon: "searnime"
-  },
-  {
-    id: "files",
-    name: "Files",
-    host: "files.local.deedlit.dev",
-    url: "https://files.local.deedlit.dev",
-    description: "File browser and shared storage index.",
+    id: "rustfs-console",
+    name: "RustFS Console",
+    host: "rustfs.deedlit.dev",
+    url: "https://rustfs.deedlit.dev",
+    description: "Object storage browser and bucket administration.",
     status: "online",
     category: "storage",
-    icon: "files"
+    icon: "files",
+    order: 20
   },
   {
-    id: "idp",
-    name: "Identity Provider",
-    host: "idp.deedlit.dev",
-    url: "https://idp.deedlit.dev",
-    description: "Authentication and SSO portal.",
+    id: "rustfs-s3",
+    name: "RustFS S3 API",
+    host: "s3.deedlit.dev",
+    url: "https://s3.deedlit.dev",
+    description: "S3-compatible endpoint backing the image library.",
     status: "online",
+    category: "storage",
+    icon: "storage",
+    order: 21
+  },
+  {
+    id: "zot",
+    name: "Container Registry",
+    host: "registry.deedlit.dev",
+    url: "https://registry.deedlit.dev",
+    description: "Private OCI registry for images built outside the cluster.",
+    status: "online",
+    category: "ops",
+    icon: "registry",
+    order: 30
+  },
+  {
+    id: "keycloak",
+    name: "Keycloak",
+    host: "auth.deedlit.dev",
+    url: "https://auth.deedlit.dev",
+    description: "Identity provider (OIDC).",
+    status: "offline",
     category: "auth",
-    icon: "idp"
+    icon: "idp",
+    order: 40
+  },
+  {
+    id: "bookorbit",
+    name: "BookOrbit",
+    host: "books.deedlit.dev",
+    url: "https://books.deedlit.dev",
+    description: "Ebook and audiobook library.",
+    status: "offline",
+    category: "media",
+    icon: "books",
+    order: 50
+  },
+  {
+    id: "readest",
+    name: "Readest",
+    host: "readest.deedlit.dev",
+    url: "https://readest.deedlit.dev",
+    description: "Ebook reader, storing files in RustFS.",
+    status: "offline",
+    category: "media",
+    icon: "books",
+    order: 51
   }
 ];
