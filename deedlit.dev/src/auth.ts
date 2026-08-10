@@ -1,5 +1,20 @@
 import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
+import type { Provider } from "next-auth/providers";
+import {
+  authorizeGitHub,
+  GITHUB_PROVIDER_ID,
+  githubProvider,
+  githubUsername,
+  isGitHubConfigured
+} from "@/lib/auth/github";
+import {
+  authorizeOidc,
+  isOidcConfigured,
+  OIDC_PROVIDER_ID,
+  oidcDisplayName,
+  oidcProvider,
+  oidcUsername
+} from "@/lib/auth/oidc";
 import { logger } from "@/lib/logger";
 
 /**
@@ -7,12 +22,14 @@ import { logger } from "@/lib/logger";
  *
  * Sessions are JWT-only: the portal stores nothing per user, so adding a
  * database adapter would buy nothing and cost a datastore. Authorization is
- * decided once, in `signIn` — GitHub tells us *who* someone is, the org/team
- * membership check decides whether they get in at all.
+ * decided once, in `signIn` — the identity provider says *who* someone is,
+ * the per-provider rules in `src/lib/auth/*` say whether they get in at all.
+ *
+ * Two providers are supported and either may be omitted: GitHub (org/team
+ * membership) and a generic OIDC issuer (`src/lib/auth/oidc.ts`). A provider
+ * that is not configured is simply not offered, and a request naming it is
+ * refused — there is no implicit fallback between them.
  */
-
-const GITHUB_API = "https://api.github.com";
-const GITHUB_API_TIMEOUT_MS = 5_000;
 
 /** Eight hours: long enough to avoid re-auth during a session of work. */
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
@@ -52,101 +69,51 @@ function hasUsableSecret(): boolean {
  */
 const configuredAuthUrl = process.env.AUTH_URL?.trim();
 
-const allowedOrg = () => process.env.AUTH_ALLOWED_GITHUB_ORG?.trim() ?? "";
-const allowedTeam = () => process.env.AUTH_ALLOWED_GITHUB_TEAM?.trim() ?? "";
-
-const allowedUsers = () =>
-  (process.env.AUTH_ALLOWED_GITHUB_USERS ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-
-async function githubGet(path: string, token: string): Promise<Response> {
-  return fetch(`${GITHUB_API}${path}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28"
-    },
-    signal: AbortSignal.timeout(GITHUB_API_TIMEOUT_MS),
-    cache: "no-store"
-  });
+export interface SignInProvider {
+  id: string;
+  /** Button label on `/login`. */
+  label: string;
 }
 
 /**
- * True when the user is an *active* member of the configured org. Uses the
- * `/user/memberships` endpoint rather than `/orgs/{org}/members/{user}`
- * because it reports private memberships too — a member whose membership is
- * concealed should still be able to sign in.
- */
-async function isActiveOrgMember(org: string, token: string): Promise<boolean> {
-  const response = await githubGet(`/user/memberships/orgs/${encodeURIComponent(org)}`, token);
-  if (!response.ok) return false;
-
-  const membership = (await response.json()) as { state?: string };
-  return membership.state === "active";
-}
-
-async function isActiveTeamMember(
-  org: string,
-  team: string,
-  login: string,
-  token: string
-): Promise<boolean> {
-  const response = await githubGet(
-    `/orgs/${encodeURIComponent(org)}/teams/${encodeURIComponent(team)}/memberships/${encodeURIComponent(login)}`,
-    token
-  );
-  if (!response.ok) return false;
-
-  const membership = (await response.json()) as { state?: string };
-  return membership.state === "active";
-}
-
-/**
- * Decides whether a freshly authenticated GitHub user may use the portal.
+ * The providers this deployment can actually complete a sign-in with. The
+ * login page renders exactly these, so a missing client secret shows up as an
+ * absent button rather than a redirect into an error page.
  *
- * Fails closed: every failure path — no token, no rule configured, API error,
- * timeout, inactive membership — returns false. A misconfiguration locks
- * everyone out rather than letting everyone in.
+ * Read per call, not cached: `next build` imports this module with no env at
+ * all, and caching there would freeze an empty list into the build.
  */
-async function isAuthorized(login: string, token: string | undefined): Promise<boolean> {
-  const normalizedLogin = login.toLowerCase();
+export function signInProviders(): SignInProvider[] {
+  const providers: SignInProvider[] = [];
 
-  if (allowedUsers().includes(normalizedLogin)) return true;
-
-  const org = allowedOrg();
-  if (!org) return false;
-
-  if (!token) {
-    logger.warn("Portal sign-in denied: GitHub returned no access token", { login });
-    return false;
+  if (isGitHubConfigured()) {
+    providers.push({ id: GITHUB_PROVIDER_ID, label: "Continue with GitHub" });
+  }
+  if (isOidcConfigured()) {
+    providers.push({ id: OIDC_PROVIDER_ID, label: `Continue with ${oidcDisplayName()}` });
   }
 
-  try {
-    if (!(await isActiveOrgMember(org, token))) return false;
+  return providers;
+}
 
-    const team = allowedTeam();
-    if (team) return await isActiveTeamMember(org, team, login, token);
+function configuredProviders(): Provider[] {
+  const providers: Provider[] = [];
 
-    return true;
-  } catch (error) {
-    logger.error("Portal sign-in denied: GitHub membership check failed", {
-      login,
-      reason: error instanceof Error ? error.message : "unknown error"
-    });
-    return false;
+  if (isGitHubConfigured()) providers.push(githubProvider());
+  if (isOidcConfigured()) providers.push(oidcProvider());
+
+  if (!providers.length) {
+    logger.warn(
+      "No authentication provider is configured — set AUTH_GITHUB_ID/SECRET or " +
+        "AUTH_OIDC_ISSUER/ID/SECRET, or nobody can sign in to the portal"
+    );
   }
+
+  return providers;
 }
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
-  providers: [
-    GitHub({
-      // `read:org` is what makes the membership lookup above possible;
-      // the default scope cannot see org membership at all.
-      authorization: { params: { scope: "read:user user:email read:org" } }
-    })
-  ],
+  providers: configuredProviders(),
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
   // The cookie must expire with the session it carries, or a stale token stays
   // presentable after the session it represents is over.
@@ -168,32 +135,49 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   callbacks: {
     async signIn({ account, profile }) {
       if (!hasUsableSecret()) return false;
-      if (account?.provider !== "github") return false;
 
-      const login = typeof profile?.login === "string" ? profile.login : "";
-      if (!login) return false;
+      // `profile` is typed loosely per provider; both authorizers read named
+      // claims defensively, so a bare record is the honest shape.
+      const claims = profile as Record<string, unknown> | undefined;
 
-      const authorized = await isAuthorized(login, account.access_token);
-      if (!authorized) {
-        logger.warn("Portal sign-in denied: not an authorized GitHub member", { login });
+      switch (account?.provider) {
+        case GITHUB_PROVIDER_ID:
+          return await authorizeGitHub(claims, account.access_token);
+        case OIDC_PROVIDER_ID:
+          return authorizeOidc(claims);
+        default:
+          // Includes the case where the provider was removed from the config
+          // between issuing an authorization request and its callback.
+          logger.warn("Portal sign-in denied: unknown provider", {
+            provider: account?.provider ?? "(none)"
+          });
+          return false;
       }
-
-      return authorized;
     },
 
-    async jwt({ token, profile }) {
-      // Only on initial sign-in does `profile` exist. The GitHub access token
-      // is deliberately NOT persisted here — it has done its job in `signIn`,
-      // and keeping it would park a live credential in the session cookie.
-      if (typeof profile?.login === "string") {
-        token.username = profile.login;
+    async jwt({ token, account, profile }) {
+      // Only on initial sign-in do `account` and `profile` exist. No provider
+      // access token is persisted here — each has done its job in `signIn`,
+      // and keeping one would park a live credential in the session cookie.
+      const claims = profile as Record<string, unknown> | undefined;
+
+      if (account?.provider === GITHUB_PROVIDER_ID) {
+        token.provider = GITHUB_PROVIDER_ID;
+        token.username = githubUsername(claims) || token.username;
+      } else if (account?.provider === OIDC_PROVIDER_ID) {
+        token.provider = OIDC_PROVIDER_ID;
+        token.username = oidcUsername(claims) || token.username;
       }
+
       return token;
     },
 
     async session({ session, token }) {
       if (session.user && typeof token.username === "string") {
         session.user.username = token.username;
+      }
+      if (session.user && typeof token.provider === "string") {
+        session.user.provider = token.provider;
       }
       return session;
     }

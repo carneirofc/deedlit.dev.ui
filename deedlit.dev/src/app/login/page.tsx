@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { FiGithub } from "react-icons/fi";
+import { FiGithub, FiShield } from "react-icons/fi";
 import { OutlineButton, PageHeader, StatusBanner, SurfacePanel } from "@carneirofc/ui";
-import { auth, signIn } from "@/auth";
+import { auth, signIn, signInProviders } from "@/auth";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -37,7 +37,7 @@ function errorMessage(code: string | undefined): string | null {
 
   switch (code) {
     case "AccessDenied":
-      return "That GitHub account is not a member of the organization this portal is restricted to.";
+      return "That account is not on the allow-list this portal is restricted to.";
     case "Verification":
       return "The sign-in link has expired. Try again.";
     default:
@@ -57,12 +57,22 @@ export default async function LoginPage({
   if (session) redirect(destination);
 
   const message = errorMessage(error);
+  const providers = signInProviders();
 
-  async function signInWithGitHub() {
+  /**
+   * The provider id arrives from the form, so it is re-checked against the
+   * configured list before reaching `signIn()` — a hand-crafted POST must not
+   * be able to name a provider this deployment does not offer.
+   */
+  async function startSignIn(formData: FormData) {
     "use server";
+    const requested = formData.get("provider");
+    const provider = signInProviders().find((entry) => entry.id === requested);
+    if (!provider) redirect("/login?error=Configuration");
+
     // Goes through the Auth.js handler, which owns the CSRF token — never
     // hand-roll this POST.
-    await signIn("github", { redirectTo: destination });
+    await signIn(provider.id, { redirectTo: destination });
   }
 
   return (
@@ -71,7 +81,7 @@ export default async function LoginPage({
         <PageHeader
           subtitle="deedlit.dev // private"
           title="Sign in"
-          description="The service portal is restricted to authorized GitHub accounts."
+          description="The service portal is restricted to authorized accounts."
         />
 
         {message && (
@@ -80,12 +90,29 @@ export default async function LoginPage({
           </div>
         )}
 
-        <form action={signInWithGitHub} className="mt-6">
-          <OutlineButton type="submit" className="w-full justify-center">
-            <FiGithub className="h-4 w-4" aria-hidden />
-            Continue with GitHub
-          </OutlineButton>
-        </form>
+        {providers.length === 0 ? (
+          <div className="mt-6">
+            <StatusBanner tone="error">
+              No sign-in provider is configured on this deployment.
+            </StatusBanner>
+          </div>
+        ) : (
+          <div className="mt-6 flex flex-col gap-3">
+            {providers.map((provider) => (
+              <form action={startSignIn} key={provider.id}>
+                <input type="hidden" name="provider" value={provider.id} />
+                <OutlineButton type="submit" className="w-full justify-center">
+                  {provider.id === "github" ? (
+                    <FiGithub className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <FiShield className="h-4 w-4" aria-hidden />
+                  )}
+                  {provider.label}
+                </OutlineButton>
+              </form>
+            ))}
+          </div>
+        )}
       </SurfacePanel>
     </main>
   );
