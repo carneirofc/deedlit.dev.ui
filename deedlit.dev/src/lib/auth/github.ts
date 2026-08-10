@@ -121,6 +121,42 @@ export function githubUsername(profile: Record<string, unknown> | undefined): st
   return typeof profile?.login === "string" ? profile.login : "";
 }
 
+/**
+ * GitHub's numeric account id. Unlike the login it cannot be changed or, once
+ * freed, re-registered by someone else, so it is what identifies the session.
+ */
+export function githubSubject(profile: Record<string, unknown> | undefined): string {
+  const id = profile?.id;
+  if (typeof id === "number" && Number.isFinite(id)) return String(id);
+  if (typeof id === "string" && id.trim()) return id.trim();
+  return "";
+}
+
+/**
+ * Re-checks an existing session against the *current* configuration, without
+ * calling GitHub.
+ *
+ * The access token is deliberately not kept (see `src/auth.ts`), so org and
+ * team membership cannot be re-verified here — that check happens once, at
+ * sign-in, and its result is bounded by the session lifetime. What can be
+ * re-checked is local and still worth it: an explicit allow-list entry that
+ * has since been removed, and a configuration that has lost its rules
+ * entirely. Both revoke at the user's next request rather than in eight hours.
+ */
+export function reauthorizeGitHub(login: string): boolean {
+  if (!login) return false;
+  if (allowedUsers().includes(login.toLowerCase())) return true;
+
+  // Admitted via org membership: re-verifying needs a credential this app
+  // refuses to store, so the sign-in decision stands for the session.
+  if (allowedOrg()) return true;
+
+  logger.warn("Portal access denied: no GitHub allow-list rule remains for this session", {
+    login
+  });
+  return false;
+}
+
 export async function authorizeGitHub(
   profile: Record<string, unknown> | undefined,
   accessToken: string | undefined

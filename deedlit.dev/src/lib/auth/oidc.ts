@@ -134,6 +134,37 @@ function verifiedEmail(profile: Record<string, unknown> | undefined): string {
 }
 
 /**
+ * The minimum an authorization decision needs, extracted from the ID token at
+ * sign-in and carried in the session so the decision can be **re-made** on
+ * later requests instead of being remembered as a yes.
+ *
+ * Only these three fields are kept. The rest of the profile is not the
+ * portal's business, and the email is stored only when the IdP verified it —
+ * so nothing that reaches `authorizeOidcIdentity()` later is weaker evidence
+ * than what was checked at sign-in.
+ */
+export interface OidcIdentity {
+  subject: string;
+  /** Empty unless `email_verified` was true. */
+  email: string;
+  groups: string[];
+}
+
+/** Group lists can be long at some IdPs; the session cookie is not storage. */
+const MAX_STORED_GROUPS = 32;
+const MAX_GROUP_LENGTH = 96;
+
+export function oidcIdentity(profile: Record<string, unknown> | undefined): OidcIdentity {
+  return {
+    subject: stringClaim(profile, "sub"),
+    email: verifiedEmail(profile),
+    groups: groupClaims(profile, env("AUTH_OIDC_GROUPS_CLAIM") || DEFAULT_GROUPS_CLAIM)
+      .filter((group) => group.length <= MAX_GROUP_LENGTH)
+      .slice(0, MAX_STORED_GROUPS)
+  };
+}
+
+/**
  * Decides whether an authenticated OIDC user may use the portal.
  *
  * Any one rule matching is enough. With no rule configured nobody gets in:
@@ -141,9 +172,19 @@ function verifiedEmail(profile: Record<string, unknown> | undefined): string {
  * portal to the whole internet.
  */
 export function authorizeOidc(profile: Record<string, unknown> | undefined): boolean {
-  const subject = stringClaim(profile, "sub");
+  return authorizeOidcIdentity(oidcIdentity(profile));
+}
+
+/**
+ * The same rules, evaluated against a stored identity rather than a live
+ * profile. Pure env comparison — no network — so it is cheap enough to run on
+ * every request, which is what makes removing someone from an allow-list take
+ * effect at their next request instead of whenever their session expires.
+ */
+export function authorizeOidcIdentity(identity: OidcIdentity): boolean {
+  const { subject } = identity;
   if (!subject) {
-    logger.warn("Portal sign-in denied: OIDC profile carries no `sub` claim");
+    logger.warn("Portal access denied: OIDC identity carries no `sub` claim");
     return false;
   }
 
@@ -154,7 +195,7 @@ export function authorizeOidc(profile: Record<string, unknown> | undefined): boo
 
   if (!subjects.length && !emails.length && !domains.length && !groups.length) {
     logger.error(
-      "Portal sign-in denied: OIDC is configured but no AUTH_ALLOWED_OIDC_* rule is set, " +
+      "Portal access denied: OIDC is configured but no AUTH_ALLOWED_OIDC_* rule is set, " +
         "so every account would otherwise be admitted"
     );
     return false;
@@ -162,7 +203,7 @@ export function authorizeOidc(profile: Record<string, unknown> | undefined): boo
 
   if (subjects.includes(subject.toLowerCase())) return true;
 
-  const email = verifiedEmail(profile);
+  const email = identity.email;
   if (email) {
     if (emails.includes(email)) return true;
 
@@ -170,12 +211,9 @@ export function authorizeOidc(profile: Record<string, unknown> | undefined): boo
     if (domain && domains.includes(domain)) return true;
   }
 
-  if (groups.length) {
-    const claimed = groupClaims(profile, env("AUTH_OIDC_GROUPS_CLAIM") || DEFAULT_GROUPS_CLAIM);
-    if (claimed.some((group) => groups.includes(group))) return true;
-  }
+  if (groups.length && identity.groups.some((group) => groups.includes(group))) return true;
 
-  logger.warn("Portal sign-in denied: OIDC account matches no allow-list rule", {
+  logger.warn("Portal access denied: OIDC account matches no allow-list rule", {
     subject,
     email: email || "(none or unverified)"
   });

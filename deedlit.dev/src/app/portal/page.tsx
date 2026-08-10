@@ -10,15 +10,15 @@ import {
 import { auth } from "@/auth";
 import { refreshServices, signOutAction } from "@/app/portal/actions";
 import { ServicesSection } from "@/features/services/components/ServicesSection";
-import { discoverServices } from "@/features/services/server/discover";
-import { checkServices } from "@/features/services/server/health";
+import { getPortalSnapshot } from "@/features/services/server/snapshot";
 
-// Discovery and health are live cluster state; caching them would be a lie.
+// Discovery and health are live cluster state; caching the *render* would be a
+// lie. The snapshot behind it has its own short TTL, which bounds how often a
+// reload can make the portal probe every service — see `server/snapshot.ts`.
 export const dynamic = "force-dynamic";
 
 async function ServicesPanel() {
-  const apps = await discoverServices();
-  const health = await checkServices(apps);
+  const { apps, health } = await getPortalSnapshot();
 
   return (
     <SurfacePanel tone="soft" padding="none" className="scroll-mt-20 overflow-hidden">
