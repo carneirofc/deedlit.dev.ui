@@ -80,8 +80,13 @@ jobs:
           tags: portal:scan
           cache-from: type=gha
 
+      # Pinned by commit SHA, not by tag. Upstream retagged its releases with a
+      # `v` prefix and the old unprefixed `0.28.0` stopped resolving, which
+      # failed this job before it ran a single scan — and a tag is mutable
+      # anyway, so a moved tag would silently change what gates the image.
+      # Refresh with: gh api repos/aquasecurity/trivy-action/git/ref/tags/vX.Y.Z
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: portal:scan
           format: table
