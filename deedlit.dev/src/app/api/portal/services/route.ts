@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { discoverServices } from "@/features/services/server/discover";
-import { checkServices } from "@/features/services/server/health";
+import { auth, sessionKey } from "@/auth";
+import { getPortalSnapshot } from "@/features/services/server/snapshot";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+/** 30 requests a minute is far above any human use of a dashboard endpoint. */
+const LIMIT = 30;
+const WINDOW_MS = 60_000;
 
 /**
  * JSON view of the portal, for scripting against.
@@ -18,11 +22,23 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const apps = await discoverServices();
-  const health = await checkServices(apps);
+  // Keyed on the session identity, not on a header. The identity comes out of
+  // an encrypted, signed cookie the client cannot rewrite, so a caller cannot
+  // shed their bucket by varying anything they control — the limit follows the
+  // account, not the connection.
+  const limited = rateLimit(`portal-services:${sessionKey(session)}`, LIMIT, WINDOW_MS);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
+    );
+  }
+
+  const { apps, health, collectedAt } = await getPortalSnapshot();
 
   return NextResponse.json(
     {
+      collectedAt,
       services: apps.map((app) => ({
         id: app.id,
         name: app.name,

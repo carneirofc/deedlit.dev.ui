@@ -1,17 +1,22 @@
-import NextAuth from "next-auth";
+import NextAuth, { type Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import type { Provider } from "next-auth/providers";
 import {
   authorizeGitHub,
   GITHUB_PROVIDER_ID,
   githubProvider,
+  githubSubject,
   githubUsername,
-  isGitHubConfigured
+  isGitHubConfigured,
+  reauthorizeGitHub
 } from "@/lib/auth/github";
 import {
   authorizeOidc,
+  authorizeOidcIdentity,
   isOidcConfigured,
   OIDC_PROVIDER_ID,
   oidcDisplayName,
+  oidcIdentity,
   oidcProvider,
   oidcUsername
 } from "@/lib/auth/oidc";
@@ -96,6 +101,61 @@ export function signInProviders(): SignInProvider[] {
   return providers;
 }
 
+/**
+ * Whether the session in hand still passes today's rules.
+ *
+ * The session cookie is an encrypted, signed JWE: its contents cannot be
+ * edited or forged without `AUTH_SECRET`, so "the user tampered with a claim"
+ * is not the threat this guards against — that one is closed by cryptography
+ * and by the minimum-length check above. The threat it *does* guard against is
+ * subtler and far more likely: a token that was legitimately issued and has
+ * since stopped deserving access, because the account was removed from an
+ * allow-list, dropped out of a group, or the provider was switched off.
+ *
+ * So authorization is never stored as a yes and trusted later. Only the raw
+ * identity is carried, and the decision is recomputed from it on every request
+ * — `jwt` runs on every `auth()` call, and returning `null` there ends the
+ * session immediately. It is a local comparison against environment
+ * configuration, so this costs no network round-trip.
+ */
+function stillAuthorized(token: JWT): boolean {
+  switch (token.provider) {
+    case GITHUB_PROVIDER_ID:
+      return isGitHubConfigured() && reauthorizeGitHub(token.username ?? "");
+
+    case OIDC_PROVIDER_ID:
+      return (
+        isOidcConfigured() &&
+        authorizeOidcIdentity({
+          subject: token.subject ?? "",
+          email: token.verifiedEmail ?? "",
+          groups: token.groups ?? []
+        })
+      );
+
+    default:
+      // No provider stamp at all: either a token from before this field
+      // existed, or one issued by a provider that has since been removed.
+      logger.warn("Portal session rejected: unknown or missing provider", {
+        provider: token.provider ?? "(none)"
+      });
+      return false;
+  }
+}
+
+/**
+ * A stable per-account key for rate limiting. Derived from the session, whose
+ * contents the client cannot rewrite, so a caller cannot escape their bucket
+ * by changing anything they control. The subject is the provider's immutable
+ * account id, so it survives a username change.
+ */
+export function sessionKey(session: Session): string {
+  const provider = session.user?.provider ?? "unknown";
+  const subject = session.user?.subject ?? session.user?.username ?? "unknown";
+
+  return `${provider}:${subject}`;
+}
+
 function configuredProviders(): Provider[] {
   const providers: Provider[] = [];
 
@@ -156,20 +216,39 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     },
 
     async jwt({ token, account, profile }) {
+      // Runs on every request that reads the session, not only at sign-in.
+      // A secret too weak to make the cookie unforgeable invalidates every
+      // session rather than quietly continuing to honour them.
+      if (!hasUsableSecret()) return null;
+
       // Only on initial sign-in do `account` and `profile` exist. No provider
       // access token is persisted here — each has done its job in `signIn`,
       // and keeping one would park a live credential in the session cookie.
+      // What is persisted is the identity the rules are evaluated against, so
+      // that `stillAuthorized()` can re-derive the decision rather than
+      // inherit it.
       const claims = profile as Record<string, unknown> | undefined;
 
       if (account?.provider === GITHUB_PROVIDER_ID) {
         token.provider = GITHUB_PROVIDER_ID;
         token.username = githubUsername(claims) || token.username;
+        token.subject = githubSubject(claims) || token.subject;
       } else if (account?.provider === OIDC_PROVIDER_ID) {
+        const identity = oidcIdentity(claims);
+
         token.provider = OIDC_PROVIDER_ID;
         token.username = oidcUsername(claims) || token.username;
+        token.subject = identity.subject || token.subject;
+        // Named apart from the standard `email` claim on purpose: that one is
+        // whatever the IdP sent, verified or not, and must never be what an
+        // allow-list matches on.
+        token.verifiedEmail = identity.email;
+        token.groups = identity.groups;
       }
 
-      return token;
+      // Returning null here ends the session — the cookie stops being honoured
+      // on the very next request.
+      return stillAuthorized(token) ? token : null;
     },
 
     async session({ session, token }) {
@@ -178,6 +257,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
       if (session.user && typeof token.provider === "string") {
         session.user.provider = token.provider;
+      }
+      if (session.user && typeof token.subject === "string") {
+        session.user.subject = token.subject;
       }
       return session;
     }

@@ -19,12 +19,20 @@ import type {
 
 const PROBE_TIMEOUT_MS = 3_000;
 
+/** `<service>.<namespace>.svc.cluster.local` and nothing else. */
+const DNS_LABEL = "[a-z0-9]([-a-z0-9]*[a-z0-9])?";
+const IN_CLUSTER_HOST = new RegExp(`^${DNS_LABEL}\\.${DNS_LABEL}\\.svc\\.cluster\\.local$`);
+
 /**
  * `probeUrl` is assembled in `discover.ts` from validated DNS labels and a
  * sanitized path, but it passes through operator-controlled annotations on the
  * way, so it is re-checked here before any request goes out. Only plain HTTP
  * to an in-cluster name is allowed — that is what keeps a hostile annotation
  * from turning the portal into an SSRF proxy.
+ *
+ * The host must match the two-label cluster form exactly. A suffix test would
+ * also admit `anything.attacker.example.svc.cluster.local`, which is a name an
+ * attacker who controls a DNS zone can make resolve wherever they like.
  */
 function isProbeTargetAllowed(rawUrl: string): boolean {
   let url: URL;
@@ -36,7 +44,7 @@ function isProbeTargetAllowed(rawUrl: string): boolean {
 
   if (url.protocol !== "http:") return false;
   if (url.username || url.password) return false;
-  if (!url.hostname.endsWith(".svc.cluster.local")) return false;
+  if (!IN_CLUSTER_HOST.test(url.hostname)) return false;
 
   return true;
 }
@@ -64,6 +72,13 @@ async function probe(service: LocalServiceApp): Promise<ServiceHealth> {
     });
 
     const responseTime = Date.now() - startedAt;
+
+    // Only the status line is wanted. Discarding the body frees the socket
+    // immediately instead of leaving it pinned until the GC runs, and means a
+    // service streaming megabytes at us is never buffered in the first place.
+    // A failure to cancel says nothing about the service's health, so it must
+    // not fall through to the catch below and be reported as "down".
+    await response.body?.cancel().catch(() => undefined);
 
     // The question is "is this service answering", not "does it like me".
     // A 3xx (console redirect), 401 (a registry demanding auth) or 404 all

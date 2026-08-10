@@ -23,12 +23,33 @@ import { localServiceApps } from "@/features/services/data/local-services";
  * A single GET against one API group is the whole requirement, so this talks
  * to the apiserver with `fetch` rather than pulling in `@kubernetes/client-node`,
  * which would add megabytes to the standalone bundle for no gain.
+ *
+ * The read surface is deliberately two verbs and nothing more: `list` on
+ * label-selected Ingresses, and `get` on the individual Services those
+ * Ingresses name. The portal never enumerates Services, never reads Pods,
+ * Secrets or ConfigMaps, and never writes anything — so the worst a bug here
+ * can leak is what is already on a portal-exposed Ingress. Keep the RBAC in
+ * `deedlit.dev.infra` matched to that; see the README.
  */
 
 const SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount";
 const TOKEN_PATH = `${SA_DIR}/token`;
 const CA_PATH = `${SA_DIR}/ca.crt`;
 const API_TIMEOUT_MS = 5_000;
+
+/**
+ * Nothing the portal reads is large — a few dozen Ingresses is under 200 KB.
+ * The cap exists so a surprising response (or a wrong URL pointed at a
+ * streaming endpoint) cannot grow the buffer until the pod is OOM-killed.
+ */
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Upper bound on the per-refresh Service reads. Only named-port backends need
+ * one, so this is generous; it bounds the fan-out at the apiserver if the
+ * exposed-Ingress set ever grows unexpectedly.
+ */
+const MAX_PORT_LOOKUPS = 32;
 
 const API_HOST =
   process.env.KUBERNETES_SERVICE_HOST && process.env.KUBERNETES_SERVICE_PORT
@@ -40,11 +61,8 @@ interface IngressBackendService {
   port?: { number?: number; name?: string };
 }
 
-interface ServiceListResponse {
-  items?: Array<{
-    metadata?: { name?: string; namespace?: string };
-    spec?: { ports?: Array<{ name?: string; port?: number }> };
-  }>;
+interface ServiceResponse {
+  spec?: { ports?: Array<{ name?: string; port?: number }> };
 }
 
 interface IngressListResponse {
@@ -82,7 +100,21 @@ async function readClusterCredentials(): Promise<{ token: string; ca: string } |
  * signed by the cluster's own root — so this one call drops to `node:https`
  * rather than disabling verification or leaning on a `NODE_EXTRA_CA_CERTS`
  * env var that a deployment could forget to set.
+ *
+ * This request carries the pod's ServiceAccount token, which is the most
+ * valuable credential the portal holds, so the transport is where it has to be
+ * protected. Verification is on (the default), the trust anchor is the
+ * cluster CA read from the projected volume rather than the system store, and
+ * TLS 1.2 is the floor — a downgrade to a broken suite is the cheap way to
+ * make a "verified" connection readable. There is deliberately no way to turn
+ * any of that off from configuration: an `AUTH_SKIP_TLS_VERIFY`-style escape
+ * hatch is the one setting that reliably ends up true in production.
  */
+/** `10.96.0.1` or `[::1]` — anything that is an address rather than a name. */
+function isIpLiteral(hostname: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":");
+}
+
 function getJson(
   url: string,
   { token, ca }: { token: string; ca: string }
@@ -97,13 +129,27 @@ function getJson(
         path: `${target.pathname}${target.search}`,
         method: "GET",
         ca,
+        // Trust *only* the cluster CA: a public CA that mis-issues for this
+        // name is not an acceptable signer for the apiserver.
+        rejectUnauthorized: true,
+        minVersion: "TLSv1.2",
+        // `KUBERNETES_SERVICE_HOST` is normally an IP, and RFC 6066 forbids an
+        // IP in SNI, so it is sent only for a real name. Either way the
+        // certificate is still checked against the host being dialled.
+        ...(isIpLiteral(target.hostname) ? {} : { servername: target.hostname }),
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         timeout: API_TIMEOUT_MS
       },
       (res) => {
         let body = "";
+        let bytes = 0;
         res.setEncoding("utf8");
-        res.on("data", (chunk) => {
+        res.on("data", (chunk: string) => {
+          bytes += Buffer.byteLength(chunk, "utf8");
+          if (bytes > MAX_RESPONSE_BYTES) {
+            req.destroy(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`));
+            return;
+          }
           body += chunk;
         });
         res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
@@ -167,24 +213,86 @@ function isValidDnsLabel(value: string | undefined): value is string {
 /**
  * Ingress backends usually name their port (`api`, `console`, `http`) rather
  * than numbering it, and a name cannot be dialled. This maps
- * `namespace/service` → { portName → number } from the Service objects so a
- * named backend can still be probed.
+ * `namespace/service` → { portName → number } so a named backend can still be
+ * probed.
+ *
+ * These are read one Service at a time, by name, rather than by listing every
+ * Service in the cluster. The list call was one line shorter but needed `list`
+ * on Services cluster-wide — the verb that turns a read-only bug or a stolen
+ * token into an inventory of every workload, port and Service annotation in
+ * the cluster. Reading only the names an exposed Ingress already points at
+ * needs `get`, which discloses nothing the portal was not told about.
  */
 type PortLookup = Map<string, Map<string, number>>;
 
-function buildPortLookup(body: ServiceListResponse): PortLookup {
-  const lookup: PortLookup = new Map();
+interface ServiceRef {
+  namespace: string;
+  name: string;
+}
+
+/** The backends whose port is a name; a numbered backend needs no lookup. */
+function namedPortBackends(body: IngressListResponse): ServiceRef[] {
+  const refs = new Map<string, ServiceRef>();
 
   for (const item of body.items ?? []) {
-    const { name, namespace } = item.metadata ?? {};
-    if (!name || !namespace) continue;
+    const namespace = item.metadata?.namespace;
+    if (!isValidDnsLabel(namespace)) continue;
+
+    for (const rule of item.spec?.rules ?? []) {
+      for (const path of rule.http?.paths ?? []) {
+        const backend = path.backend?.service;
+        if (!backend?.port?.name) continue;
+        if (!isValidDnsLabel(backend.name)) continue;
+
+        refs.set(`${namespace}/${backend.name}`, { namespace, name: backend.name });
+      }
+    }
+  }
+
+  return [...refs.values()].slice(0, MAX_PORT_LOOKUPS);
+}
+
+async function resolveNamedPorts(
+  refs: ServiceRef[],
+  credentials: { token: string; ca: string }
+): Promise<PortLookup> {
+  const lookup: PortLookup = new Map();
+  if (!refs.length) return lookup;
+
+  // Both components are validated DNS labels, so the path cannot be escaped.
+  const results = await Promise.all(
+    refs.map(async (ref) => {
+      const url = `${API_HOST}/api/v1/namespaces/${ref.namespace}/services/${ref.name}`;
+
+      try {
+        const response = await getJson(url, credentials);
+        if (response.status < 200 || response.status >= 300) {
+          logger.warn("Portal service lookup failed; set portal.deedlit.dev/health-port", {
+            service: `${ref.namespace}/${ref.name}`,
+            status: response.status
+          });
+          return null;
+        }
+        return { ref, body: JSON.parse(response.body) as ServiceResponse };
+      } catch (error) {
+        logger.warn("Portal service lookup threw", {
+          service: `${ref.namespace}/${ref.name}`,
+          reason: error instanceof Error ? error.message : "unknown error"
+        });
+        return null;
+      }
+    })
+  );
+
+  for (const result of results) {
+    if (!result) continue;
 
     const ports = new Map<string, number>();
-    for (const port of item.spec?.ports ?? []) {
+    for (const port of result.body.spec?.ports ?? []) {
       if (port.name && typeof port.port === "number") ports.set(port.name, port.port);
     }
 
-    lookup.set(`${namespace}/${name}`, ports);
+    lookup.set(`${result.ref.namespace}/${result.ref.name}`, ports);
   }
 
   return lookup;
@@ -254,27 +362,21 @@ export async function discoverServices(): Promise<LocalServiceApp[]> {
 
   const selector = encodeURIComponent(`${PORTAL_EXPOSE_LABEL}=true`);
   const ingressUrl = `${API_HOST}/apis/networking.k8s.io/v1/ingresses?labelSelector=${selector}`;
-  const serviceUrl = `${API_HOST}/api/v1/services`;
 
   try {
-    const [ingressResponse, serviceResponse] = await Promise.all([
-      getJson(ingressUrl, credentials),
-      getJson(serviceUrl, credentials)
-    ]);
+    const ingressResponse = await getJson(ingressUrl, credentials);
 
     if (ingressResponse.status < 200 || ingressResponse.status >= 300) {
       logger.error("Kubernetes ingress discovery failed", { status: ingressResponse.status });
       return [];
     }
 
-    // A failure here is not fatal: without it, named-port backends simply get
-    // no probe URL and render as "unknown" rather than the whole page failing.
-    const portLookup =
-      serviceResponse.status >= 200 && serviceResponse.status < 300
-        ? buildPortLookup(JSON.parse(serviceResponse.body) as ServiceListResponse)
-        : new Map();
-
     const body = JSON.parse(ingressResponse.body) as IngressListResponse;
+
+    // A failure in here is not fatal: without it, named-port backends simply
+    // get no probe URL and render as "unknown" rather than the page failing.
+    const portLookup = await resolveNamedPorts(namedPortBackends(body), credentials);
+
     const services = (body.items ?? [])
       .map((item) => toServiceApp(item, portLookup))
       .filter((service): service is LocalServiceApp => service !== null);

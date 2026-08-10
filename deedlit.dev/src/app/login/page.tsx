@@ -3,6 +3,15 @@ import { redirect } from "next/navigation";
 import { FiGithub, FiShield } from "react-icons/fi";
 import { OutlineButton, PageHeader, StatusBanner, SurfacePanel } from "@carneirofc/ui";
 import { auth, signIn, signInProviders } from "@/auth";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
+
+/**
+ * Sign-in is unauthenticated, so it is keyed on the client address rather than
+ * a session. Each attempt costs an outbound round-trip to GitHub or the IdP;
+ * ten a minute is generous for a human and unhelpful as an amplifier.
+ */
+const SIGN_IN_LIMIT = 10;
+const SIGN_IN_WINDOW_MS = 60_000;
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -38,6 +47,8 @@ function errorMessage(code: string | undefined): string | null {
   switch (code) {
     case "AccessDenied":
       return "That account is not on the allow-list this portal is restricted to.";
+    case "RateLimited":
+      return "Too many sign-in attempts. Wait a minute and try again.";
     case "Verification":
       return "The sign-in link has expired. Try again.";
     default:
@@ -69,6 +80,9 @@ export default async function LoginPage({
     const requested = formData.get("provider");
     const provider = signInProviders().find((entry) => entry.id === requested);
     if (!provider) redirect("/login?error=Configuration");
+
+    const limited = rateLimit(await clientKey("sign-in"), SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
+    if (!limited.ok) redirect("/login?error=RateLimited");
 
     // Goes through the Auth.js handler, which owns the CSRF token — never
     // hand-roll this POST.
