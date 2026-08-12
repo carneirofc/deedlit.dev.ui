@@ -12,7 +12,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 ## Layout
 
-This is a **monorepo** with sibling packages (`deedlit.dev/`, `deedlit.dev.comfyhelper/`, `deedlit.dev.ui/`, `deedlit.vision/`, and the new `deedlit.*` FastAPI services). Treat it as single-context for now (one root `CONTEXT.md` + `docs/adr/`) until a `CONTEXT-MAP.md` is introduced. Package-local docs (`<package>/IMAGE_LIBRARY.md`, `<package>/.github/copilot-instructions.md`) are authoritative for that package.
+This is a **monorepo** with sibling packages (`deedlit.dev.comfyhelper/`, `deedlit.dev.ui/`, `deedlit.vision/`, and the new `deedlit.*` FastAPI services). The public portal site lives in the separate `deedlit.dev.portal` repo. Treat it as single-context for now (one root `CONTEXT.md` + `docs/adr/`) until a `CONTEXT-MAP.md` is introduced. Package-local docs (`<package>/IMAGE_LIBRARY.md`, `<package>/.github/copilot-instructions.md`) are authoritative for that package.
 
 ## Use the glossary's vocabulary
 

@@ -1,10 +1,15 @@
 # deedlit.dev — Monorepo
 
 A self-hosted library for the images you generate locally with ComfyUI and
-Automatic1111, plus the deedlit.dev landing site. **ComfyHelper** ingests a folder
-of outputs, parses the metadata embedded in each file (prompt, tags, parameters,
-model/LoRA references), and lets you filter by those fields and find similar images
+Automatic1111. **ComfyHelper** ingests a folder of outputs, parses the
+metadata embedded in each file (prompt, tags, parameters, model/LoRA
+references), and lets you filter by those fields and find similar images
 through hybrid vector search.
+
+The public deedlit.dev landing site now lives in its own repo,
+[`carneirofc/deedlit.dev.portal`](https://github.com/carneirofc/deedlit.dev.portal),
+and consumes `@carneirofc/ui` from this repo as a published GitHub Packages
+dependency.
 
 The web apps are an npm workspace; the image-library backend is a mesh of standalone
 **FastAPI** services (database-per-service, HTTP-only) managed with `uv`.
@@ -33,14 +38,12 @@ The inline Mermaid diagrams below stay as the quick at-a-glance view.
 ```mermaid
 flowchart LR
     subgraph apps["Web apps (npm workspace)"]
-        dev["deedlit.dev<br/>:3001"]
         ch["ComfyHelper<br/>:3000"]
         ui["@carneirofc/ui"]
     end
-    ui -. components .-> dev
     ui -. components .-> ch
+    ui -. "published package" .-> dev["deedlit.dev.portal<br/>(separate repo)"]
 
-    dev --> api
     ch --> api
 
     subgraph services["FastAPI services"]
@@ -74,18 +77,11 @@ flowchart LR
 
 | Package | Port | Description |
 |---|---|---|
-| [`deedlit.dev`](./deedlit.dev/) | 3001 | Public Next.js site — home, books, gallery, services |
 | [`deedlit.dev.comfyhelper`](./deedlit.dev.comfyhelper/) | 3000 | ComfyHelper UI for the image library |
 | [`deedlit.dev.ui`](./deedlit.dev.ui/) | — | Shared `@carneirofc/ui` component library — [live Storybook](https://carneirofc.github.io/deedlit.dev/ui/storybook/) |
 
-#### deedlit.dev — public site
-
-Home hub with quick access to self-hosted services, an image gallery, and the
-reference book shelf:
-
-| Home / services hub | Image archive | Reference shelf |
-|---|---|---|
-| ![deedlit.dev home](./docs/screenshots/deedlit-dev-home.png) | ![deedlit.dev gallery](./docs/screenshots/deedlit-dev-gallery.png) | ![deedlit.dev books](./docs/screenshots/deedlit-dev-books.png) |
+The public landing site (home, books, gallery, services) lives in
+[`carneirofc/deedlit.dev.portal`](https://github.com/carneirofc/deedlit.dev.portal).
 
 #### ComfyHelper — image library
 
@@ -178,7 +174,7 @@ npm run dev                # start every app + service via mprocs (one pane each
 
 `npm run dev` runs [`mprocs`](./mprocs.yaml): one pane per process, `r` restarts
 one, `q` tears the whole tree down cleanly. `predev` runs `infra:up` + `dev:migrate`
-for you. Run a single piece with `npm run dev:<name>` (e.g. `dev:dev`,
+for you. Run a single piece with `npm run dev:<name>` (e.g.
 `dev:comfyhelper`, `dev:api`, `dev:catalog`, …) or all services without the web
 apps via `npm run dev:services`.
 
@@ -186,7 +182,6 @@ apps via `npm run dev:services`.
 
 ```bash
 npm run build:ui           # shared UI only
-npm run build:dev          # landing site (+ UI)
 npm run build:comfyhelper  # ComfyHelper (+ UI)
 npm run build              # everything
 ```
@@ -223,7 +218,6 @@ npm run build-storybook -w @carneirofc/ui    # static build → deedlit.dev.ui/s
 ## Project structure
 
 ```
-deedlit.dev/              ← landing site (Next.js)
 deedlit.dev.comfyhelper/  ← ComfyHelper image-library UI (Next.js)
 deedlit.dev.ui/           ← shared component library (@carneirofc/ui)
 deedlit.<service>/        ← FastAPI services (api, catalog, search, graph,

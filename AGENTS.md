@@ -9,9 +9,9 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - Toolchain not on the bare PATH: Node is via **fnm** (`fnm env --use-on-cd | Out-String | Invoke-Expression`), Python via **uv** (`uv run …`) — full details in [`docs/agents/toolchain.md`](docs/agents/toolchain.md).
 
 ## Package Ownership
-- `deedlit.dev/`: marketing site, home page, books, gallery presentation, static content, PWA-related work, and the authenticated `/portal` service dashboard (GitHub OAuth; deployed by `deedlit.dev.infra/apps/portal`).
+- The marketing site, home page, books, gallery presentation, and authenticated `/portal` service dashboard live in the separate `carneirofc/deedlit.dev.portal` repo — not in this monorepo. It consumes `@carneirofc/ui` as a published GitHub Packages dependency (see `.github/workflows/publish-ui.yml`).
 - `deedlit.dev.comfyhelper/`: generated-image library **UI** (Next.js) — talks to the `deedlit.api` gateway. See `deedlit.dev.comfyhelper/IMAGE_LIBRARY.md` for the backend architecture.
-- `deedlit.dev.ui/`: shared UI components, icons, tokens, CSS variables, and app-agnostic presentation primitives.
+- `deedlit.dev.ui/`: shared UI components, icons, tokens, CSS variables, and app-agnostic presentation primitives. Published to GitHub Packages as `@carneirofc/ui` for `deedlit.dev.portal` to consume; also used in-tree by `deedlit.dev.comfyhelper`.
 - `deedlit.<service>/`: FastAPI image-library services (`api`, `catalog`, `search`, `graph`, `ingest`, `metadata`, `labelagent`, `vision`) — database-per-service, HTTP-only, `uv`-managed. Each owns its store and is the sole writer of it.
 
 ## Working Rules
@@ -22,7 +22,6 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - When a task spans packages, keep ownership clear: shared primitive in `deedlit.dev.ui`, integration in the consuming app.
 
 ## Package Entry Points
-- `deedlit.dev/`: start from `src/app/`, `src/features/`, and `scripts/`.
 - `deedlit.dev.comfyhelper/`: start from `app/`, `lib/`, `prisma/`, and `.github/instructions/`.
 - `deedlit.dev.ui/`: start from `src/`, `styles/`, and the package exports in `package.json`.
 - `deedlit.<service>/`: start from `app.py` (FastAPI entry), the package module (`<service>/`), `pyproject.toml`, and `tests/`. Ingest also has `worker.py` (the queue consumer).
@@ -30,7 +29,6 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 ## Command Reference
 - Build shared UI: `npm run build:ui`
 - Run everything (orchestrated): `npm run dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `npm run infra:up`.
-- Run landing app only: `npm run dev:dev`
 - Run comfyhelper only: `npm run dev:comfyhelper`
 - Build all workspaces: `npm run build`
 - Lint (JS/TS/CSS): `npm run lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `npm run lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
@@ -104,7 +102,7 @@ Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail 
 - [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.
 
 ### Web apps (npm workspace)
-- [`deedlit.dev/AGENTS.md`](deedlit.dev/AGENTS.md) — public Next.js site (:3001): home, books, gallery, PWA, plus the authenticated `/portal` service dashboard. Nests [`deedlit.dev/docs/AGENTS.md`](deedlit.dev/docs/AGENTS.md) (testing/setup guide).
+- The public Next.js site (:3001) — home, books, gallery, PWA, plus the authenticated `/portal` service dashboard — lives in `carneirofc/deedlit.dev.portal`, not here.
 - [`deedlit.dev.comfyhelper/AGENTS.md`](deedlit.dev.comfyhelper/AGENTS.md) — ComfyHelper image-library UI (:3000), gateway client only.
 - [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md) — shared `@carneirofc/ui` component library + tokens.
 

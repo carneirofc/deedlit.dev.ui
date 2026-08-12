@@ -54,7 +54,7 @@ jobs:
           mkdir -p _site/ui
           mv deedlit.dev.ui/storybook-static _site/ui/storybook
           cp docs/site/index.html _site/index.html
-          cp deedlit.dev/public/icons/icon.svg _site/icon.svg
+          cp docs/site/icon.svg _site/icon.svg
           cp -r docs/screenshots _site/screenshots
           touch _site/.nojekyll
 
