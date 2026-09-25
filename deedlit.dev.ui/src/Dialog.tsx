@@ -7,10 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import { Dialog as RadixDialog } from "radix-ui";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS, BORDER_PATTERNS } from "./utils";
 
-export type DialogSize = "sm" | "md" | "lg" | "xl" | "full";
+export const DialogSizeSchema = z.enum(["sm", "md", "lg", "xl", "full"]);
+export type DialogSize = z.infer<typeof DialogSizeSchema>;
 
 const SIZE_CLASS_NAMES: Record<DialogSize, string> = {
   sm: "max-w-md",
@@ -65,15 +67,17 @@ export const DialogOverlay = forwardRef<
 });
 DialogOverlay.displayName = "DialogOverlay";
 
-export type DialogContentProps = ComponentPropsWithoutRef<typeof RadixDialog.Content> & {
-  size?: DialogSize;
+export const DialogContentOwnPropsSchema = z.object({
+  size: DialogSizeSchema.optional(),
   /** Hide the built-in close button rendered in the top-right corner. */
-  showCloseButton?: boolean;
-  closeLabel?: string;
-  overlayClassName?: string;
+  showCloseButton: z.boolean().optional(),
+  closeLabel: z.string().optional(),
+  overlayClassName: z.string().optional(),
   /** Render without the portal (e.g. inside an already-portaled host). */
-  portal?: boolean;
-};
+  portal: z.boolean().optional(),
+});
+export type DialogContentProps = z.infer<typeof DialogContentOwnPropsSchema> &
+  ComponentPropsWithoutRef<typeof RadixDialog.Content>;
 
 export const DialogContent = forwardRef<
   ElementRef<typeof RadixDialog.Content>,

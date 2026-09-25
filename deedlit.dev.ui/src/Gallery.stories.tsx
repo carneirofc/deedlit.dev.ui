@@ -1,13 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, useState } from "react";
+import { z } from "zod";
 
 import { Gallery, type GalleryViewMode } from "./Gallery";
 
-interface Tile {
-  id: string;
-  index: number;
-  hue: number;
-}
+export const TileSchema = z.object({
+  id: z.string(),
+  index: z.number(),
+  hue: z.number(),
+});
+type Tile = z.infer<typeof TileSchema>;
 
 function makeTiles(count: number): Tile[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -39,54 +41,56 @@ type Story = StoryObj<typeof meta>;
  * how many `[data-gallery-item]` nodes exist so a scroll never leaves a blank.
  * Each tile prints its absolute index, so the mounted range is verifiable.
  */
-export const Windowed: Story = {
-  render: () => {
-    const [view, setView] = useState<GalleryViewMode>("grid");
-    const items = useMemo(() => makeTiles(500), []);
-    return (
-      <div className="min-h-screen bg-ui-bg-deep p-4 text-ui-ink">
-        <div className="sticky top-0 z-10 mb-4 flex items-center gap-3 bg-ui-bg-deep/90 py-2 backdrop-blur">
-          {(["grid", "masonry", "list"] as GalleryViewMode[]).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={`rounded px-3 py-1 text-sm ${view === v ? "bg-accent-cyan text-ui-bg-deep" : "bg-ui-bg-soft"}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <Gallery<Tile>
-          items={items}
-          getKey={(t) => t.id}
-          viewMode={view}
-          windowing={{ pageSize: 40, pages: 5 }}
-          gridClassName="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
-          masonryClassName="columns-2 gap-3 sm:columns-4 lg:columns-6"
-          listClassName="flex flex-col gap-2"
-          cardClassName="overflow-hidden rounded-lg"
-          renderMedia={(t, ctx) => (
-            <div
-              data-testid={`tile-${t.index}`}
-              className={
-                ctx.viewMode === "list"
-                  ? "flex h-16 w-16 items-center justify-center text-sm font-bold text-black"
-                  : ctx.viewMode === "masonry"
-                    ? "flex items-center justify-center text-lg font-bold text-black"
-                    : "flex aspect-square items-center justify-center text-lg font-bold text-black"
-              }
-              style={{
-                backgroundColor: `hsl(${t.hue} 70% 60%)`,
-                // Vary masonry heights so the column layout is real.
-                height: ctx.viewMode === "masonry" ? 120 + (t.index % 5) * 40 : undefined,
-              }}
-            >
-              {t.index}
-            </div>
-          )}
-        />
+function windowedTileClassName(viewMode: GalleryViewMode): string {
+  if (viewMode === "list") return "flex h-16 w-16 items-center justify-center text-sm font-bold text-black";
+  if (viewMode === "masonry") return "flex items-center justify-center text-lg font-bold text-black";
+  return "flex aspect-square items-center justify-center text-lg font-bold text-black";
+}
+
+function WindowedGalleryStory() {
+  const [view, setView] = useState<GalleryViewMode>("grid");
+  const items = useMemo(() => makeTiles(500), []);
+  return (
+    <div className="min-h-screen bg-ui-bg-deep p-4 text-ui-ink">
+      <div className="sticky top-0 z-10 mb-4 flex items-center gap-3 bg-ui-bg-deep/90 py-2 backdrop-blur">
+        {(["grid", "masonry", "list"] as GalleryViewMode[]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            className={`rounded px-3 py-1 text-sm ${view === v ? "bg-accent-cyan text-ui-bg-deep" : "bg-ui-bg-soft"}`}
+          >
+            {v}
+          </button>
+        ))}
       </div>
-    );
-  },
+      <Gallery<Tile>
+        items={items}
+        getKey={(t) => t.id}
+        viewMode={view}
+        windowing={{ pageSize: 40, pages: 5 }}
+        gridClassName="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6"
+        masonryClassName="columns-2 gap-3 sm:columns-4 lg:columns-6"
+        listClassName="flex flex-col gap-2"
+        cardClassName="overflow-hidden rounded-lg"
+        renderMedia={(t, ctx) => (
+          <div
+            data-testid={`tile-${t.index}`}
+            className={windowedTileClassName(ctx.viewMode)}
+            style={{
+              backgroundColor: `hsl(${t.hue} 70% 60%)`,
+              // Vary masonry heights so the column layout is real.
+              height: ctx.viewMode === "masonry" ? 120 + (t.index % 5) * 40 : undefined,
+            }}
+          >
+            {t.index}
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
+export const Windowed: Story = {
+  render: WindowedGalleryStory,
 };

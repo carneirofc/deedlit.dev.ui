@@ -1,8 +1,11 @@
 import { type ComponentPropsWithoutRef, forwardRef } from "react"
+import { z } from "zod";
 import { cn } from "./utils";
-export type CheckboxProps = ComponentPropsWithoutRef<"input"> & {
-	label?: string;
-}
+
+export const CheckboxOwnPropsSchema = z.object({
+	label: z.string().optional(),
+});
+export type CheckboxProps = z.infer<typeof CheckboxOwnPropsSchema> & ComponentPropsWithoutRef<"input">;
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(props, ref) {
 	const { label, id, className, disabled, ...rest } = props;

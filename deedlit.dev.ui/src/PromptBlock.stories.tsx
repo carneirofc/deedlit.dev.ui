@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { fn } from "storybook/test";
 
 import PromptBlock from "./PromptBlock";
@@ -39,20 +39,22 @@ export const Negative: Story = {
   ),
 };
 
+function InteractivePromptBlockStory(args: ComponentProps<typeof PromptBlock>) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="w-96">
+      <PromptBlock
+        {...args}
+        copied={copied}
+        onCopy={() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        }}
+      />
+    </div>
+  );
+}
+
 export const Interactive: Story = {
-  render: (args) => {
-    const [copied, setCopied] = useState(false);
-    return (
-      <div className="w-96">
-        <PromptBlock
-          {...args}
-          copied={copied}
-          onCopy={() => {
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1200);
-          }}
-        />
-      </div>
-    );
-  },
+  render: InteractivePromptBlockStory,
 };

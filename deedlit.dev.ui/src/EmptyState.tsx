@@ -2,10 +2,12 @@
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type EmptyStateTone = "default" | "subtle";
+export const EmptyStateToneSchema = z.enum(["default", "subtle"]);
+export type EmptyStateTone = z.infer<typeof EmptyStateToneSchema>;
 
 export const emptyStateVariants = cva("text-ui-sm text-[color:var(--ui-ink-subtle)]", {
   variants: {
@@ -19,11 +21,13 @@ export const emptyStateVariants = cva("text-ui-sm text-[color:var(--ui-ink-subtl
   },
 });
 
-export type EmptyStateProps = HTMLAttributes<HTMLParagraphElement> &
-  VariantProps<typeof emptyStateVariants> & {
-    children: ReactNode;
-    testId?: string;
-  };
+export const EmptyStateOwnPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+  testId: z.string().optional(),
+});
+export type EmptyStateProps = z.infer<typeof EmptyStateOwnPropsSchema> &
+  HTMLAttributes<HTMLParagraphElement> &
+  VariantProps<typeof emptyStateVariants>;
 
 const EmptyState = forwardRef<HTMLParagraphElement, EmptyStateProps>(
   function EmptyState({ children, tone, testId, className, ...props }, ref) {

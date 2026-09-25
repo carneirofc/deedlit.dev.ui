@@ -1,14 +1,16 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type InfoChipProps = HTMLAttributes<HTMLSpanElement> & {
-  children: ReactNode;
-  testId?: string;
-  "data-testid"?: string;
-};
+export const InfoChipOwnPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+  testId: z.string().optional(),
+  "data-testid": z.string().optional(),
+});
+export type InfoChipProps = z.infer<typeof InfoChipOwnPropsSchema> & HTMLAttributes<HTMLSpanElement>;
 
 const InfoChip = forwardRef<HTMLSpanElement, InfoChipProps>(function InfoChip(
   { children, testId, className, "data-testid": dataTestId, ...props },

@@ -2,10 +2,12 @@
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type StatusBannerTone = "loading" | "error";
+export const StatusBannerToneSchema = z.enum(["loading", "error"]);
+export type StatusBannerTone = z.infer<typeof StatusBannerToneSchema>;
 
 export const statusBannerVariants = cva("rounded-lg border px-2 py-2 text-ui-xs", {
   variants: {
@@ -20,11 +22,13 @@ export const statusBannerVariants = cva("rounded-lg border px-2 py-2 text-ui-xs"
   },
 });
 
-export type StatusBannerProps = HTMLAttributes<HTMLParagraphElement> &
-  VariantProps<typeof statusBannerVariants> & {
-    tone: StatusBannerTone;
-    children: ReactNode;
-  };
+export const StatusBannerOwnPropsSchema = z.object({
+  tone: StatusBannerToneSchema,
+  children: z.custom<ReactNode>(),
+});
+export type StatusBannerProps = z.infer<typeof StatusBannerOwnPropsSchema> &
+  HTMLAttributes<HTMLParagraphElement> &
+  VariantProps<typeof statusBannerVariants>;
 
 /**
  * Compact inline status banner for loading / error states inside panels.

@@ -2,12 +2,13 @@
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva } from "class-variance-authority";
+import { z } from "zod";
 
 import CopyButton from "./CopyButton";
 import SectionLabel from "./SectionLabel";
-import { cn } from "./utils";
 
-export type PromptBlockTone = "positive" | "negative" | "neutral";
+export const PromptBlockToneSchema = z.enum(["positive", "negative", "neutral"]);
+export type PromptBlockTone = z.infer<typeof PromptBlockToneSchema>;
 
 export const promptBlockTextVariants = cva(
   "mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg p-2 text-ui-xs text-[color:var(--ui-ink-primary)]",
@@ -25,19 +26,21 @@ export const promptBlockTextVariants = cva(
   },
 );
 
-export type PromptBlockProps = Omit<HTMLAttributes<HTMLElement>, "children"> & {
+export const PromptBlockOwnPropsSchema = z.object({
   /** Section heading displayed above the prompt text. */
-  label: ReactNode;
+  label: z.custom<ReactNode>(),
   /** The prompt text. */
-  children: ReactNode;
+  children: z.custom<ReactNode>(),
   /** Visual tone controlling the background colour of the text area. */
-  tone?: PromptBlockTone;
+  tone: PromptBlockToneSchema.optional(),
   /** Whether the copy button shows "Copied" state. */
-  copied?: boolean;
+  copied: z.boolean().optional(),
   /** Called when the copy button is clicked. */
-  onCopy?: () => void;
-  testId?: string;
-};
+  onCopy: z.custom<() => void>().optional(),
+  testId: z.string().optional(),
+});
+export type PromptBlockProps = z.infer<typeof PromptBlockOwnPropsSchema> &
+  Omit<HTMLAttributes<HTMLElement>, "children">;
 
 /**
  * Labelled prompt display block with a copy button.

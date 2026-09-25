@@ -1,15 +1,17 @@
 "use client";
 
 import { forwardRef, type SVGAttributes } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
 // ── Base icon props ──────────────────────────────────────────────────
 
-export type IconProps = SVGAttributes<SVGSVGElement> & {
+export const IconOwnPropsSchema = z.object({
   /** Override the default 24×24 size class. */
-  size?: string;
-};
+  size: z.string().optional(),
+});
+export type IconProps = z.infer<typeof IconOwnPropsSchema> & SVGAttributes<SVGSVGElement>;
 
 const BASE_ICON_CLASSES = "shrink-0 fill-none stroke-current";
 const DEFAULT_SIZE = "h-4 w-4";
@@ -42,7 +44,12 @@ function icon(
 
 // ── Icons ────────────────────────────────────────────────────────────
 
-export const HeartIcon = forwardRef<SVGSVGElement, IconProps & { filled?: boolean }>(
+export const HeartIconOwnPropsSchema = z.object({
+  filled: z.boolean().optional(),
+});
+export type HeartIconProps = z.infer<typeof HeartIconOwnPropsSchema> & IconProps;
+
+export const HeartIcon = forwardRef<SVGSVGElement, HeartIconProps>(
   function HeartIcon({ filled, size, className, ...props }, ref) {
     return (
       <svg

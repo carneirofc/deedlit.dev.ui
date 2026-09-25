@@ -1,18 +1,20 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type PanelSectionHeaderProps = {
-  title: ReactNode;
-  description?: ReactNode;
-  actions?: ReactNode;
-  className?: string;
-  titleClassName?: string;
-  descriptionClassName?: string;
-  actionsClassName?: string;
-};
+export const PanelSectionHeaderPropsSchema = z.object({
+  title: z.custom<ReactNode>(),
+  description: z.custom<ReactNode>().optional(),
+  actions: z.custom<ReactNode>().optional(),
+  className: z.string().optional(),
+  titleClassName: z.string().optional(),
+  descriptionClassName: z.string().optional(),
+  actionsClassName: z.string().optional(),
+});
+export type PanelSectionHeaderProps = z.infer<typeof PanelSectionHeaderPropsSchema>;
 
 const PanelSectionHeader = forwardRef<HTMLDivElement, PanelSectionHeaderProps>(
   function PanelSectionHeader(

@@ -1,20 +1,23 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes } from "react";
+import { z } from "zod";
 
 import OutlineButton from "./OutlineButton";
 import { cn, LAYOUT_PATTERNS } from "./utils";
 
-export type PaginationProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
-  page: number;
-  totalPages: number;
-  onPrevPage: () => void;
-  onNextPage: () => void;
-  disabled?: boolean;
-  prevLabel?: string;
-  nextLabel?: string;
-  testIdPrefix?: string;
-};
+export const PaginationOwnPropsSchema = z.object({
+  page: z.number(),
+  totalPages: z.number(),
+  onPrevPage: z.custom<() => void>(),
+  onNextPage: z.custom<() => void>(),
+  disabled: z.boolean().optional(),
+  prevLabel: z.string().optional(),
+  nextLabel: z.string().optional(),
+  testIdPrefix: z.string().optional(),
+});
+export type PaginationProps = z.infer<typeof PaginationOwnPropsSchema> &
+  Omit<HTMLAttributes<HTMLDivElement>, "children">;
 
 const Pagination = forwardRef<HTMLDivElement, PaginationProps>(
   function Pagination(

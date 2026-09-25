@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 
 import Toast from "./Toast";
 import OutlineButton from "./OutlineButton";
@@ -9,6 +9,9 @@ const meta = {
   component: Toast,
   tags: ["autodocs"],
   parameters: { layout: "fullscreen" },
+  args: {
+    title: "Library synced",
+  },
   argTypes: {
     tone: { control: "inline-radio", options: ["info", "success", "warn", "error"] },
   },
@@ -17,23 +20,25 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+function DefaultToastStory(args: ComponentProps<typeof Toast>) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="grid min-h-[60vh] place-items-center">
+      <OutlineButton onClick={() => setOpen(true)}>Show toast</OutlineButton>
+      <Toast
+        {...args}
+        open={open}
+        title="Library synced"
+        description="1,204 images indexed across 3 source directories."
+        onClose={() => setOpen(false)}
+      />
+    </div>
+  );
+}
+
 export const Default: Story = {
   args: { tone: "success" },
-  render: (args) => {
-    const [open, setOpen] = useState(true);
-    return (
-      <div className="grid min-h-[60vh] place-items-center">
-        <OutlineButton onClick={() => setOpen(true)}>Show toast</OutlineButton>
-        <Toast
-          {...args}
-          open={open}
-          title="Library synced"
-          description="1,204 images indexed across 3 source directories."
-          onClose={() => setOpen(false)}
-        />
-      </div>
-    );
-  },
+  render: DefaultToastStory,
 };
 
 export const Error: Story = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
+import { z } from "zod";
 
 import {
   Dialog,
@@ -11,21 +12,74 @@ import {
 import OutlineButton from "./OutlineButton";
 import { cn, SPACING_PATTERNS, BORDER_PATTERNS } from "./utils";
 
-export type ConfirmationDialogData = {
-  title: string;
-  details: string[];
-  outcomes: string[];
-  confirmLabel?: string;
-  cancelLabel?: string;
-};
+export const ConfirmationDialogDataSchema = z.object({
+  title: z.string(),
+  details: z.array(z.string()),
+  outcomes: z.array(z.string()),
+  confirmLabel: z.string().optional(),
+  cancelLabel: z.string().optional(),
+});
+export type ConfirmationDialogData = z.infer<typeof ConfirmationDialogDataSchema>;
 
-export type ConfirmationDialogProps = {
-  dialog: ConfirmationDialogData;
-  onClose: (accepted: boolean) => void;
-  className?: string;
-  overlayClassName?: string;
-  testIdPrefix?: string;
-};
+export const ConfirmationDialogPropsSchema = z.object({
+  dialog: ConfirmationDialogDataSchema,
+  onClose: z.custom<(accepted: boolean) => void>(),
+  className: z.string().optional(),
+  overlayClassName: z.string().optional(),
+  testIdPrefix: z.string().optional(),
+});
+export type ConfirmationDialogProps = z.infer<typeof ConfirmationDialogPropsSchema>;
+
+export const ConfirmationDialogListPropsSchema = z.object({
+  heading: z.string(),
+  lines: z.array(z.string()),
+  itemClassName: z.string(),
+  keyPrefix: z.string(),
+});
+export type ConfirmationDialogListProps = z.infer<typeof ConfirmationDialogListPropsSchema>;
+
+function ConfirmationDialogList({ heading, lines, itemClassName, keyPrefix }: ConfirmationDialogListProps) {
+  return (
+    <section>
+      <p className="ui-text-label-sm text-ui-ink-subtle">{heading}</p>
+      <ul className="mt-2 space-y-1">
+        {lines.map((line, index) => (
+          <li key={`${keyPrefix}:${index}`} className={cn("rounded-md", itemClassName, SPACING_PATTERNS.controlXs)}>
+            {line}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export const ConfirmationDialogFooterPropsSchema = z.object({
+  dialog: ConfirmationDialogDataSchema,
+  onClose: z.custom<(accepted: boolean) => void>(),
+  testIdPrefix: z.string(),
+});
+export type ConfirmationDialogFooterProps = z.infer<typeof ConfirmationDialogFooterPropsSchema>;
+
+function ConfirmationDialogFooter({ dialog, onClose, testIdPrefix }: ConfirmationDialogFooterProps) {
+  return (
+    <div className={cn("flex items-center justify-end gap-2", BORDER_PATTERNS.topFaint, SPACING_PATTERNS.dialogSection)}>
+      <DialogClose asChild>
+        <OutlineButton data-testid={`${testIdPrefix}-cancel-button`} controlSize="md">
+          {dialog.cancelLabel ?? "Cancel"}
+        </OutlineButton>
+      </DialogClose>
+      <OutlineButton
+        autoFocus
+        data-testid={`${testIdPrefix}-accept-button`}
+        onClick={() => onClose(true)}
+        variant="accent"
+        controlSize="md"
+      >
+        {dialog.confirmLabel ?? "Confirm"}
+      </OutlineButton>
+    </div>
+  );
+}
 
 /**
  * Confirmation dialog driven by a `dialog` data object. Built on the accessible
@@ -65,45 +119,22 @@ const ConfirmationDialog = forwardRef<HTMLDivElement, ConfirmationDialogProps>(f
         </div>
 
         <div className={cn("max-h-[min(62dvh,36rem)] space-y-4 overflow-y-auto text-ui-sm text-ui-ink-accent", SPACING_PATTERNS.dialogSection)}>
-          <section>
-            <p className="ui-text-label-sm text-ui-ink-subtle">Details</p>
-            <ul className="mt-2 space-y-1">
-              {dialog.details.map((line, index) => (
-                <li key={`detail:${index}`} className={cn("rounded-md bg-ui-bg-muted", SPACING_PATTERNS.controlXs)}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <ConfirmationDialogList
+            heading="Details"
+            lines={dialog.details}
+            itemClassName="bg-ui-bg-muted"
+            keyPrefix="detail"
+          />
 
-          <section>
-            <p className="ui-text-label-sm text-ui-ink-subtle">If You Accept</p>
-            <ul className="mt-2 space-y-1">
-              {dialog.outcomes.map((line, index) => (
-                <li key={`outcome:${index}`} className={cn("rounded-md bg-ui-bg-info", SPACING_PATTERNS.controlXs)}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <ConfirmationDialogList
+            heading="If You Accept"
+            lines={dialog.outcomes}
+            itemClassName="bg-ui-bg-info"
+            keyPrefix="outcome"
+          />
         </div>
 
-        <div className={cn("flex items-center justify-end gap-2", BORDER_PATTERNS.topFaint, SPACING_PATTERNS.dialogSection)}>
-          <DialogClose asChild>
-            <OutlineButton data-testid={`${testIdPrefix}-cancel-button`} controlSize="md">
-              {dialog.cancelLabel ?? "Cancel"}
-            </OutlineButton>
-          </DialogClose>
-          <OutlineButton
-            autoFocus
-            data-testid={`${testIdPrefix}-accept-button`}
-            onClick={() => onClose(true)}
-            variant="accent"
-            controlSize="md"
-          >
-            {dialog.confirmLabel ?? "Confirm"}
-          </OutlineButton>
-        </div>
+        <ConfirmationDialogFooter dialog={dialog} onClose={onClose} testIdPrefix={testIdPrefix} />
       </DialogContent>
     </Dialog>
   );

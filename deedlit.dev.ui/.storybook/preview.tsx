@@ -7,7 +7,7 @@ type ThemeName = "light" | "dark";
 
 /** Apply the selected theme the same way the app does: a `data-theme` attribute
  *  on the document element, which flips the CSS-variable design tokens. */
-const withTheme: Decorator = (Story, context) => {
+const WithTheme: Decorator = (Story, context) => {
   const theme = (context.globals.theme as ThemeName) ?? "light";
 
   useEffect(() => {
@@ -52,7 +52,7 @@ const preview: Preview = {
       },
     },
   },
-  decorators: [withTheme],
+  decorators: [WithTheme],
 };
 
 export default preview;

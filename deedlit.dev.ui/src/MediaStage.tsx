@@ -1,23 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { z } from "zod";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "./Icons";
 import { cn } from "./utils";
 
-export type MediaStageProps = {
-  children: ReactNode;
-  hidden?: boolean;
-  canNavigate?: boolean;
-  onNavigate?: (direction: -1 | 1) => void;
-  previousLabel?: string;
-  nextLabel?: string;
-  navigationVisibility?: "hover" | "always";
-  className?: string;
-  viewportClassName?: string;
-  previousOverlayClassName?: string;
-  nextOverlayClassName?: string;
-};
+export const MediaStagePropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+  hidden: z.boolean().optional(),
+  canNavigate: z.boolean().optional(),
+  onNavigate: z.custom<(direction: -1 | 1) => void>().optional(),
+  previousLabel: z.string().optional(),
+  nextLabel: z.string().optional(),
+  navigationVisibility: z.enum(["hover", "always"]).optional(),
+  className: z.string().optional(),
+  viewportClassName: z.string().optional(),
+  previousOverlayClassName: z.string().optional(),
+  nextOverlayClassName: z.string().optional(),
+});
+export type MediaStageProps = z.infer<typeof MediaStagePropsSchema>;
 
 export default function MediaStage({
   children,

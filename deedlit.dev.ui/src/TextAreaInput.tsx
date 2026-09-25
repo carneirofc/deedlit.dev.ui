@@ -1,14 +1,18 @@
 "use client";
 
 import { forwardRef, type TextareaHTMLAttributes } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type TextAreaInputSize = "sm" | "md";
+export const TextAreaInputSizeSchema = z.enum(["sm", "md"]);
+export type TextAreaInputSize = z.infer<typeof TextAreaInputSizeSchema>;
 
-export type TextAreaInputProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  controlSize?: TextAreaInputSize;
-};
+export const TextAreaInputOwnPropsSchema = z.object({
+  controlSize: TextAreaInputSizeSchema.optional(),
+});
+export type TextAreaInputProps = z.infer<typeof TextAreaInputOwnPropsSchema> &
+  TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 const BASE_CLASS_NAME = "cyber-input resize-y outline-none";
 

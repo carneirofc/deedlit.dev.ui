@@ -1,17 +1,19 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type KeyValueFieldProps = HTMLAttributes<HTMLDivElement> & {
+export const KeyValueFieldOwnPropsSchema = z.object({
   /** Small uppercase label. */
-  label: ReactNode;
+  label: z.custom<ReactNode>(),
   /** Primary value content. */
-  value: ReactNode;
-  labelClassName?: string;
-  valueClassName?: string;
-};
+  value: z.custom<ReactNode>(),
+  labelClassName: z.string().optional(),
+  valueClassName: z.string().optional(),
+});
+export type KeyValueFieldProps = z.infer<typeof KeyValueFieldOwnPropsSchema> & HTMLAttributes<HTMLDivElement>;
 
 /**
  * A small card displaying a label/value pair on a soft background.

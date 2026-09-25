@@ -1,14 +1,17 @@
 "use client";
 
 import { forwardRef, type InputHTMLAttributes } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type TextInputSize = "sm" | "md";
+export const TextInputSizeSchema = z.enum(["sm", "md"]);
+export type TextInputSize = z.infer<typeof TextInputSizeSchema>;
 
-export type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
-  controlSize?: TextInputSize;
-};
+export const TextInputOwnPropsSchema = z.object({
+  controlSize: TextInputSizeSchema.optional(),
+});
+export type TextInputProps = z.infer<typeof TextInputOwnPropsSchema> & InputHTMLAttributes<HTMLInputElement>;
 
 const BASE_CLASS_NAME = "cyber-input outline-none";
 

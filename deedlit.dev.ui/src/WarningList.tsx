@@ -1,14 +1,16 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type WarningListProps = HTMLAttributes<HTMLDivElement> & {
-  warnings: string[];
-  testId?: string;
-  entryTestId?: string;
-};
+export const WarningListOwnPropsSchema = z.object({
+  warnings: z.array(z.string()),
+  testId: z.string().optional(),
+  entryTestId: z.string().optional(),
+});
+export type WarningListProps = z.infer<typeof WarningListOwnPropsSchema> & HTMLAttributes<HTMLDivElement>;
 
 const WarningList = forwardRef<HTMLDivElement, WarningListProps>(function WarningList(
   { warnings, testId, entryTestId, className, ...props },

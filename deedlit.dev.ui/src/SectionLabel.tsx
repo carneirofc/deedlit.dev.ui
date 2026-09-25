@@ -1,12 +1,14 @@
 "use client";
 
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type SectionLabelProps = HTMLAttributes<HTMLParagraphElement> & {
-  children: ReactNode;
-};
+export const SectionLabelOwnPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+});
+export type SectionLabelProps = z.infer<typeof SectionLabelOwnPropsSchema> & HTMLAttributes<HTMLParagraphElement>;
 
 /**
  * Uppercase small-caps section label used as a divider heading inside panels.

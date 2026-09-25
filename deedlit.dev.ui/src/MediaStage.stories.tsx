@@ -3,12 +3,19 @@ import { fn } from "storybook/test";
 
 import MediaStage from "./MediaStage";
 
+const Placeholder = () => (
+  <div className="grid h-full min-h-60 w-[28rem] place-items-center bg-[color:var(--ui-bg-deep)] text-ui-sm text-[color:var(--ui-ink-inverse)]">
+    media content
+  </div>
+);
+
 const meta = {
   title: "Components/MediaStage",
   component: MediaStage,
   tags: ["autodocs"],
   parameters: { layout: "centered" },
   args: {
+    children: <Placeholder />,
     canNavigate: true,
     onNavigate: fn(),
     navigationVisibility: "hover",
@@ -21,12 +28,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-const Placeholder = () => (
-  <div className="grid h-full min-h-60 w-[28rem] place-items-center bg-[color:var(--ui-bg-deep)] text-ui-sm text-[color:var(--ui-ink-inverse)]">
-    media content
-  </div>
-);
 
 export const Default: Story = {
   render: (args) => (

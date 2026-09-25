@@ -1,16 +1,18 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type CodeBlockProps = {
-  children: ReactNode;
+export const CodeBlockPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
   /** Maximum height before scrolling (default: "max-h-[65vh]") */
-  maxHeight?: string;
-  className?: string;
-  testId?: string;
-};
+  maxHeight: z.string().optional(),
+  className: z.string().optional(),
+  testId: z.string().optional(),
+});
+export type CodeBlockProps = z.infer<typeof CodeBlockPropsSchema>;
 
 /**
  * Scrollable preformatted code/text block with dark background.

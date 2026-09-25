@@ -1,18 +1,21 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type StatusTone = "info" | "warn" | "error" | "success";
+export const StatusToneSchema = z.enum(["info", "warn", "error", "success"]);
+export type StatusTone = z.infer<typeof StatusToneSchema>;
 
-export type StatusMessageProps = {
-  testId?: string;
-  role: "status" | "alert";
-  tone: StatusTone;
-  children: ReactNode;
-  className?: string;
-};
+export const StatusMessagePropsSchema = z.object({
+  testId: z.string().optional(),
+  role: z.enum(["status", "alert"]),
+  tone: StatusToneSchema,
+  children: z.custom<ReactNode>(),
+  className: z.string().optional(),
+});
+export type StatusMessageProps = z.infer<typeof StatusMessagePropsSchema>;
 
 const TONE_CLASSES: Record<StatusTone, string> = {
   error: "border-error-edge bg-error text-error-ink",

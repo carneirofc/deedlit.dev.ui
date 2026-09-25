@@ -1,21 +1,23 @@
 "use client";
 
 import { forwardRef, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type ScanProgressProps = {
-  title?: string;
-  rootCount?: number;
-  className?: string;
-  progressPercent?: number;
-  processedCount?: number;
-  totalCount?: number;
-  statusLabel?: string;
+export const ScanProgressPropsSchema = z.object({
+  title: z.string().optional(),
+  rootCount: z.number().optional(),
+  className: z.string().optional(),
+  progressPercent: z.number().optional(),
+  processedCount: z.number().optional(),
+  totalCount: z.number().optional(),
+  statusLabel: z.string().optional(),
   /** Custom stage labels shown during indeterminate progress based on elapsed time. */
-  stageLabels?: readonly string[];
-  testId?: string;
-};
+  stageLabels: z.array(z.string()).optional(),
+  testId: z.string().optional(),
+});
+export type ScanProgressProps = z.infer<typeof ScanProgressPropsSchema>;
 
 const DEFAULT_SCAN_STAGE_LABELS = [
   "Preparing roots",
@@ -47,20 +49,9 @@ function getStageIndex(elapsedSeconds: number): number {
 
 export { DEFAULT_SCAN_STAGE_LABELS };
 
-const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function ScanProgress({
-  title = "Scanning image library",
-  rootCount,
-  className,
-  progressPercent,
-  processedCount,
-  totalCount,
-  statusLabel,
-  stageLabels,
-  testId,
-}, ref) {
+function useSimulatedProgress(hasExternalProgress: boolean) {
   const [progress, setProgress] = useState(8);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const hasExternalProgress = typeof progressPercent === "number" && Number.isFinite(progressPercent);
 
   useEffect(() => {
     if (hasExternalProgress) {
@@ -84,20 +75,43 @@ const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function Scan
     };
   }, [hasExternalProgress]);
 
+  return { progress, elapsedSeconds };
+}
+
+function rootSummaryText(rootCount: number | undefined): string {
+  return typeof rootCount === "number" && rootCount > 0
+    ? `${rootCount} ${rootCount === 1 ? "root" : "roots"} configured`
+    : "Preparing configured roots";
+}
+
+function countSummaryText(processedCount: number | undefined, totalCount: number | undefined): string | null {
+  return typeof processedCount === "number" && typeof totalCount === "number" && totalCount > 0
+    ? `${processedCount}/${totalCount} files`
+    : null;
+}
+
+const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function ScanProgress({
+  title = "Scanning image library",
+  rootCount,
+  className,
+  progressPercent,
+  processedCount,
+  totalCount,
+  statusLabel,
+  stageLabels,
+  testId,
+}, ref) {
+  const hasExternalProgress = typeof progressPercent === "number" && Number.isFinite(progressPercent);
+  const { progress, elapsedSeconds } = useSimulatedProgress(hasExternalProgress);
+
   const resolvedStageLabels = stageLabels ?? DEFAULT_SCAN_STAGE_LABELS;
   const stageIndex = useMemo(() => getStageIndex(elapsedSeconds), [elapsedSeconds]);
   const stageLabel = resolvedStageLabels[stageIndex] ?? resolvedStageLabels[resolvedStageLabels.length - 1] ?? "";
   const displayProgress = hasExternalProgress
     ? Math.max(0, Math.min(100, Math.floor(progressPercent)))
     : Math.max(8, Math.floor(progress));
-  const rootSummary =
-    typeof rootCount === "number" && rootCount > 0
-      ? `${rootCount} ${rootCount === 1 ? "root" : "roots"} configured`
-      : "Preparing configured roots";
-  const countSummary =
-    typeof processedCount === "number" && typeof totalCount === "number" && totalCount > 0
-      ? `${processedCount}/${totalCount} files`
-      : null;
+  const rootSummary = rootSummaryText(rootCount);
+  const countSummary = countSummaryText(processedCount, totalCount);
 
   return (
     <div

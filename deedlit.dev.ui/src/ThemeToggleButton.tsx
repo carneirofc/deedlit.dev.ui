@@ -1,21 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 
 // ── Public types ─────────────────────────────────────────────────────
-export type ThemeMode = "light" | "dark";
+export const ThemeModeSchema = z.enum(["light", "dark"]);
+export type ThemeMode = z.infer<typeof ThemeModeSchema>;
 
-export interface ThemeToggleButtonProps {
+export const ThemeToggleButtonPropsSchema = z.object({
   /** Read the persisted theme. Defaults to `localStorage.getItem("ui-theme")`. */
-  readTheme?: () => ThemeMode | null;
+  readTheme: z.custom<() => ThemeMode | null>().optional(),
   /** Persist the resolved theme. Defaults to `localStorage.setItem("ui-theme", theme)`. */
-  writeTheme?: (theme: ThemeMode) => void;
+  writeTheme: z.custom<(theme: ThemeMode) => void>().optional(),
   /** Extra class names appended to the button element. */
-  className?: string;
-}
+  className: z.string().optional(),
+});
+export type ThemeToggleButtonProps = z.infer<typeof ThemeToggleButtonPropsSchema>;
 
 // ── Internal helpers ─────────────────────────────────────────────────
-type DragPosition = { x: number; y: number };
+export const DragPositionSchema = z.object({ x: z.number(), y: z.number() });
+export type DragPosition = z.infer<typeof DragPositionSchema>;
 
 const STORAGE_KEY_POSITION = "theme-toggle-position";
 const DRAG_THRESHOLD = 5;
@@ -85,38 +89,11 @@ function clampPosition(x: number, y: number): DragPosition {
   };
 }
 
-// ── Component ────────────────────────────────────────────────────────
-export default function ThemeToggleButton({
-  readTheme,
-  writeTheme,
-  className,
-}: ThemeToggleButtonProps) {
+function useThemeState(readTheme?: () => ThemeMode | null, writeTheme?: (theme: ThemeMode) => void) {
   const read = readTheme ?? defaultReadTheme;
   const write = writeTheme ?? defaultWriteTheme;
-
   const [theme, setTheme] = useState<ThemeMode>(() => resolveInitialTheme(read));
-  const [position, setPosition] = useState<DragPosition | null>(null);
-  const isDraggingRef = useRef(false);
-  const didDragRef = useRef(false);
-  const startRef = useRef({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Load saved position on mount
-  useEffect(() => {
-    const saved = loadSavedPosition();
-    if (saved) setPosition(clampPosition(saved.x, saved.y));
-  }, []);
-
-  // Clamp on resize
-  useEffect(() => {
-    function handleResize() {
-      setPosition((prev) => (prev ? clampPosition(prev.x, prev.y) : null));
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Apply + persist whenever theme changes
   useEffect(() => {
     try {
       document.documentElement.setAttribute("data-theme", theme);
@@ -130,6 +107,41 @@ export default function ThemeToggleButton({
     setTheme((cur) => (cur === "dark" ? "light" : "dark"));
   }, []);
 
+  return { theme, toggleTheme };
+}
+
+function usePersistedPosition() {
+  const [position, setPosition] = useState<DragPosition | null>(null);
+
+  // Load saved position on mount. Deliberately deferred to an effect (rather
+  // than a lazy useState initializer) so the client's first render matches the
+  // server-rendered markup (no `localStorage` on the server) before the saved
+  // position is applied.
+  useEffect(() => {
+    const saved = loadSavedPosition();
+    // One-time hydration of persisted state from localStorage; see comment above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved) setPosition(clampPosition(saved.x, saved.y));
+  }, []);
+
+  // Clamp on resize
+  useEffect(() => {
+    function handleResize() {
+      setPosition((prev) => (prev ? clampPosition(prev.x, prev.y) : null));
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return [position, setPosition] as const;
+}
+
+function useDragHandlers(setPosition: (updater: (prev: DragPosition | null) => DragPosition | null) => void) {
+  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const didDragRef = useRef(false);
+  const startRef = useRef({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
+
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     startRef.current = { mouseX: e.clientX, mouseY: e.clientY, elX: rect.left, elY: rect.top };
@@ -138,26 +150,49 @@ export default function ThemeToggleButton({
     e.currentTarget.setPointerCapture(e.pointerId);
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-    const dx = e.clientX - startRef.current.mouseX;
-    const dy = e.clientY - startRef.current.mouseY;
-    if (!isDraggingRef.current && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
-    isDraggingRef.current = true;
-    didDragRef.current = true;
-    setPosition(clampPosition(startRef.current.elX + dx, startRef.current.elY + dy));
-  }, []);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+      const dx = e.clientX - startRef.current.mouseX;
+      const dy = e.clientY - startRef.current.mouseY;
+      if (!isDraggingRef.current && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+      isDraggingRef.current = true;
+      didDragRef.current = true;
+      setIsDragging(true);
+      setPosition(() => clampPosition(startRef.current.elX + dx, startRef.current.elY + dy));
+    },
+    [setPosition],
+  );
 
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    if (isDraggingRef.current) {
-      isDraggingRef.current = false;
-      setPosition((prev) => {
-        if (prev) saveDragPosition(prev);
-        return prev;
-      });
-    }
-  }, []);
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        setPosition((prev) => {
+          if (prev) saveDragPosition(prev);
+          return prev;
+        });
+      }
+    },
+    [setPosition],
+  );
+
+  return { isDragging, didDragRef, handlePointerDown, handlePointerMove, handlePointerUp };
+}
+
+// ── Component ────────────────────────────────────────────────────────
+export default function ThemeToggleButton({
+  readTheme,
+  writeTheme,
+  className,
+}: ThemeToggleButtonProps) {
+  const { theme, toggleTheme } = useThemeState(readTheme, writeTheme);
+  const [position, setPosition] = usePersistedPosition();
+  const { isDragging, didDragRef, handlePointerDown, handlePointerMove, handlePointerUp } =
+    useDragHandlers(setPosition);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const handleClick = useCallback(() => {
     if (didDragRef.current) {
@@ -165,12 +200,12 @@ export default function ThemeToggleButton({
       return;
     }
     toggleTheme();
-  }, [toggleTheme]);
+  }, [toggleTheme, didDragRef]);
 
   const isPositioned = !!position;
 
   const style: React.CSSProperties = isPositioned
-    ? { left: position.x, top: position.y, right: "auto", transition: isDraggingRef.current ? "none" : undefined }
+    ? { left: position.x, top: position.y, right: "auto", transition: isDragging ? "none" : undefined }
     : {};
 
   return (

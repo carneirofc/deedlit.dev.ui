@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { fn } from "storybook/test";
 
 import CopyButton from "./CopyButton";
@@ -24,18 +24,20 @@ export const Idle: Story = {};
 export const Copied: Story = { args: { copied: true } };
 
 /** Wire `copied` to a timeout for the real "Copy → Copied → Copy" feedback. */
+function InteractiveCopyButtonStory(args: ComponentProps<typeof CopyButton>) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <CopyButton
+      {...args}
+      copied={copied}
+      onClick={() => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1200);
+      }}
+    />
+  );
+}
+
 export const Interactive: Story = {
-  render: (args) => {
-    const [copied, setCopied] = useState(false);
-    return (
-      <CopyButton
-        {...args}
-        copied={copied}
-        onClick={() => {
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1200);
-        }}
-      />
-    );
-  },
+  render: InteractiveCopyButtonStory,
 };

@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, type ReactNode, useEffect, useId, useMemo } from "react";
+import { forwardRef, type ReactNode, type CSSProperties, useEffect, useId, useMemo } from "react";
+import { z } from "zod";
 
 import InfoChip from "./InfoChip";
 import OutlineButton from "./OutlineButton";
@@ -15,7 +16,8 @@ const SIZE_CLASSES = {
   xl: "md:w-[min(64rem,calc(100vw-1.5rem))] md:min-w-[42rem]",
 } as const;
 
-export type DockPanelSize = keyof typeof SIZE_CLASSES;
+export const DockPanelSizeSchema = z.enum(["sm", "md", "lg", "xl"]);
+export type DockPanelSize = z.infer<typeof DockPanelSizeSchema>;
 
 /* ── Toggle slot presets (vertical position of toggle button) ──────
  *  Each slot stacks the toggle button higher from the bottom-right.
@@ -23,78 +25,60 @@ export type DockPanelSize = keyof typeof SIZE_CLASSES;
  */
 const TOGGLE_SLOT_BOTTOM_REM = [1, 5, 9, 13] as const;
 
-export type DockPanelProps = {
+export const DockPanelPropsSchema = z.object({
   /** Controlled open state */
-  isOpen: boolean;
+  isOpen: z.boolean(),
   /** Called when the panel should open or close */
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: z.custom<(open: boolean) => void>(),
   /** Title shown in the dock header */
-  title: string;
+  title: z.string(),
   /** Badge count shown on the toggle button */
-  badgeCount?: number;
+  badgeCount: z.number().optional(),
   /** Label text for the toggle button when closed */
-  openLabel?: string;
+  openLabel: z.string().optional(),
   /** Label text for the toggle button when open */
-  closeLabel?: string;
+  closeLabel: z.string().optional(),
   /** Panel content */
-  children: ReactNode;
+  children: z.custom<ReactNode>(),
   /** Optional content inserted between the header and the scrollable children area */
-  headerExtras?: ReactNode;
+  headerExtras: z.custom<ReactNode>().optional(),
 
   /**
    * Desktop panel width preset. Defaults to "md".
    *   sm ≈ 36 rem, md ≈ 42 rem, lg ≈ 48 rem, xl ≈ 64 rem
    */
-  size?: DockPanelSize;
+  size: DockPanelSizeSchema.optional(),
 
   /**
    * Vertical slot index for the toggle button (0 = bottom, 1, 2, …).
    * Auto-positions the toggle at `right: 1rem; bottom: <slot-offset>`.
    * Use instead of `toggleClassName` for standard stacked-dock layouts.
    */
-  toggleSlot?: number;
+  toggleSlot: z.number().optional(),
 
   /**
    * Stacking order when multiple DockPanels coexist.
    * Higher numbers render above lower ones.  Controls z-index of
    * the toggle button, backdrop overlay, and panel.  Defaults to 0.
    */
-  stackOrder?: number;
+  stackOrder: z.number().optional(),
 
   /** @deprecated Prefer `toggleSlot` + `stackOrder`. Raw className for the toggle button. */
-  toggleClassName?: string;
+  toggleClassName: z.string().optional(),
   /** Extra className merged into the panel (use for additional overrides only) */
-  panelClassName?: string;
+  panelClassName: z.string().optional(),
   /** className for the scrollable content wrapper */
-  contentClassName?: string;
+  contentClassName: z.string().optional(),
 
   /** Prefix for all data-testid and id attributes */
-  testIdPrefix?: string;
+  testIdPrefix: z.string().optional(),
   /** Whether pressing Escape closes the panel (default: true) */
-  closeOnEscape?: boolean;
-};
+  closeOnEscape: z.boolean().optional(),
+});
+export type DockPanelProps = z.infer<typeof DockPanelPropsSchema>;
 
-const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
-  isOpen,
-  onOpenChange,
-  title,
-  badgeCount,
-  openLabel,
-  closeLabel,
-  children,
-  headerExtras,
-  size = "md",
-  toggleSlot,
-  stackOrder = 0,
-  toggleClassName,
-  panelClassName,
-  contentClassName,
-  testIdPrefix,
-  closeOnEscape = true,
-}, ref) {
-  const generatedId = useId();
-  const baseId = testIdPrefix ?? `dock-panel-${generatedId}`;
-
+/** Closes the panel on Escape while it is open, unless disabled. */
+function useCloseOnEscape(isOpen: boolean, closeOnEscape: boolean, onOpenChange: (open: boolean) => void) {
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
 
@@ -107,33 +91,74 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, closeOnEscape, onOpenChange]);
+}
 
-  /* ── Z-index layers derived from stackOrder ──────────────────────
-   *  backdrop  = 40 + stackOrder   (40, 41, 42 …)
-   *  toggle    = 50 + stackOrder   (50, 51, 52 …)
-   *  panel     = 60 + stackOrder   (60, 61, 62 …)
-   *
-   *  All toggles (50+) sit above all backdrops (40+).
-   *  All panels  (60+) sit above all toggles.
-   *  Within each group, higher stackOrder wins.
-   */
-  const zBackdrop = 40 + stackOrder;
-  const zToggle   = 50 + stackOrder;
-  const zPanel    = 60 + stackOrder;
+/* ── Z-index layers derived from stackOrder ──────────────────────
+ *  backdrop  = 40 + stackOrder   (40, 41, 42 …)
+ *  toggle    = 50 + stackOrder   (50, 51, 52 …)
+ *  panel     = 60 + stackOrder   (60, 61, 62 …)
+ *
+ *  All toggles (50+) sit above all backdrops (40+).
+ *  All panels  (60+) sit above all toggles.
+ *  Within each group, higher stackOrder wins.
+ */
+function useZIndexes(stackOrder: number) {
+  return useMemo(
+    () => ({ zBackdrop: 40 + stackOrder, zToggle: 50 + stackOrder, zPanel: 60 + stackOrder }),
+    [stackOrder],
+  );
+}
 
-  /* ── Toggle position from slot or legacy className ───────────────
-   *  When `toggleSlot` is provided, position is auto-calculated.
-   *  Falls back to `toggleClassName` for custom overrides.
-   */
-  const toggleStyle = useMemo(() => {
+/* ── Toggle position from slot or legacy className ───────────────
+ *  When `toggleSlot` is provided, position is auto-calculated.
+ *  Falls back to `toggleClassName` for custom overrides.
+ */
+function useToggleStyle(toggleSlot: number | undefined, zToggle: number): CSSProperties {
+  return useMemo(() => {
     if (typeof toggleSlot !== "number") return { zIndex: zToggle };
-    const bottomRem = TOGGLE_SLOT_BOTTOM_REM[toggleSlot] ?? (1 + toggleSlot * 4);
+    const bottomRem = TOGGLE_SLOT_BOTTOM_REM[toggleSlot] ?? 1 + toggleSlot * 4;
     return { zIndex: zToggle, right: "1rem", bottom: `${bottomRem}rem` };
   }, [toggleSlot, zToggle]);
+}
 
-  const resolvedOpenLabel = openLabel ?? `Open ${title.toLowerCase()}`;
-  const resolvedCloseLabel = closeLabel ?? `Close ${title.toLowerCase()}`;
+/** Bundles the z-index layers, toggle position, and panel classes derived from props. */
+function useDockPanelLayout(
+  size: DockPanelSize,
+  isOpen: boolean,
+  panelClassName: string | undefined,
+  toggleSlot: number | undefined,
+  stackOrder: number,
+) {
+  const { zBackdrop, zToggle, zPanel } = useZIndexes(stackOrder);
+  const toggleStyle = useToggleStyle(toggleSlot, zToggle);
+  const asideClassName = buildAsideClassName(size, isOpen, panelClassName);
+  return { zBackdrop, zPanel, toggleStyle, asideClassName };
+}
 
+/** All derived chrome/layout state for a DockPanel, plus the escape-to-close effect. */
+function useDockPanel(props: DockPanelProps) {
+  const {
+    isOpen,
+    onOpenChange,
+    title,
+    openLabel,
+    closeLabel,
+    size = "md",
+    toggleSlot,
+    stackOrder = 0,
+    panelClassName,
+    testIdPrefix,
+    closeOnEscape = true,
+  } = props;
+
+  const chrome = useDockPanelChrome(testIdPrefix, title, openLabel, closeLabel);
+  useCloseOnEscape(isOpen, closeOnEscape, onOpenChange);
+  const layout = useDockPanelLayout(size, isOpen, panelClassName, toggleSlot, stackOrder);
+
+  return { ...chrome, ...layout };
+}
+
+function buildAsideClassName(size: DockPanelSize, isOpen: boolean, panelClassName: string | undefined) {
   /*
    * IMPORTANT: State-dependent classes (visibility, opacity, translate) are
    * concatenated directly — NOT passed through twMerge/cn().
@@ -147,7 +172,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
     ? "visible opacity-100 translate-y-0 md:translate-x-0"
     : "invisible opacity-0 pointer-events-none translate-y-full md:translate-y-0 md:translate-x-full";
 
-  const asideClassName = [
+  return [
     // Structure (z-index via inline style)
     "fixed overflow-hidden rounded-2xl border-ui bg-[color:var(--ui-bg)] shadow-2xl",
     // Transition
@@ -161,38 +186,134 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
     panelStateClasses,
     // Consumer overrides
     panelClassName,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export const DockToggleButtonPropsSchema = z.object({
+  baseId: z.string(),
+  isOpen: z.boolean(),
+  onOpenChange: z.custom<(open: boolean) => void>(),
+  toggleStyle: z.custom<CSSProperties>(),
+  toggleClassName: z.string().optional(),
+  badgeCount: z.number().optional(),
+  resolvedOpenLabel: z.string(),
+  resolvedCloseLabel: z.string(),
+});
+export type DockToggleButtonProps = z.infer<typeof DockToggleButtonPropsSchema>;
+
+function DockToggleButton({
+  baseId,
+  isOpen,
+  onOpenChange,
+  toggleStyle,
+  toggleClassName,
+  badgeCount,
+  resolvedOpenLabel,
+  resolvedCloseLabel,
+}: DockToggleButtonProps) {
+  return (
+    <OutlineButton
+      id={`${baseId}-toggle`}
+      data-testid={`${baseId}-toggle`}
+      onClick={() => onOpenChange(!isOpen)}
+      aria-expanded={isOpen}
+      aria-controls={baseId}
+      style={toggleStyle}
+      className={cn(
+        "fixed inline-flex min-h-11 items-center gap-2 rounded-full border-ui-active bg-[color:var(--ui-bg-active)] px-4 py-2 text-ui-sm text-[color:var(--ui-ink-highlight)] shadow-lg",
+        toggleClassName,
+      )}
+    >
+      <span>{isOpen ? resolvedCloseLabel : resolvedOpenLabel}</span>
+      {typeof badgeCount === "number" ? <InfoChip className="px-1.5 py-0.5 text-ui-xs">{badgeCount}</InfoChip> : null}
+    </OutlineButton>
+  );
+}
+
+export const DockPanelBodyPropsSchema = z.object({
+  title: z.string(),
+  headerExtras: z.custom<ReactNode>().optional(),
+  contentClassName: z.string().optional(),
+  onClose: z.custom<() => void>(),
+  children: z.custom<ReactNode>(),
+});
+export type DockPanelBodyProps = z.infer<typeof DockPanelBodyPropsSchema>;
+
+function DockPanelBody({ title, headerExtras, contentClassName, onClose, children }: DockPanelBodyProps) {
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col p-3">
+      {/* Header with close button */}
+      <div className={cn(LAYOUT_PATTERNS.flexCenterBetweenGap2)}>
+        <p className="text-ui-xs uppercase tracking-[0.14em] text-[color:var(--ui-ink-caption)]">{title}</p>
+        <OutlineButton onClick={onClose} className={cn("rounded-md text-ui-xs", SPACING_PATTERNS.controlXs)} aria-label="Close">
+          <XIcon size="h-4 w-4" />
+        </OutlineButton>
+      </div>
+
+      {/* Optional header extras (e.g., tabs) */}
+      {headerExtras}
+
+      {/* Scrollable content */}
+      <div className={cn("mt-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-1", contentClassName)}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export const DockBackdropPropsSchema = z.object({
+  zBackdrop: z.number(),
+  onClose: z.custom<() => void>(),
+});
+export type DockBackdropProps = z.infer<typeof DockBackdropPropsSchema>;
+
+function DockBackdrop({ zBackdrop, onClose }: DockBackdropProps) {
+  return (
+    <div
+      role="presentation"
+      onClick={onClose}
+      style={{ zIndex: zBackdrop }}
+      className="fixed inset-0 bg-slate-950/30 transition-opacity"
+    />
+  );
+}
+
+/** Derives the panel's DOM id and the toggle button's resolved labels. */
+function useDockPanelChrome(
+  testIdPrefix: string | undefined,
+  title: string,
+  openLabel: string | undefined,
+  closeLabel: string | undefined,
+) {
+  const generatedId = useId();
+  const baseId = testIdPrefix ?? `dock-panel-${generatedId}`;
+  const resolvedOpenLabel = openLabel ?? `Open ${title.toLowerCase()}`;
+  const resolvedCloseLabel = closeLabel ?? `Close ${title.toLowerCase()}`;
+  return { baseId, resolvedOpenLabel, resolvedCloseLabel };
+}
+
+const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel(props, ref) {
+  const { isOpen, onOpenChange, title, badgeCount, children, headerExtras, toggleClassName, contentClassName } =
+    props;
+  const { baseId, resolvedOpenLabel, resolvedCloseLabel, zBackdrop, zPanel, toggleStyle, asideClassName } =
+    useDockPanel(props);
 
   return (
     <>
-      {/* Toggle button */}
-      <OutlineButton
-        id={`${baseId}-toggle`}
-        data-testid={`${baseId}-toggle`}
-        onClick={() => onOpenChange(!isOpen)}
-        aria-expanded={isOpen}
-        aria-controls={baseId}
-        style={toggleStyle}
-        className={cn(
-          "fixed inline-flex min-h-11 items-center gap-2 rounded-full border-ui-active bg-[color:var(--ui-bg-active)] px-4 py-2 text-ui-sm text-[color:var(--ui-ink-highlight)] shadow-lg",
-          toggleClassName,
-        )}
-      >
-        <span>{isOpen ? resolvedCloseLabel : resolvedOpenLabel}</span>
-        {typeof badgeCount === "number" ? (
-          <InfoChip className="px-1.5 py-0.5 text-ui-xs">{badgeCount}</InfoChip>
-        ) : null}
-      </OutlineButton>
+      <DockToggleButton
+        baseId={baseId}
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        toggleStyle={toggleStyle}
+        toggleClassName={toggleClassName}
+        badgeCount={badgeCount}
+        resolvedOpenLabel={resolvedOpenLabel}
+        resolvedCloseLabel={resolvedCloseLabel}
+      />
 
-      {/* Backdrop overlay */}
-      {isOpen && (
-        <div
-          role="presentation"
-          onClick={() => onOpenChange(false)}
-          style={{ zIndex: zBackdrop }}
-          className="fixed inset-0 bg-slate-950/30 transition-opacity"
-        />
-      )}
+      {isOpen && <DockBackdrop zBackdrop={zBackdrop} onClose={() => onOpenChange(false)} />}
 
       {/* Panel */}
       <aside
@@ -203,34 +324,14 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
         style={{ zIndex: zPanel }}
         className={asideClassName}
       >
-        <div className="flex h-full min-h-0 min-w-0 flex-col p-3">
-          {/* Header with close button */}
-          <div className={cn(LAYOUT_PATTERNS.flexCenterBetweenGap2)}>
-            <p className="text-ui-xs uppercase tracking-[0.14em] text-[color:var(--ui-ink-caption)]">
-              {title}
-            </p>
-            <OutlineButton
-              onClick={() => onOpenChange(false)}
-              className={cn("rounded-md text-ui-xs", SPACING_PATTERNS.controlXs)}
-              aria-label="Close"
-            >
-              <XIcon size="h-4 w-4" />
-            </OutlineButton>
-          </div>
-
-          {/* Optional header extras (e.g., tabs) */}
-          {headerExtras}
-
-          {/* Scrollable content */}
-          <div
-            className={cn(
-              "mt-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-1",
-              contentClassName,
-            )}
-          >
-            {children}
-          </div>
-        </div>
+        <DockPanelBody
+          title={title}
+          headerExtras={headerExtras}
+          contentClassName={contentClassName}
+          onClose={() => onOpenChange(false)}
+        >
+          {children}
+        </DockPanelBody>
       </aside>
     </>
   );

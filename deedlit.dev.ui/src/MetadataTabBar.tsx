@@ -1,18 +1,28 @@
 "use client";
 
+import { z } from "zod";
+
 import { Tabs, TabsList, TabsTrigger } from "./Tabs";
 import { cn } from "./utils";
 
-export type MetadataTabValue = "details" | "workflow" | "raw";
+export const MetadataTabValueSchema = z.enum(["details", "workflow", "raw"]);
+export type MetadataTabValue = z.infer<typeof MetadataTabValueSchema>;
 
-export type MetadataTabBarProps = {
-  value: MetadataTabValue;
-  onValueChange: (value: MetadataTabValue) => void;
-  className?: string;
-  optionClassName?: string;
-};
+export const MetadataTabBarPropsSchema = z.object({
+  value: MetadataTabValueSchema,
+  onValueChange: z.custom<(value: MetadataTabValue) => void>(),
+  className: z.string().optional(),
+  optionClassName: z.string().optional(),
+});
+export type MetadataTabBarProps = z.infer<typeof MetadataTabBarPropsSchema>;
 
-const TAB_OPTIONS: Array<{ value: MetadataTabValue; label: string }> = [
+export const TabOptionSchema = z.object({
+  value: MetadataTabValueSchema,
+  label: z.string(),
+});
+export type TabOption = z.infer<typeof TabOptionSchema>;
+
+const TAB_OPTIONS: TabOption[] = [
   { value: "details", label: "Details" },
   { value: "workflow", label: "Workflow" },
   { value: "raw", label: "Raw Metadata" },

@@ -1,30 +1,41 @@
 "use client";
 
 import { forwardRef, type ForwardedRef, type ReactElement, type ReactNode } from "react";
+import { z } from "zod";
 
 import OutlineButton from "./OutlineButton";
 import { cn } from "./utils";
 
-export type SegmentedControlOption<TValue extends string = string> = {
-  value: TValue;
-  label: ReactNode;
-  testId?: string;
-  disabled?: boolean;
-  tooltip?: string;
-  ariaLabel?: string;
-  title?: string;
-  className?: string;
-};
+// Generic (over TValue) prop shapes: the `value`/`options`/`onValueChange`
+// fields depend on a caller-supplied type parameter, so they are intersected
+// in via `Record<...>` rather than a zod schema (zod schemas cannot be
+// generic over a caller-supplied type parameter).
+export const SegmentedControlOptionBaseSchema = z.object({
+  label: z.custom<ReactNode>(),
+  testId: z.string().optional(),
+  disabled: z.boolean().optional(),
+  tooltip: z.string().optional(),
+  ariaLabel: z.string().optional(),
+  title: z.string().optional(),
+  className: z.string().optional(),
+});
+export type SegmentedControlOption<TValue extends string = string> = z.infer<
+  typeof SegmentedControlOptionBaseSchema
+> &
+  Record<"value", TValue>;
 
-export type SegmentedControlProps<TValue extends string = string> = {
-  value: TValue;
-  options: Array<SegmentedControlOption<TValue>>;
-  onValueChange: (value: TValue) => void;
-  className?: string;
-  optionClassName?: string;
-  activeOptionClassName?: string;
-  inactiveOptionClassName?: string;
-};
+export const SegmentedControlOwnPropsSchema = z.object({
+  className: z.string().optional(),
+  optionClassName: z.string().optional(),
+  activeOptionClassName: z.string().optional(),
+  inactiveOptionClassName: z.string().optional(),
+});
+export type SegmentedControlProps<TValue extends string = string> = z.infer<
+  typeof SegmentedControlOwnPropsSchema
+> &
+  Record<"value", TValue> &
+  Record<"options", Array<SegmentedControlOption<TValue>>> &
+  Record<"onValueChange", (value: TValue) => void>;
 
 const DEFAULT_ACTIVE_OPTION_CLASS =
   "border-ui-active bg-[color:var(--ui-bg-active)] text-[color:var(--ui-ink-highlight)]";
@@ -82,10 +93,15 @@ function SegmentedControlFn<TValue extends string = string>(
   );
 }
 
+type SegmentedControlWithRefProps<TValue extends string = string> = SegmentedControlProps<TValue> &
+  Partial<Record<"ref", ForwardedRef<HTMLDivElement>>>;
+
 const SegmentedControl = forwardRef(SegmentedControlFn) as <TValue extends string = string>(
-  props: SegmentedControlProps<TValue> & { ref?: ForwardedRef<HTMLDivElement> },
+  props: SegmentedControlWithRefProps<TValue>,
 ) => ReactElement;
 
-(SegmentedControl as { displayName?: string }).displayName = "SegmentedControl";
+export const ComponentWithDisplayNameSchema = z.object({ displayName: z.string().optional() });
+export type ComponentWithDisplayName = z.infer<typeof ComponentWithDisplayNameSchema>;
+(SegmentedControl as ComponentWithDisplayName).displayName = "SegmentedControl";
 
 export default SegmentedControl;

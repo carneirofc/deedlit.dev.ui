@@ -4,16 +4,6 @@ import { useState } from "react";
 import ConfirmationDialog from "./ConfirmationDialog";
 import OutlineButton from "./OutlineButton";
 
-const meta = {
-  title: "Components/ConfirmationDialog",
-  component: ConfirmationDialog,
-  tags: ["autodocs"],
-  parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof ConfirmationDialog>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
 const DIALOG = {
   title: "Delete 3 source directories?",
   details: [
@@ -30,26 +20,42 @@ const DIALOG = {
   cancelLabel: "Keep them",
 };
 
-export const Default: Story = {
-  render: () => {
-    const [open, setOpen] = useState(false);
-    const [result, setResult] = useState<string | null>(null);
-    return (
-      <div className="grid min-h-[70vh] place-items-center gap-3">
-        <OutlineButton variant="danger" onClick={() => setOpen(true)}>
-          Delete roots
-        </OutlineButton>
-        {result && <p className="text-ui-sm text-[color:var(--ui-ink-secondary)]">Last choice: {result}</p>}
-        {open && (
-          <ConfirmationDialog
-            dialog={DIALOG}
-            onClose={(accepted) => {
-              setResult(accepted ? "confirmed" : "cancelled");
-              setOpen(false);
-            }}
-          />
-        )}
-      </div>
-    );
+const meta = {
+  title: "Components/ConfirmationDialog",
+  component: ConfirmationDialog,
+  tags: ["autodocs"],
+  parameters: { layout: "fullscreen" },
+  args: {
+    dialog: DIALOG,
+    onClose: () => {},
   },
+} satisfies Meta<typeof ConfirmationDialog>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+function DefaultConfirmationDialogStory() {
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  return (
+    <div className="grid min-h-[70vh] place-items-center gap-3">
+      <OutlineButton variant="danger" onClick={() => setOpen(true)}>
+        Delete roots
+      </OutlineButton>
+      {result && <p className="text-ui-sm text-[color:var(--ui-ink-secondary)]">Last choice: {result}</p>}
+      {open && (
+        <ConfirmationDialog
+          dialog={DIALOG}
+          onClose={(accepted) => {
+            setResult(accepted ? "confirmed" : "cancelled");
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export const Default: Story = {
+  render: DefaultConfirmationDialogStory,
 };

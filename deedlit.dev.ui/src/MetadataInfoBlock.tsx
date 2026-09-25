@@ -1,14 +1,16 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type MetadataInfoBlockProps = {
-  children: ReactNode;
-  className?: string;
-  testId?: string;
-};
+export const MetadataInfoBlockPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+  className: z.string().optional(),
+  testId: z.string().optional(),
+});
+export type MetadataInfoBlockProps = z.infer<typeof MetadataInfoBlockPropsSchema>;
 
 /**
  * A subtle info block for displaying metadata source details.

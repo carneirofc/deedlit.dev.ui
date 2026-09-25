@@ -1,14 +1,17 @@
 "use client";
 
 import { forwardRef, type SelectHTMLAttributes } from "react";
+import { z } from "zod";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
-export type SelectInputSize = "sm" | "md";
+export const SelectInputSizeSchema = z.enum(["sm", "md"]);
+export type SelectInputSize = z.infer<typeof SelectInputSizeSchema>;
 
-export type SelectInputProps = SelectHTMLAttributes<HTMLSelectElement> & {
-  controlSize?: SelectInputSize;
-};
+export const SelectInputOwnPropsSchema = z.object({
+  controlSize: SelectInputSizeSchema.optional(),
+});
+export type SelectInputProps = z.infer<typeof SelectInputOwnPropsSchema> & SelectHTMLAttributes<HTMLSelectElement>;
 
 const BASE_CLASS_NAME = "cyber-input outline-none";
 

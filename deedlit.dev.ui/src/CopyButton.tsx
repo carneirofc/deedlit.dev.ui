@@ -1,19 +1,22 @@
 "use client";
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { z } from "zod";
 
 import OutlineButton from "./OutlineButton";
 import { CopyIcon } from "./Icons";
 import { cn } from "./utils";
 
-export type CopyButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+export const CopyButtonOwnPropsSchema = z.object({
   /** Label shown when idle. @default "Copy" */
-  label?: ReactNode;
+  label: z.custom<ReactNode>().optional(),
   /** Label shown after a successful copy. @default "Copied" */
-  copiedLabel?: ReactNode;
+  copiedLabel: z.custom<ReactNode>().optional(),
   /** Whether the copy action has just completed (drives label swap). */
-  copied?: boolean;
-};
+  copied: z.boolean().optional(),
+});
+export type CopyButtonProps = z.infer<typeof CopyButtonOwnPropsSchema> &
+  Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">;
 
 /**
  * Small outline button with a clipboard copy icon.

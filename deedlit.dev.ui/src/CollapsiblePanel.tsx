@@ -1,23 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { z } from "zod";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./Collapsible";
 import { ChevronDownIcon } from "./Icons";
 import { cn } from "./utils";
 
-export type CollapsiblePanelProps = {
-  label: ReactNode;
-  isOpen?: boolean;
-  onToggle?: () => void;
-  defaultOpen?: boolean;
-  children?: ReactNode;
-  className?: string;
-  triggerClassName?: string;
-  contentClassName?: string;
-  chevronClassName?: string;
-  testId?: string;
-};
+export const CollapsiblePanelPropsSchema = z.object({
+  label: z.custom<ReactNode>(),
+  isOpen: z.boolean().optional(),
+  onToggle: z.custom<() => void>().optional(),
+  defaultOpen: z.boolean().optional(),
+  children: z.custom<ReactNode>().optional(),
+  className: z.string().optional(),
+  triggerClassName: z.string().optional(),
+  contentClassName: z.string().optional(),
+  chevronClassName: z.string().optional(),
+  testId: z.string().optional(),
+});
+export type CollapsiblePanelProps = z.infer<typeof CollapsiblePanelPropsSchema>;
 
 /**
  * Convenience disclosure panel built on the {@link Collapsible} primitives.

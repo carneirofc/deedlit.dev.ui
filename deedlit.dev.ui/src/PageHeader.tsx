@@ -1,29 +1,31 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type PageHeaderProps = {
+export const PageHeaderPropsSchema = z.object({
   /** Subtitle shown above the title (e.g. "deedlit.dev // gallery") */
-  subtitle: string;
+  subtitle: z.string(),
   /** Main heading */
-  title: string;
+  title: z.string(),
   /** Heading tag used for title text */
-  titleTag?: "h1" | "h2";
+  titleTag: z.enum(["h1", "h2"]).optional(),
   /** Description paragraph below title */
-  description: string;
+  description: z.string(),
   /** Optional id and data-testid for the header element */
-  testId?: string;
+  testId: z.string().optional(),
   /** Optional class name for the root header container */
-  className?: string;
+  className: z.string().optional(),
   /** Optional summary pills rendered on the right */
-  pills?: ReactNode;
+  pills: z.custom<ReactNode>().optional(),
   /** Optional class name for the pill container */
-  pillsClassName?: string;
+  pillsClassName: z.string().optional(),
   /** Optional children rendered after the header */
-  children?: ReactNode;
-};
+  children: z.custom<ReactNode>().optional(),
+});
+export type PageHeaderProps = z.infer<typeof PageHeaderPropsSchema>;
 
 const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function PageHeader(
   { subtitle, title, titleTag = "h1", description, testId, className, pills, pillsClassName, children },

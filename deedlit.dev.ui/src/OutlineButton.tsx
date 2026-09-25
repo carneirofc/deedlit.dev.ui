@@ -3,11 +3,15 @@
 import { Children, forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Slot } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
+import { z } from "zod";
 
 import { cn } from "./utils";
 
-export type OutlineButtonVariant = "neutral" | "danger" | "ghost" | "accent";
-export type OutlineButtonSize = "xs" | "sm" | "md" | "lg" | "icon";
+export const OutlineButtonVariantSchema = z.enum(["neutral", "danger", "ghost", "accent"]);
+export type OutlineButtonVariant = z.infer<typeof OutlineButtonVariantSchema>;
+
+export const OutlineButtonSizeSchema = z.enum(["xs", "sm", "md", "lg", "icon"]);
+export type OutlineButtonSize = z.infer<typeof OutlineButtonSizeSchema>;
 
 /**
  * Type-safe class recipe for the outline button. Exported so consumers can
@@ -43,13 +47,20 @@ export const buttonVariants = cva(
   },
 );
 
-export type OutlineButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof buttonVariants> & {
-    /** Render the styles onto the single child element instead of a `<button>`. */
-    asChild?: boolean;
-    tooltip?: string;
-    label?: string;
-  };
+export const OutlineButtonOwnPropsSchema = z.object({
+  /** Render the styles onto the single child element instead of a `<button>`. */
+  asChild: z.boolean().optional(),
+  tooltip: z.string().optional(),
+  label: z.string().optional(),
+});
+export type OutlineButtonProps = z.infer<typeof OutlineButtonOwnPropsSchema> &
+  ButtonHTMLAttributes<HTMLButtonElement> &
+  VariantProps<typeof buttonVariants>;
+
+export const ElementWithChildrenPropsSchema = z.object({
+  children: z.custom<ReactNode>().optional(),
+});
+export type ElementWithChildrenProps = z.infer<typeof ElementWithChildrenPropsSchema>;
 
 function extractTextLabel(content: ReactNode): string | undefined {
   const textContent = Children.toArray(content)
@@ -58,7 +69,7 @@ function extractTextLabel(content: ReactNode): string | undefined {
         return String(child).trim();
       }
 
-      if (isValidElement<{ children?: ReactNode }>(child)) {
+      if (isValidElement<ElementWithChildrenProps>(child)) {
         return extractTextLabel(child.props.children) ?? "";
       }
 
@@ -69,6 +80,22 @@ function extractTextLabel(content: ReactNode): string | undefined {
     .trim();
 
   return textContent.length > 0 ? textContent : undefined;
+}
+
+export const AccessibleLabelsInputSchema = z.object({
+  tooltip: z.string().optional(),
+  label: z.string().optional(),
+  title: z.custom<string | undefined>().optional(),
+  ariaLabel: z.string().optional(),
+  children: z.custom<ReactNode>().optional(),
+});
+export type AccessibleLabelsInput = z.infer<typeof AccessibleLabelsInputSchema>;
+
+function resolveAccessibleLabels({ tooltip, label, title, ariaLabel, children }: AccessibleLabelsInput) {
+  const inferredLabel = extractTextLabel(children);
+  const resolvedTooltip = tooltip ?? title ?? label ?? ariaLabel ?? inferredLabel;
+  const resolvedAriaLabel = label ?? ariaLabel ?? (!inferredLabel ? resolvedTooltip : undefined);
+  return { resolvedTooltip, resolvedAriaLabel };
 }
 
 const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function OutlineButton(
@@ -88,9 +115,7 @@ const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function
   },
   ref,
 ) {
-  const inferredLabel = extractTextLabel(children);
-  const resolvedTooltip = tooltip ?? title ?? label ?? ariaLabel ?? inferredLabel;
-  const resolvedAriaLabel = label ?? ariaLabel ?? (!inferredLabel ? resolvedTooltip : undefined);
+  const { resolvedTooltip, resolvedAriaLabel } = resolveAccessibleLabels({ tooltip, label, title, ariaLabel, children });
 
   const Comp = asChild ? Slot.Root : "button";
 
