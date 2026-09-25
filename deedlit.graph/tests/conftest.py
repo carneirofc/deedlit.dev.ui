@@ -8,7 +8,6 @@ the whole module is skipped with a clear message.
 from __future__ import annotations
 
 import pytest
-
 from graph import repository
 from graph.db import neo4j_ready
 

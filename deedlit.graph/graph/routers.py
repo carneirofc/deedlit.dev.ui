@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
@@ -11,11 +10,13 @@ from pydantic import BaseModel, Field
 from graph import repository
 from graph.models import (
     EdgeUpsert,
-    Neighbor,
+    EdgeUpsertResult,
     NeighborResponse,
+    PruneResponse,
     RelatedTag,
+    StatusDeletedResponse,
 )
-from graph.rebuild import rebuild_from_catalog
+from graph.rebuild import RebuildResult, rebuild_from_catalog
 
 router = APIRouter()
 
@@ -39,54 +40,67 @@ class BatchDeleteRequest(BaseModel):
 EDGES_BATCH_MAX = max(1, int(os.getenv("GRAPH_EDGES_BATCH_MAX", "64")))
 EDGES_BATCH_WAIT_MS = max(0.0, float(os.getenv("GRAPH_EDGES_BATCH_WAIT_MS", "10")))
 
+_EdgeJob = tuple[EdgeUpsert, "asyncio.Future[EdgeUpsertResult]"]
+
 # Loop-bound (recreated if the running loop changes, e.g. across TestClient
 # requests) so a Future is never awaited on a foreign loop.
-_edges_queue: asyncio.Queue | None = None
-_edges_task: asyncio.Task | None = None
-_edges_loop: Any = None
+_edges_queue: asyncio.Queue[_EdgeJob] | None = None
+_edges_task: asyncio.Task[None] | None = None
+_edges_loop: asyncio.AbstractEventLoop | None = None
 
 
-async def _edges_batch_loop(queue: asyncio.Queue) -> None:
-    """Drain ``queue`` forever, flushing each coalesced batch in one Neo4j tx."""
+async def _accumulate_batch(queue: asyncio.Queue[_EdgeJob], first: _EdgeJob) -> list[_EdgeJob]:
+    """Collect ``first`` plus whatever else arrives on ``queue`` within the
+    coalescing window, up to ``EDGES_BATCH_MAX``."""
     loop = asyncio.get_running_loop()
-    while True:
-        edge, fut = await queue.get()
-        batch: list[tuple[EdgeUpsert, asyncio.Future]] = [(edge, fut)]
-        deadline = loop.time() + EDGES_BATCH_WAIT_MS / 1000.0
-        while len(batch) < EDGES_BATCH_MAX:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                break
-            try:
-                batch.append(await asyncio.wait_for(queue.get(), remaining))
-            except asyncio.TimeoutError:
-                break
-
-        edges = [e for e, _ in batch]
-
-        def _flush() -> list[dict]:
-            return repository.upsert_edges_batch(edges)
-
+    batch = [first]
+    deadline = loop.time() + EDGES_BATCH_WAIT_MS / 1000.0
+    while len(batch) < EDGES_BATCH_MAX:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
         try:
-            results = await asyncio.to_thread(_flush)
-            # Map results back by sha256 (order-independent + handles a duplicate
-            # image queued twice within the window — both waiters get its result).
-            by_sha = {r["sha256"]: r for r in results}
-            for e, f in batch:
-                if not f.done():
-                    f.set_result(
-                        by_sha.get(
-                            e.sha256,
-                            {"sha256": e.sha256, "assets": 0, "tags": 0, "lineage": 0},
-                        )
+            batch.append(await asyncio.wait_for(queue.get(), remaining))
+        except TimeoutError:
+            break
+    return batch
+
+
+def _flush_batch(edges: list[EdgeUpsert]) -> list[EdgeUpsertResult]:
+    return repository.upsert_edges_batch(edges)
+
+
+async def _resolve_batch(batch: list[_EdgeJob]) -> None:
+    """Flush ``batch`` in one Neo4j write tx and resolve each waiter's future."""
+    edges = [e for e, _ in batch]
+    try:
+        results = await asyncio.to_thread(_flush_batch, edges)
+        # Map results back by sha256 (order-independent + handles a duplicate
+        # image queued twice within the window — both waiters get its result).
+        by_sha = {r.sha256: r for r in results}
+        for e, f in batch:
+            if not f.done():
+                f.set_result(
+                    by_sha.get(
+                        e.sha256,
+                        EdgeUpsertResult(sha256=e.sha256, assets=0, tags=0, lineage=0),
                     )
-        except Exception as exc:  # propagate the same failure to every waiter
-            for _, f in batch:
-                if not f.done():
-                    f.set_exception(exc)
+                )
+    except Exception as exc:  # propagate the same failure to every waiter
+        for _, f in batch:
+            if not f.done():
+                f.set_exception(exc)
 
 
-def _get_edges_queue() -> asyncio.Queue:
+async def _edges_batch_loop(queue: asyncio.Queue[_EdgeJob]) -> None:
+    """Drain ``queue`` forever, flushing each coalesced batch in one Neo4j tx."""
+    while True:
+        job = await queue.get()
+        batch = await _accumulate_batch(queue, job)
+        await _resolve_batch(batch)
+
+
+def _get_edges_queue() -> asyncio.Queue[_EdgeJob]:
     """Return (lazily creating) the per-loop edges queue + its drain task."""
     global _edges_queue, _edges_task, _edges_loop
     loop = asyncio.get_running_loop()
@@ -98,26 +112,26 @@ def _get_edges_queue() -> asyncio.Queue:
 
 
 @router.post("/edges")
-async def post_edges(edge: EdgeUpsert) -> dict:
+async def post_edges(edge: EdgeUpsert) -> EdgeUpsertResult:
     """Upsert one image's edges — coalesced with concurrent calls into one Neo4j
     write transaction by the micro-batcher. Awaits its flush (read-after-write)."""
-    fut: asyncio.Future = asyncio.get_running_loop().create_future()
+    fut: asyncio.Future[EdgeUpsertResult] = asyncio.get_running_loop().create_future()
     await _get_edges_queue().put((edge, fut))
     return await fut
 
 
 @router.post("/images/batch-delete")
-def batch_delete_images(body: BatchDeleteRequest) -> dict:
+def batch_delete_images(body: BatchDeleteRequest) -> StatusDeletedResponse:
     """Delete MANY image nodes + edges in one query (bulk un-index). Idempotent.
 
     Called by the gateway after the catalog records are gone. Missing nodes are a
     no-op. Returns the count of nodes removed."""
     deleted = repository.delete_images(body.sha256s)
-    return {"status": "ok", "deleted": deleted}
+    return StatusDeletedResponse(status="ok", deleted=deleted)
 
 
 @router.delete("/images/{sha256}")
-def delete_image(sha256: str) -> dict:
+def delete_image(sha256: str) -> StatusDeletedResponse:
     """Delete an image node + its edges from the graph projection. Idempotent.
 
     Returns ``{deleted: <count>}`` (0 when the node was not present). A missing
@@ -125,7 +139,7 @@ def delete_image(sha256: str) -> dict:
     treats this as best-effort cleanup once the catalog record is gone.
     """
     deleted = repository.delete_image(sha256)
-    return {"status": "ok", "deleted": deleted}
+    return StatusDeletedResponse(status="ok", deleted=deleted)
 
 
 @router.get("/neighbors/{sha256}", response_model=NeighborResponse)
@@ -135,21 +149,20 @@ def get_neighbors(
     limit: int = Query(24, ge=1, le=200),
 ) -> NeighborResponse:
     rows = repository.neighbors(sha256, relation=relation, limit=limit)
-    return NeighborResponse(neighbors=[Neighbor(**r) for r in rows])
+    return NeighborResponse(neighbors=rows)
 
 
 @router.get("/lineage/{sha256}", response_model=NeighborResponse)
 def get_lineage(sha256: str) -> NeighborResponse:
     rows = repository.lineage(sha256)
-    return NeighborResponse(neighbors=[Neighbor(**r) for r in rows])
+    return NeighborResponse(neighbors=rows)
 
 
 @router.get("/related-tags/{tag}", response_model=list[RelatedTag])
 def get_related_tags(
     tag: str, limit: int = Query(24, ge=1, le=200)
 ) -> list[RelatedTag]:
-    rows = repository.related_tags(tag, limit=limit)
-    return [RelatedTag(**r) for r in rows]
+    return repository.related_tags(tag, limit=limit)
 
 
 @router.get("/entities", response_model=list[str])
@@ -167,7 +180,7 @@ def list_entities(
 
 
 @router.post("/rebuild", status_code=202)
-def post_rebuild() -> dict:
+def post_rebuild() -> RebuildResult:
     return rebuild_from_catalog()
 
 
@@ -179,7 +192,7 @@ class PruneRequest(BaseModel):
 
 
 @router.post("/prune")
-def post_prune(body: PruneRequest | None = None) -> dict:
+def post_prune(body: PruneRequest | None = None) -> PruneResponse:
     """Remove structurally-orphaned :Asset / :Tag nodes (no incoming USES /
     TAGGED) left behind by image deletes. Idempotent. :Image nodes are never
     touched — reconciling them against catalog truth is the rebuild path.
@@ -188,4 +201,9 @@ def post_prune(body: PruneRequest | None = None) -> dict:
     ``prune-graph-orphans`` maintenance job, and the opt-in periodic sweep.
     With ``dry_run`` it only counts, for a preview before the real run."""
     result = repository.prune_orphans(dry_run=(body.dry_run if body else False))
-    return {"status": "ok", **result}
+    return PruneResponse(
+        status="ok",
+        assets_deleted=result.assets_deleted,
+        tags_deleted=result.tags_deleted,
+        dry_run=result.dry_run,
+    )

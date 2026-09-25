@@ -21,7 +21,10 @@ def get_driver() -> Driver:
     if _driver is None or _driver_key != key:
         if _driver is not None:
             _driver.close()
-        _driver = GraphDatabase.driver(
+        # GraphDatabase.driver's TYPE_CHECKING overload isn't picked up cleanly
+        # by basedpyright (the member itself types as partially unknown even
+        # though the returned Driver is precise) — a genuine library typing gap.
+        _driver = GraphDatabase.driver(  # pyright: ignore[reportUnknownMemberType]
             cfg.neo4j_uri, auth=(cfg.neo4j_user, cfg.neo4j_password)
         )
         _driver_key = key
@@ -43,7 +46,8 @@ def get_database() -> str:
 
 def neo4j_ready() -> bool:
     try:
-        get_driver().verify_connectivity()
+        # Same TYPE_CHECKING-overload typing gap as GraphDatabase.driver above.
+        get_driver().verify_connectivity()  # pyright: ignore[reportUnknownMemberType]
         return True
     except Exception:
         return False

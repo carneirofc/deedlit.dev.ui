@@ -37,12 +37,22 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import LiteralString, cast
 
-from neo4j import Driver
+from neo4j import Driver, ManagedTransaction, Record, Session
 
 from graph.db import get_database, get_driver
-from graph.models import AssetRef, EdgeUpsert, LineageRef
+from graph.models import (
+    AssetRef,
+    EdgeUpsert,
+    EdgeUpsertResult,
+    LineageRef,
+    Neighbor,
+    PruneResult,
+    RelatedTag,
+)
 
 
 def normalize_name(name: str) -> str:
@@ -94,7 +104,7 @@ _SCHEMA_STATEMENTS = (
 def ensure_schema() -> None:
     """Create the MERGE lookup indexes (idempotent). Call on startup / before a
     rebuild. Cheap when they already exist; turns the per-tag full scan into a seek."""
-    with _driver().session(database=get_database()) as session:
+    with _session() as session:
         for stmt in _SCHEMA_STATEMENTS:
             session.run(stmt).consume()
 
@@ -110,75 +120,126 @@ def _driver() -> Driver:
     return get_driver()
 
 
-def upsert_edges(edge: EdgeUpsert) -> dict:
-    """Upsert the image node plus all USES / TAGGED / DERIVED_FROM edges."""
-    references = [
-        {"kind": r.kind, "name": r.name, "key": asset_key(r)} for r in edge.references
-    ]
-    tags = sorted({c for t in edge.tags if (c := clean_tag(t))})
-    lineage = [{"parent": l.parent, "kind": l.kind} for l in edge.lineage]
+def _session() -> Session:
+    """Open a session on the configured database.
 
-    query = """
-    MERGE (img:Image {sha256: $sha256})
-    WITH img
-    // assets
-    CALL (img) {
-        UNWIND $references AS ref
-        MERGE (a:Asset {kind: ref.kind, key: ref.key})
-          ON CREATE SET a.name = ref.name
-        MERGE (img)-[:USES]->(a)
-        RETURN count(*) AS _assets
-    }
-    // tags
-    CALL (img) {
-        UNWIND $tags AS tname
-        MERGE (t:Tag {name: tname})
-        MERGE (img)-[:TAGGED]->(t)
-        RETURN count(*) AS _tags
-    }
-    // lineage (parent images may not be upserted yet — MERGE creates the stub)
-    CALL (img) {
-        UNWIND $lineage AS lin
-        MERGE (p:Image {sha256: lin.parent})
-        MERGE (img)-[d:DERIVED_FROM]->(p)
-          SET d.kind = lin.kind
-        RETURN count(*) AS _lineage
-    }
-    RETURN size($references) AS assets, size($tags) AS tags, size($lineage) AS lineage
+    ``Driver.session`` has a ``TYPE_CHECKING``-only overload that basedpyright
+    doesn't fully resolve (the member itself types as partially unknown even
+    though the returned ``Session`` is precise) — a genuine library typing gap,
+    isolated here so the ignore only needs to exist once.
     """
-    params = {
-        "sha256": edge.sha256,
-        "references": references,
-        "tags": tags,
-        "lineage": lineage,
-    }
-    with _driver().session(database=get_database()) as session:
+    return _driver().session(database=get_database())  # pyright: ignore[reportUnknownMemberType]
+
+
+def _rec_str(rec: Record, key: str) -> str:
+    return cast(str, rec[key])
+
+
+def _rec_int(rec: Record, key: str) -> int:
+    return cast(int, rec[key])
+
+
+def _rec_float(rec: Record, key: str) -> float:
+    return cast(float, rec[key])
+
+
+# Row shape sent to Neo4j as Cypher parameters: a plain JSON-ish dict (the
+# driver only accepts primitives/dict/list), built from the typed AssetRef /
+# LineageRef models just before the query call.
+_AssetRow = dict[str, str]
+_LineageRow = dict[str, str]
+_EdgeRow = dict[str, str | list[str] | list[_AssetRow] | list[_LineageRow]]
+
+
+def _asset_rows(references: Iterable[AssetRef]) -> list[_AssetRow]:
+    return [{"kind": r.kind, "name": r.name, "key": asset_key(r)} for r in references]
+
+
+def _clean_tags(tags: Iterable[str]) -> list[str]:
+    return sorted({c for t in tags if (c := clean_tag(t))})
+
+
+def _lineage_rows(lineage: Iterable[LineageRef]) -> list[_LineageRow]:
+    return [{"parent": ln.parent, "kind": ln.kind} for ln in lineage]
+
+
+_UPSERT_EDGE_QUERY = """
+MERGE (img:Image {sha256: $sha256})
+WITH img
+// assets
+CALL (img) {
+    UNWIND $references AS ref
+    MERGE (a:Asset {kind: ref.kind, key: ref.key})
+      ON CREATE SET a.name = ref.name
+    MERGE (img)-[:USES]->(a)
+    RETURN count(*) AS _assets
+}
+// tags
+CALL (img) {
+    UNWIND $tags AS tname
+    MERGE (t:Tag {name: tname})
+    MERGE (img)-[:TAGGED]->(t)
+    RETURN count(*) AS _tags
+}
+// lineage (parent images may not be upserted yet — MERGE creates the stub)
+CALL (img) {
+    UNWIND $lineage AS lin
+    MERGE (p:Image {sha256: lin.parent})
+    MERGE (img)-[d:DERIVED_FROM]->(p)
+      SET d.kind = lin.kind
+    RETURN count(*) AS _lineage
+}
+RETURN size($references) AS assets, size($tags) AS tags, size($lineage) AS lineage
+"""
+
+
+def _run_upsert_edges(
+    tx: ManagedTransaction,
+    sha256: str,
+    references: list[_AssetRow],
+    tags: list[str],
+    lineage: list[_LineageRow],
+) -> Record | None:
+    return tx.run(
+        _UPSERT_EDGE_QUERY, sha256=sha256, references=references, tags=tags, lineage=lineage
+    ).single()
+
+
+def upsert_edges(edge: EdgeUpsert) -> EdgeUpsertResult:
+    """Upsert the image node plus all USES / TAGGED / DERIVED_FROM edges."""
+    references = _asset_rows(edge.references)
+    tags = _clean_tags(edge.tags)
+    lineage = _lineage_rows(edge.lineage)
+
+    with _session() as session:
         # Managed write transaction: auto-retries transient errors / deadlocks
         # (which Neo4j throws under concurrent MERGE load) — see the driver perf
         # guide. The result is consumed inside the tx function.
-        rec = session.execute_write(lambda tx: tx.run(query, **params).single())
-        return {
-            "sha256": edge.sha256,
-            "assets": rec["assets"],
-            "tags": rec["tags"],
-            "lineage": rec["lineage"],
-        }
+        def _tx(tx: ManagedTransaction) -> Record | None:
+            return _run_upsert_edges(tx, edge.sha256, references, tags, lineage)
+
+        rec = session.execute_write(_tx)
+        assert rec is not None
+        return EdgeUpsertResult(
+            sha256=edge.sha256,
+            assets=_rec_int(rec, "assets"),
+            tags=_rec_int(rec, "tags"),
+            lineage=_rec_int(rec, "lineage"),
+        )
 
 
-def _edge_payload(edge: EdgeUpsert) -> dict:
+def _edge_payload(edge: EdgeUpsert) -> _EdgeRow:
     """Normalize one EdgeUpsert into the {sha256, references, tags, lineage} row
     shape the batched UNWIND query consumes (same normalization as upsert_edges)."""
     return {
         "sha256": edge.sha256,
-        "references": [
-            {"kind": r.kind, "name": r.name, "key": asset_key(r)} for r in edge.references
-        ],
-        "tags": sorted({c for t in edge.tags if (c := clean_tag(t))}),
-        "lineage": [{"parent": ln.parent, "kind": ln.kind} for ln in edge.lineage],
+        "references": _asset_rows(edge.references),
+        "tags": _clean_tags(edge.tags),
+        "lineage": _lineage_rows(edge.lineage),
     }
 
 
-def upsert_edges_batch(edges: list[EdgeUpsert]) -> list[dict]:
+def upsert_edges_batch(edges: list[EdgeUpsert]) -> list[EdgeUpsertResult]:
     """Upsert MANY images' edges in ONE Neo4j transaction (UNWIND over the batch).
 
     The batch counterpart to :func:`upsert_edges`: the index.graph worker pool
@@ -218,12 +279,21 @@ def upsert_edges_batch(edges: list[EdgeUpsert]) -> list[dict]:
            size(item.tags) AS tags,
            size(item.lineage) AS lineage
     """
-    with _driver().session(database=get_database()) as session:
+
+    def _tx(tx: ManagedTransaction) -> list[Record]:
+        return list(tx.run(query, batch=batch))
+
+    with _session() as session:
         # Managed write transaction (auto-retry transient/deadlock) for the whole
         # coalesced batch — one round-trip + retry boundary for many images.
-        rows = session.execute_write(lambda tx: tx.run(query, batch=batch).data())
+        rows = session.execute_write(_tx)
     return [
-        {"sha256": r["sha256"], "assets": r["assets"], "tags": r["tags"], "lineage": r["lineage"]}
+        EdgeUpsertResult(
+            sha256=_rec_str(r, "sha256"),
+            assets=_rec_int(r, "assets"),
+            tags=_rec_int(r, "tags"),
+            lineage=_rec_int(r, "lineage"),
+        )
         for r in rows
     ]
 
@@ -241,9 +311,13 @@ def delete_image(sha256: str) -> int:
     DETACH DELETE img
     RETURN count(*) AS deleted
     """
-    with _driver().session(database=get_database()) as session:
-        rec = session.execute_write(lambda tx: tx.run(q, sha256=sha256).single())
-        return int(rec["deleted"]) if rec else 0
+
+    def _tx(tx: ManagedTransaction) -> Record | None:
+        return tx.run(q, sha256=sha256).single()
+
+    with _session() as session:
+        rec = session.execute_write(_tx)
+        return _rec_int(rec, "deleted") if rec else 0
 
 
 def delete_images(sha256s: list[str]) -> int:
@@ -260,9 +334,13 @@ def delete_images(sha256s: list[str]) -> int:
     DETACH DELETE img
     RETURN count(*) AS deleted
     """
-    with _driver().session(database=get_database()) as session:
-        rec = session.execute_write(lambda tx: tx.run(q, shas=sha256s).single())
-        return int(rec["deleted"]) if rec else 0
+
+    def _tx(tx: ManagedTransaction) -> Record | None:
+        return tx.run(q, shas=sha256s).single()
+
+    with _session() as session:
+        rec = session.execute_write(_tx)
+        return _rec_int(rec, "deleted") if rec else 0
 
 
 # Cap how many nodes one prune transaction removes, so a large orphan backlog
@@ -272,7 +350,13 @@ def delete_images(sha256s: list[str]) -> int:
 _PRUNE_BATCH = max(1, int(os.getenv("GRAPH_PRUNE_BATCH", "10000")))
 
 
-def _count_orphans() -> dict:
+@dataclass(frozen=True, slots=True)
+class _OrphanCounts:
+    assets: int
+    tags: int
+
+
+def _count_orphans() -> _OrphanCounts:
     """Count orphan :Asset (no incoming USES) and :Tag (no incoming TAGGED)
     nodes without deleting anything — backs the prune ``dry_run`` preview."""
     q = """
@@ -281,12 +365,13 @@ def _count_orphans() -> dict:
     MATCH (t:Tag) WHERE NOT (t)<-[:TAGGED]-(:Image)
     RETURN assets, count(t) AS tags
     """
-    with _driver().session(database=get_database()) as session:
+    with _session() as session:
         rec = session.run(q).single()
-        return {"assets": int(rec["assets"]), "tags": int(rec["tags"])}
+        assert rec is not None
+        return _OrphanCounts(assets=_rec_int(rec, "assets"), tags=_rec_int(rec, "tags"))
 
 
-def _delete_orphan_batches(session, match_clause: str, var: str) -> int:
+def _delete_orphan_batches(session: Session, match_clause: str, var: str) -> int:
     """Delete the nodes matched by ``match_clause`` in ``_PRUNE_BATCH``-sized
     transactions, looping until a round removes fewer than a full batch.
 
@@ -294,21 +379,33 @@ def _delete_orphan_batches(session, match_clause: str, var: str) -> int:
     a structurally-orphaned :Asset/:Tag has no edges by construction, so a plain
     DELETE that errored would surface a logic bug instead of silently force-
     removing a live edge. Returns the total number of nodes deleted."""
-    q = f"""
+    # match_clause/var are always one of the two internal literals passed by
+    # prune_orphans (never user input), so this is safe to treat as a fixed
+    # query template — cast past LiteralString since it's built via f-string.
+    q = cast(
+        LiteralString,
+        f"""
     {match_clause}
     WITH {var} LIMIT $batch
     DELETE {var}
     RETURN count(*) AS n
-    """
+    """,
+    )
+
+    def _tx(tx: ManagedTransaction) -> Record | None:
+        return tx.run(q, batch=_PRUNE_BATCH).single()
+
     deleted = 0
     while True:
-        n = int(session.execute_write(lambda tx: tx.run(q, batch=_PRUNE_BATCH).single()["n"]))
+        rec = session.execute_write(_tx)
+        assert rec is not None
+        n = _rec_int(rec, "n")
         deleted += n
         if n < _PRUNE_BATCH:
             return deleted
 
 
-def prune_orphans(*, dry_run: bool = False) -> dict:
+def prune_orphans(*, dry_run: bool = False) -> PruneResult:
     """Remove structurally-orphaned graph entries left behind by image deletes.
 
     ``delete_image`` removes an :Image and its edges but intentionally leaves the
@@ -338,66 +435,70 @@ def prune_orphans(*, dry_run: bool = False) -> dict:
     """
     if dry_run:
         counts = _count_orphans()
-        return {"assets_deleted": counts["assets"], "tags_deleted": counts["tags"], "dry_run": True}
-    with _driver().session(database=get_database()) as session:
+        return PruneResult(assets_deleted=counts.assets, tags_deleted=counts.tags, dry_run=True)
+    with _session() as session:
         assets = _delete_orphan_batches(
             session, "MATCH (a:Asset) WHERE NOT (a)<-[:USES]-(:Image)", "a"
         )
         tags = _delete_orphan_batches(
             session, "MATCH (t:Tag) WHERE NOT (t)<-[:TAGGED]-(:Image)", "t"
         )
-    return {"assets_deleted": assets, "tags_deleted": tags, "dry_run": False}
+    return PruneResult(assets_deleted=assets, tags_deleted=tags, dry_run=False)
 
 
-def neighbors(sha256: str, relation: str = "any", limit: int = 24) -> list[dict]:
+def _merge_shared_asset_neighbors(results: dict[str, Neighbor], sha256: str, limit: int) -> None:
+    q = """
+    MATCH (i:Image {sha256: $sha256})-[:USES]->(a:Asset)<-[:USES]-(o:Image)
+    WHERE o.sha256 <> $sha256
+    RETURN o.sha256 AS sha256, count(DISTINCT a) AS weight
+    ORDER BY weight DESC, sha256
+    LIMIT $limit
+    """
+    with _session() as session:
+        for rec in session.run(q, sha256=sha256, limit=limit):
+            other = _rec_str(rec, "sha256")
+            results[other] = Neighbor(
+                sha256=other, relation="shared_asset", weight=_rec_float(rec, "weight")
+            )
+
+
+def _merge_tag_cooccurrence_neighbors(
+    results: dict[str, Neighbor], sha256: str, limit: int
+) -> None:
+    q = """
+    MATCH (i:Image {sha256: $sha256})-[:TAGGED]->(t:Tag)<-[:TAGGED]-(o:Image)
+    WHERE o.sha256 <> $sha256
+    RETURN o.sha256 AS sha256, count(DISTINCT t) AS weight
+    ORDER BY weight DESC, sha256
+    LIMIT $limit
+    """
+    with _session() as session:
+        for rec in session.run(q, sha256=sha256, limit=limit):
+            other = _rec_str(rec, "sha256")
+            weight = _rec_float(rec, "weight")
+            existing = results.get(other)
+            if existing is None:
+                results[other] = Neighbor(sha256=other, relation="tag_cooccurrence", weight=weight)
+            else:
+                # appears under both relations
+                existing.relation = "shared_asset+tag_cooccurrence"
+                existing.weight = (existing.weight or 0) + weight
+
+
+def neighbors(sha256: str, relation: str = "any", limit: int = 24) -> list[Neighbor]:
     """Related images by shared asset and/or tag co-occurrence (traversal)."""
-    results: dict[str, dict] = {}
+    results: dict[str, Neighbor] = {}
 
     if relation in ("shared_asset", "any"):
-        q = """
-        MATCH (i:Image {sha256: $sha256})-[:USES]->(a:Asset)<-[:USES]-(o:Image)
-        WHERE o.sha256 <> $sha256
-        RETURN o.sha256 AS sha256, count(DISTINCT a) AS weight
-        ORDER BY weight DESC, sha256
-        LIMIT $limit
-        """
-        with _driver().session(database=get_database()) as session:
-            for rec in session.run(q, sha256=sha256, limit=limit):
-                results[rec["sha256"]] = {
-                    "sha256": rec["sha256"],
-                    "relation": "shared_asset",
-                    "weight": float(rec["weight"]),
-                }
-
+        _merge_shared_asset_neighbors(results, sha256, limit)
     if relation in ("tag_cooccurrence", "any"):
-        q = """
-        MATCH (i:Image {sha256: $sha256})-[:TAGGED]->(t:Tag)<-[:TAGGED]-(o:Image)
-        WHERE o.sha256 <> $sha256
-        RETURN o.sha256 AS sha256, count(DISTINCT t) AS weight
-        ORDER BY weight DESC, sha256
-        LIMIT $limit
-        """
-        with _driver().session(database=get_database()) as session:
-            for rec in session.run(q, sha256=sha256, limit=limit):
-                existing = results.get(rec["sha256"])
-                if existing is None:
-                    results[rec["sha256"]] = {
-                        "sha256": rec["sha256"],
-                        "relation": "tag_cooccurrence",
-                        "weight": float(rec["weight"]),
-                    }
-                else:
-                    # appears under both relations
-                    existing["relation"] = "shared_asset+tag_cooccurrence"
-                    existing["weight"] = (existing["weight"] or 0) + float(rec["weight"])
+        _merge_tag_cooccurrence_neighbors(results, sha256, limit)
 
-    ordered = sorted(
-        results.values(), key=lambda n: (-(n["weight"] or 0), n["sha256"])
-    )
+    ordered = sorted(results.values(), key=lambda n: (-(n.weight or 0), n.sha256))
     return ordered[:limit]
 
 
-def lineage(sha256: str) -> list[dict]:
+def lineage(sha256: str) -> list[Neighbor]:
     """Full variant/upscale/inpaint chain: ancestors and descendants of the image."""
     q = """
     MATCH (i:Image {sha256: $sha256})-[:DERIVED_FROM*1..]->(anc:Image)
@@ -406,16 +507,16 @@ def lineage(sha256: str) -> list[dict]:
     MATCH (desc:Image)-[:DERIVED_FROM*1..]->(i:Image {sha256: $sha256})
     RETURN DISTINCT desc.sha256 AS sha256, 'descendant' AS relation
     """
-    seen: dict[str, dict] = {}
-    with _driver().session(database=get_database()) as session:
+    seen: dict[str, Neighbor] = {}
+    with _session() as session:
         for rec in session.run(q, sha256=sha256):
-            sha = rec["sha256"]
+            sha = _rec_str(rec, "sha256")
             if sha and sha != sha256 and sha not in seen:
-                seen[sha] = {"sha256": sha, "relation": rec["relation"], "weight": None}
+                seen[sha] = Neighbor(sha256=sha, relation=_rec_str(rec, "relation"), weight=None)
     return list(seen.values())
 
 
-def related_tags(tag: str, limit: int = 24) -> list[dict]:
+def related_tags(tag: str, limit: int = 24) -> list[RelatedTag]:
     """Tags that co-occur (share an image) with the given tag, by frequency."""
     norm = tag.strip().lower()
     q = """
@@ -425,10 +526,44 @@ def related_tags(tag: str, limit: int = 24) -> list[dict]:
     ORDER BY weight DESC, tag
     LIMIT $limit
     """
-    with _driver().session(database=get_database()) as session:
+    with _session() as session:
         return [
-            {"tag": rec["tag"], "weight": float(rec["weight"])}
+            RelatedTag(tag=_rec_str(rec, "tag"), weight=_rec_float(rec, "weight"))
             for rec in session.run(q, tag=norm, limit=limit)
+        ]
+
+
+def _suggest_tags(pfx: str, limit: int) -> list[str]:
+    q = """
+    MATCH (t:Tag)
+    WHERE $pfx = '' OR toLower(t.name) STARTS WITH $pfx
+    OPTIONAL MATCH (t)<-[:TAGGED]-(i:Image)
+    WITH t.name AS name, count(i) AS uses
+    RETURN name ORDER BY uses DESC, name ASC
+    LIMIT $limit
+    """
+    with _session() as session:
+        return [
+            name
+            for rec in session.run(q, pfx=pfx, limit=limit)
+            if (name := _rec_str(rec, "name"))
+        ]
+
+
+def _suggest_assets(kind: str, pfx: str, limit: int) -> list[str]:
+    q = """
+    MATCH (a:Asset {kind: $kind})
+    WHERE $pfx = '' OR toLower(a.name) STARTS WITH $pfx
+    OPTIONAL MATCH (a)<-[:USES]-(i:Image)
+    WITH a.name AS name, count(i) AS uses
+    RETURN name ORDER BY uses DESC, name ASC
+    LIMIT $limit
+    """
+    with _session() as session:
+        return [
+            name
+            for rec in session.run(q, kind=kind, pfx=pfx, limit=limit)
+            if (name := _rec_str(rec, "name"))
         ]
 
 
@@ -446,32 +581,13 @@ def suggest_entities(entity_type: str, prefix: str = "", limit: int = 50) -> lis
     t = (entity_type or "").strip().lower()
     pfx = (prefix or "").strip().lower()
     if t == "tag":
-        query = """
-        MATCH (t:Tag)
-        WHERE $pfx = '' OR toLower(t.name) STARTS WITH $pfx
-        OPTIONAL MATCH (t)<-[:TAGGED]-(i:Image)
-        WITH t.name AS name, count(i) AS uses
-        RETURN name ORDER BY uses DESC, name ASC
-        LIMIT $limit
-        """
-        params: dict = {"pfx": pfx, "limit": limit}
-    else:
-        query = """
-        MATCH (a:Asset {kind: $kind})
-        WHERE $pfx = '' OR toLower(a.name) STARTS WITH $pfx
-        OPTIONAL MATCH (a)<-[:USES]-(i:Image)
-        WITH a.name AS name, count(i) AS uses
-        RETURN name ORDER BY uses DESC, name ASC
-        LIMIT $limit
-        """
-        params = {"kind": t, "pfx": pfx, "limit": limit}
-    with _driver().session(database=get_database()) as session:
-        return [rec["name"] for rec in session.run(query, **params) if rec["name"]]
+        return _suggest_tags(pfx, limit)
+    return _suggest_assets(t, pfx, limit)
 
 
 def wipe_all() -> None:
     """Delete every node + relationship. Used by tests for isolation."""
-    with _driver().session(database=get_database()) as session:
+    with _session() as session:
         session.run("MATCH (n) DETACH DELETE n")
 
 

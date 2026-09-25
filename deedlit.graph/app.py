@@ -6,27 +6,30 @@ This is an OWNING service: it never calls search, and only reads the catalog
 during ``POST /rebuild``. See contracts/graph.openapi.yaml and graph/repository.py
 for the graph model + name-normalization rule.
 """
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from activity import install_activity
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from activity import install_activity
 from graph import repository
 from graph.db import neo4j_ready
+from graph.models import HealthResponse
 from graph.routers import router
 
 _log = logging.getLogger("deedlit.graph")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Ensure the MERGE lookup indexes (Tag.name / Image.sha256 / Asset.kind,key)
     # exist before serving — without them ingest's per-tag MERGE is a full label
     # scan. Best-effort: a cold/unreachable Neo4j must never block startup (the
@@ -60,9 +63,9 @@ install_activity(app)
 
 
 @app.get("/health")
-def health() -> dict:
+def health() -> HealthResponse:
     ready = neo4j_ready()
-    return {"status": "ok" if ready else "degraded", "neo4j_ready": ready}
+    return HealthResponse(status="ok" if ready else "degraded", neo4j_ready=ready)
 
 
 app.include_router(router)

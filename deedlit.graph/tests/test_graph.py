@@ -4,9 +4,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import httpx
-from fastapi.testclient import TestClient
-
 from app import app
+from fastapi.testclient import TestClient
 from graph.models import AssetRef
 from graph.repository import asset_key, normalize_name
 from tests.conftest import sha
@@ -117,7 +116,7 @@ def test_edges_key_on_normalized_name_when_hash_absent():
     ref1 = {"kind": "checkpoint", "name": "SD/Foo.safetensors", "hash": None}
     ref2 = {"kind": "checkpoint", "name": "other\\dir\\foo.ckpt"}  # hash omitted
 
-    assert asset_key(AssetRef(**ref1)) == asset_key(AssetRef(**ref2))
+    assert asset_key(AssetRef.model_validate(ref1)) == asset_key(AssetRef.model_validate(ref2))
 
     client.post("/edges", json={"sha256": a, "references": [ref1]})
     client.post("/edges", json={"sha256": b, "references": [ref2]})

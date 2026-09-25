@@ -8,8 +8,6 @@ from pydantic import BaseModel, Field
 AssetKind = Literal["checkpoint", "lora", "embedding", "vae", "controlnet", "upscaler"]
 LineageKind = Literal["variant", "upscale", "inpaint"]
 
-SHA256 = Field(pattern=r"^[a-f0-9]{64}$")
-
 
 class AssetRef(BaseModel):
     kind: AssetKind
@@ -42,3 +40,33 @@ class NeighborResponse(BaseModel):
 class RelatedTag(BaseModel):
     tag: str
     weight: float | None = None
+
+
+class EdgeUpsertResult(BaseModel):
+    sha256: str
+    assets: int
+    tags: int
+    lineage: int
+
+
+class StatusDeletedResponse(BaseModel):
+    status: str
+    deleted: int
+
+
+class PruneResult(BaseModel):
+    assets_deleted: int
+    tags_deleted: int
+    dry_run: bool
+
+
+class PruneResponse(BaseModel):
+    status: str
+    assets_deleted: int
+    tags_deleted: int
+    dry_run: bool
+
+
+class HealthResponse(BaseModel):
+    status: str
+    neo4j_ready: bool
