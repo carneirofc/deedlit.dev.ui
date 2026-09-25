@@ -9,17 +9,20 @@ gateway 404; any other downstream failure surfaces as a 502.
 from __future__ import annotations
 
 import json
-
-import httpx
-import pytest
-from fastapi.testclient import TestClient
+from collections.abc import Callable
 
 import app as app_module
 import clients
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import JsonValue
 
 SHA = "a" * 64
 NOTE_ID = "note-1"
 COL_ID = "col-1"
+
+RecorderHandler = Callable[[httpx.Request], httpx.Response | JsonValue]
 
 
 class Recorder:
@@ -27,9 +30,9 @@ class Recorder:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, str]] = []
-        self.routes: dict[tuple[str, str], object] = {}
+        self.routes: dict[tuple[str, str], RecorderHandler] = {}
 
-    def on(self, method: str, path: str, handler) -> None:
+    def on(self, method: str, path: str, handler: RecorderHandler) -> None:
         self.routes[(method.upper(), path)] = handler
 
     async def handle(self, request: httpx.Request) -> httpx.Response:

@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
+from collections.abc import Sequence
+from typing import cast
 
 import httpx
+from pydantic import JsonValue
 
 # ---------------------------------------------------------------------------
 # Downstream base URLs (env-overridable; defaults for local dev)
@@ -46,6 +48,14 @@ RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/")
 HTTP_TIMEOUT = float(os.getenv("API_HTTP_TIMEOUT", "15.0"))
 
 
+# ---------------------------------------------------------------------------
+# Query-string param shape (matches httpx's QueryParamTypes primitives) so
+# route/tool code can build params without reaching for `Any`.
+# ---------------------------------------------------------------------------
+QueryValue = str | int | float | bool | None
+QueryParams = dict[str, QueryValue | Sequence[QueryValue]]
+
+
 class DownstreamError(Exception):
     """A downstream service returned a non-2xx response or was unreachable."""
 
@@ -56,13 +66,12 @@ class DownstreamError(Exception):
         super().__init__(f"{service} -> {status}: {detail}")
 
 
-def make_async_client(**kwargs: Any) -> httpx.AsyncClient:
+def make_async_client() -> httpx.AsyncClient:
     """Construct the AsyncClient used for one downstream call.
 
     Isolated into a factory so tests can swap in an ``httpx.MockTransport``.
     """
-    kwargs.setdefault("timeout", HTTP_TIMEOUT)
-    return httpx.AsyncClient(**kwargs)
+    return httpx.AsyncClient(timeout=HTTP_TIMEOUT)
 
 
 async def request(
@@ -71,9 +80,9 @@ async def request(
     base_url: str,
     path: str,
     *,
-    params: dict[str, Any] | None = None,
-    json: Any | None = None,
-) -> Any:
+    params: QueryParams | None = None,
+    json: JsonValue | None = None,
+) -> JsonValue:
     """Make one downstream call and return the decoded JSON body.
 
     Raises :class:`DownstreamError` on a transport error or a non-2xx status so
@@ -93,7 +102,9 @@ async def request(
     if not resp.content:
         return None
     try:
-        return resp.json()
+        # httpx's Response.json() is untyped (returns Any); the wire contract is
+        # arbitrary downstream JSON, so a JsonValue cast is the boundary here.
+        return cast(JsonValue, resp.json())
     except ValueError:
         return None
 
@@ -104,7 +115,7 @@ async def request_bytes(
     base_url: str,
     path: str,
     *,
-    params: dict[str, Any] | None = None,
+    params: QueryParams | None = None,
 ) -> tuple[bytes, str]:
     """Make one downstream call and return its RAW body + content-type.
 
@@ -120,13 +131,14 @@ async def request_bytes(
         raise DownstreamError(service, None, str(exc)) from exc
     if resp.status_code >= 400:
         raise DownstreamError(service, resp.status_code, _safe_detail(resp))
-    content_type = resp.headers.get("content-type", "application/octet-stream")
+    # httpx.Headers.get is untyped for a str default (returns Any); pin it here.
+    content_type = cast(str, resp.headers.get("content-type", "application/octet-stream"))
     return resp.content, content_type
 
 
 def _safe_detail(resp: httpx.Response) -> str:
     try:
-        body = resp.json()
+        body = cast(JsonValue, resp.json())
         if isinstance(body, dict) and "detail" in body:
             return str(body["detail"])
         return str(body)
@@ -137,27 +149,37 @@ def _safe_detail(resp: httpx.Response) -> str:
 # ---------------------------------------------------------------------------
 # Typed convenience wrappers (used by routes + MCP tools)
 # ---------------------------------------------------------------------------
-async def catalog(method: str, path: str, **kw: Any) -> Any:
-    return await request("catalog", method, CATALOG_URL, path, **kw)
+async def catalog(
+    method: str, path: str, *, params: QueryParams | None = None, json: JsonValue | None = None
+) -> JsonValue:
+    return await request("catalog", method, CATALOG_URL, path, params=params, json=json)
 
 
-async def search(method: str, path: str, **kw: Any) -> Any:
-    return await request("search", method, SEARCH_URL, path, **kw)
+async def search(
+    method: str, path: str, *, params: QueryParams | None = None, json: JsonValue | None = None
+) -> JsonValue:
+    return await request("search", method, SEARCH_URL, path, params=params, json=json)
 
 
-async def graph(method: str, path: str, **kw: Any) -> Any:
-    return await request("graph", method, GRAPH_URL, path, **kw)
+async def graph(
+    method: str, path: str, *, params: QueryParams | None = None, json: JsonValue | None = None
+) -> JsonValue:
+    return await request("graph", method, GRAPH_URL, path, params=params, json=json)
 
 
-async def ingest(method: str, path: str, **kw: Any) -> Any:
-    return await request("ingest", method, INGEST_URL, path, **kw)
+async def ingest(
+    method: str, path: str, *, params: QueryParams | None = None, json: JsonValue | None = None
+) -> JsonValue:
+    return await request("ingest", method, INGEST_URL, path, params=params, json=json)
 
 
-async def vision(method: str, path: str, **kw: Any) -> Any:
-    return await request("vision", method, VISION_URL, path, **kw)
+async def vision(
+    method: str, path: str, *, params: QueryParams | None = None, json: JsonValue | None = None
+) -> JsonValue:
+    return await request("vision", method, VISION_URL, path, params=params, json=json)
 
 
-async def rabbitmq_mgmt(method: str, path: str, *, json: Any | None = None) -> Any:
+async def rabbitmq_mgmt(method: str, path: str, *, json: JsonValue | None = None) -> JsonValue:
     """Call the RabbitMQ management HTTP API with the server-held credentials.
 
     Backs the queue visualization page (#29). Raises :class:`DownstreamError` on
@@ -177,7 +199,7 @@ async def rabbitmq_mgmt(method: str, path: str, *, json: Any | None = None) -> A
     if not resp.content:
         return None
     try:
-        return resp.json()
+        return cast(JsonValue, resp.json())
     except ValueError:
         return None
 
@@ -190,7 +212,7 @@ async def rabbitmq_mgmt(method: str, path: str, *, json: Any | None = None) -> A
 # gateway must first encode the query via deedlit.vision (the same towers ingest
 # uses at write time), then hand the vectors to search. This is the missing hop
 # the raw proxy skipped.
-async def encode_query(query: str) -> dict[str, Any] | None:
+async def encode_query(query: str) -> dict[str, JsonValue] | None:
     """Encode a text query into the dense + sparse vectors search expects.
 
     Returns ``None`` for an empty/whitespace query: there is no vector to search
@@ -202,16 +224,28 @@ async def encode_query(query: str) -> dict[str, Any] | None:
         return None
     dense_res = await vision("POST", "/embed/text", json={"text": text})
     sparse_res = await vision("POST", "/embed/sparse", json={"text": text})
+    dense_body = dense_res if isinstance(dense_res, dict) else {}
+    sparse_body = sparse_res if isinstance(sparse_res, dict) else {}
     return {
-        "dense": (dense_res or {}).get("embedding"),
+        "dense": dense_body.get("embedding"),
         "sparse": {
-            "indices": (sparse_res or {}).get("indices", []),
-            "values": (sparse_res or {}).get("values", []),
+            "indices": sparse_body.get("indices", []),
+            "values": sparse_body.get("values", []),
         },
     }
 
 
-def _to_qdrant_filter(facets: dict[str, Any] | None) -> dict[str, Any] | None:
+def _string_list(value: JsonValue) -> list[str]:
+    """Narrow a JSON value to a list of strings: a bare string becomes a single-
+    item list, a list keeps only its string entries, anything else -> []."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, str)]
+    return []
+
+
+def _to_qdrant_filter(facets: JsonValue) -> dict[str, JsonValue] | None:
     """Translate the UI's camelCase facet object into a Qdrant ``Filter`` shape.
 
     Only facets that exist in each point's payload (written by ingest) can be
@@ -223,26 +257,24 @@ def _to_qdrant_filter(facets: dict[str, Any] | None) -> dict[str, Any] | None:
     search runs unfiltered (and so a raw facet dict never reaches Qdrant's
     ``Filter(**raw)``, which only understands must/should/must_not).
     """
-    if not facets:
+    if not isinstance(facets, dict):
         return None
-    must: list[dict[str, Any]] = []
-    must_not: list[dict[str, Any]] = []
+    must: list[JsonValue] = []
+    must_not: list[JsonValue] = []
 
-    tags = facets.get("tags")
-    if isinstance(tags, list) and tags:
-        must.append({"key": "tags", "match": {"any": list(tags)}})
+    tags = _string_list(facets.get("tags"))
+    if tags:
+        must.append({"key": "tags", "match": {"any": cast(list[JsonValue], tags)}})
 
-    safety = facets.get("safety")
-    if isinstance(safety, str) and safety:
-        safety = [safety]
-    if isinstance(safety, list) and safety:
-        must.append({"key": "safety", "match": {"any": list(safety)}})
+    safety = _string_list(facets.get("safety"))
+    if safety:
+        must.append({"key": "safety", "match": {"any": cast(list[JsonValue], safety)}})
 
-    exclude = facets.get("excludeTags")
-    if isinstance(exclude, list) and exclude:
-        must_not.append({"key": "tags", "match": {"any": list(exclude)}})
+    exclude = _string_list(facets.get("excludeTags"))
+    if exclude:
+        must_not.append({"key": "tags", "match": {"any": cast(list[JsonValue], exclude)}})
 
-    qfilter: dict[str, Any] = {}
+    qfilter: dict[str, JsonValue] = {}
     if must:
         qfilter["must"] = must
     if must_not:
@@ -281,13 +313,17 @@ async def embed_image_bytes(
         raise DownstreamError("vision", None, str(exc)) from exc
     if resp.status_code >= 400:
         raise DownstreamError("vision", resp.status_code, _safe_detail(resp))
-    body = resp.json() if resp.content else {}
+    body: JsonValue = cast(JsonValue, resp.json()) if resp.content else {}
+    body_map = body if isinstance(body, dict) else {}
     # The live service returns ``embedding``; tolerate ``vector`` for parity with
     # the ingest pipeline's reader (both shapes have appeared across versions).
-    embedding = (body or {}).get("embedding") or (body or {}).get("vector")
-    if not embedding:
+    raw_embedding = body_map.get("embedding") or body_map.get("vector")
+    if not raw_embedding or not isinstance(raw_embedding, list):
         raise DownstreamError("vision", resp.status_code, "embed/image returned no embedding")
-    return embedding
+    # vision's documented /embed/image contract is a list of floats; the isinstance
+    # check above only narrows to "list", so the element type is a genuine library
+    # typing gap pinned here rather than threaded through as Any.
+    return cast(list[float], raw_embedding)
 
 
 async def search_by_image_upload(
@@ -297,8 +333,8 @@ async def search_by_image_upload(
     *,
     limit: int,
     offset: int = 0,
-    filter: dict[str, Any] | None = None,
-) -> Any:
+    filter: JsonValue = None,
+) -> JsonValue:
     """Embed an uploaded image via vision, then run a dense vector search.
 
     The image-upload counterpart to :func:`search_by_text`: the bytes are encoded
@@ -310,8 +346,8 @@ async def search_by_image_upload(
     search. ``offset`` pages deeper into the ranked results.
     """
     dense = await embed_image_bytes(data, filename, content_type)
-    body = {
-        "dense": dense,
+    body: dict[str, JsonValue] = {
+        "dense": cast(list[JsonValue], dense),
         "limit": limit,
         "offset": offset,
         "filter": _to_qdrant_filter(filter),
@@ -319,9 +355,7 @@ async def search_by_image_upload(
     return await search("POST", "/query", json=body)
 
 
-async def search_by_text(
-    query: str, limit: int, filter: dict[str, Any] | None, offset: int = 0
-) -> Any:
+async def search_by_text(query: str, limit: int, filter: JsonValue, offset: int = 0) -> JsonValue:
     """Encode ``query`` via vision, then run the hybrid search on deedlit.search.
 
     An empty query has no vector to search by. Rather than returning nothing
@@ -337,16 +371,21 @@ async def search_by_text(
     vectors = await encode_query(query)
     if vectors is None:
         return await browse_catalog(limit, filter, offset)
-    body = {**vectors, "limit": limit, "offset": offset, "filter": _to_qdrant_filter(filter)}
+    body: dict[str, JsonValue] = {
+        **vectors,
+        "limit": limit,
+        "offset": offset,
+        "filter": _to_qdrant_filter(filter),
+    }
     return await search("POST", "/query", json=body)
 
 
 async def search_similar(
     sha256: str,
     limit: int,
-    filters: dict[str, Any] | None = None,
+    filters: JsonValue = None,
     offset: int = 0,
-) -> Any:
+) -> JsonValue:
     """Image-to-image search on deedlit.search, honouring the UI facet filter.
 
     Mirrors :func:`search_by_text`'s facet handling on the by-image path: the UI's
@@ -358,7 +397,7 @@ async def search_similar(
     ``offset`` pages deeper into the ranked neighbours so the UI can keep loading
     more proximity results.
     """
-    body: dict[str, Any] = {"sha256": sha256, "limit": limit}
+    body: dict[str, JsonValue] = {"sha256": sha256, "limit": limit}
     if offset:
         body["offset"] = offset
     qfilter = _to_qdrant_filter(filters)
@@ -367,9 +406,7 @@ async def search_similar(
     return await search("POST", "/similar", json=body)
 
 
-async def browse_catalog(
-    limit: int, filter: dict[str, Any] | None, offset: int = 0
-) -> dict[str, Any]:
+async def browse_catalog(limit: int, filter: JsonValue, offset: int = 0) -> dict[str, JsonValue]:
     """List cataloged images as search-shaped hits (no-query browse fallback).
 
     deedlit.search is purely vector-driven and can't answer a filter-only/empty
@@ -378,32 +415,28 @@ async def browse_catalog(
     the UI already consumes, threading the supported facets (tag/favorite) into
     catalog ``GET /images`` query params. ``offset`` pages the catalog list.
     """
-    params: dict[str, Any] = {"limit": limit}
+    params: QueryParams = {"limit": limit}
     if offset:
         params["offset"] = offset
-    if filter:
+    if isinstance(filter, dict):
         # The UI sends `tags: [...]` (catalog lists by a single tag) + `favorite`.
-        tags = filter.get("tags") or filter.get("tag")
-        if isinstance(tags, list) and tags:
+        tags = _string_list(filter.get("tags") or filter.get("tag"))
+        if tags:
             params["tag"] = tags[0]
-        elif isinstance(tags, str) and tags:
-            params["tag"] = tags
         fav = filter.get("favorite")
         if isinstance(fav, bool):
             params["favorite"] = fav
         # Content-safety multi-select -> repeated ?safety= params (catalog lists
         # by the set). httpx serialises a list value as repeated query params.
-        safety = filter.get("safety")
-        if isinstance(safety, str) and safety:
-            safety = [safety]
-        if isinstance(safety, list) and safety:
-            params["safety"] = list(safety)
+        safety = _string_list(filter.get("safety"))
+        if safety:
+            params["safety"] = safety
     try:
         rows = await catalog("GET", "/images", params=params)
     except DownstreamError:
         return {"fusion": "browse", "hits": []}
-    hits = []
-    for row in rows or []:
+    hits: list[JsonValue] = []
+    for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, dict):
             continue
         sha = row.get("sha256")
@@ -429,7 +462,7 @@ async def image_detail(
     *,
     similar_limit: int | None = None,
     neighbor_limit: int | None = None,
-) -> dict[str, Any]:
+) -> dict[str, JsonValue]:
     """Aggregate an image's detail (catalog record + search-similar + graph
     neighbors) in ONE parallel fan-out.
 
@@ -438,34 +471,39 @@ async def image_detail(
     (similar from search, neighbors from graph) are best-effort — a single
     downstream miss degrades to an empty list so everything else still returns.
     """
-    async def get_image() -> Any:
+
+    async def get_image() -> JsonValue:
         return await catalog("GET", f"/images/{sha256}")
 
-    async def get_similar() -> Any:
-        body: dict[str, Any] = {"sha256": sha256}
+    async def get_similar() -> list[JsonValue]:
+        body: dict[str, JsonValue] = {"sha256": sha256}
         if similar_limit is not None:
             body["limit"] = similar_limit
         res = await search("POST", "/similar", json=body)
-        return (res or {}).get("hits", [])
+        hits = res.get("hits") if isinstance(res, dict) else None
+        return hits if isinstance(hits, list) else []
 
-    async def get_neighbors() -> Any:
-        params = {"limit": neighbor_limit} if neighbor_limit is not None else None
+    async def get_neighbors() -> list[JsonValue]:
+        params: QueryParams | None = (
+            {"limit": neighbor_limit} if neighbor_limit is not None else None
+        )
         res = await graph("GET", f"/neighbors/{sha256}", params=params)
-        return (res or {}).get("neighbors", [])
+        neighbors = res.get("neighbors") if isinstance(res, dict) else None
+        return neighbors if isinstance(neighbors, list) else []
 
     image_r, similar_r, neighbors_r = await asyncio.gather(
         get_image(), get_similar(), get_neighbors(), return_exceptions=True
     )
-    if isinstance(image_r, Exception):
+    if isinstance(image_r, BaseException):
         raise image_r
     return {
         "image": image_r,
-        "similar": [] if isinstance(similar_r, Exception) else similar_r,
-        "neighbors": [] if isinstance(neighbors_r, Exception) else neighbors_r,
+        "similar": [] if isinstance(similar_r, BaseException) else similar_r,
+        "neighbors": [] if isinstance(neighbors_r, BaseException) else neighbors_r,
     }
 
 
-async def unindex_image(sha256: str) -> dict[str, Any]:
+async def unindex_image(sha256: str) -> dict[str, JsonValue]:
     """Delete an image's INDEXATION across the stores (catalog record + search
     vector + graph node), NOT the source file on disk.
 
@@ -484,9 +522,7 @@ async def unindex_image(sha256: str) -> dict[str, Any]:
         await graph("DELETE", f"/images/{sha256}")
         return True
 
-    search_r, graph_r = await asyncio.gather(
-        del_search(), del_graph(), return_exceptions=True
-    )
+    search_r, graph_r = await asyncio.gather(del_search(), del_graph(), return_exceptions=True)
     return {
         "status": "ok",
         "sha256": sha256,
@@ -496,7 +532,7 @@ async def unindex_image(sha256: str) -> dict[str, Any]:
     }
 
 
-async def unindex_images(sha256s: list[str]) -> dict[str, Any]:
+async def unindex_images(sha256s: list[str]) -> dict[str, JsonValue]:
     """Bulk un-index MANY images across the stores in ONE call per store.
 
     The batch counterpart to :func:`unindex_image`: catalog (truth) goes FIRST via
@@ -506,9 +542,14 @@ async def unindex_images(sha256s: list[str]) -> dict[str, Any]:
     caller maps it); the projection cleanups degrade to a per-store ``False``.
     """
     requested = list(dict.fromkeys(sha256s))  # de-dupe, keep order
-    cat = await catalog("POST", "/images/batch-delete", json={"sha256s": requested})
-    deleted = list((cat or {}).get("deleted", []))
-    missing = list((cat or {}).get("missing", []))
+    cat = await catalog(
+        "POST", "/images/batch-delete", json={"sha256s": cast(list[JsonValue], requested)}
+    )
+    cat_map = cat if isinstance(cat, dict) else {}
+    deleted_raw = cat_map.get("deleted", [])
+    missing_raw = cat_map.get("missing", [])
+    deleted = deleted_raw if isinstance(deleted_raw, list) else []
+    missing = missing_raw if isinstance(missing_raw, list) else []
 
     async def del_search() -> bool:
         await search("POST", "/points/batch-delete", json={"sha256s": deleted})
@@ -520,9 +561,7 @@ async def unindex_images(sha256s: list[str]) -> dict[str, Any]:
 
     # Nothing actually deleted -> no projections to clean (skip the round-trips).
     if deleted:
-        search_r, graph_r = await asyncio.gather(
-            del_search(), del_graph(), return_exceptions=True
-        )
+        search_r, graph_r = await asyncio.gather(del_search(), del_graph(), return_exceptions=True)
     else:
         search_r = graph_r = True
     return {

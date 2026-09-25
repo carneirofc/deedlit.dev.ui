@@ -22,7 +22,9 @@ MCP tool surface lives in mcp.py.
 """
 from __future__ import annotations
 
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
@@ -30,18 +32,19 @@ if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
 import asyncio
 import json
 import logging
-from typing import Any
-
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
+from typing import Annotated, cast
+from urllib.parse import urlencode
 
 import clients
 import mcp
 from activity import install_activity
 from activity import tracker as gateway_tracker
-from clients import DownstreamError
+from clients import DownstreamError, QueryParams
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, Field, JsonValue
 
 
 # Health probes are polled on a tight interval (Docker HEALTHCHECK + the status
@@ -75,15 +78,15 @@ install_activity(app, register_route=False)
 # GET /health — per-service health dashboard (parallel probe)
 # ---------------------------------------------------------------------------
 @app.get("/health")
-async def health() -> dict[str, Any]:
-    async def probe(name: str, base: str) -> dict[str, Any]:
+async def health() -> dict[str, JsonValue]:
+    async def probe(name: str, base: str) -> dict[str, JsonValue]:
         try:
             body = await clients.request(name, "GET", base, "/health")
         except DownstreamError:
             return {"name": name, "status": "down"}
         detail = body if isinstance(body, dict) else None
         raw = (detail or {}).get("status", "ok")
-        result: dict[str, Any] = {"name": name, "status": "ok" if raw == "ok" else "degraded"}
+        result: dict[str, JsonValue] = {"name": name, "status": "ok" if raw == "ok" else "degraded"}
         # Forward the downstream's own readiness flags (db_ready, blob_ready,
         # neo4j_ready, collection_ready, vision_ready, …) so the status
         # dashboard can show each service's dependencies, not just a roll-up.
@@ -109,7 +112,7 @@ async def health() -> dict[str, Any]:
 # and a downstream miss degrades to an idle row (busy=false, reachable=false) so
 # the board still shows the service rather than dropping it.
 # ---------------------------------------------------------------------------
-def _idle_activity(name: str, *, reachable: bool) -> dict[str, Any]:
+def _idle_activity(name: str, *, reachable: bool) -> dict[str, JsonValue]:
     return {
         "name": name,
         "inflight": 0,
@@ -121,8 +124,8 @@ def _idle_activity(name: str, *, reachable: bool) -> dict[str, Any]:
 
 
 @app.get("/activity")
-async def activity() -> dict[str, Any]:
-    async def probe(name: str, base: str) -> dict[str, Any]:
+async def activity() -> dict[str, JsonValue]:
+    async def probe(name: str, base: str) -> dict[str, JsonValue]:
         try:
             body = await clients.request(name, "GET", base, "/activity")
         except DownstreamError:
@@ -130,8 +133,8 @@ async def activity() -> dict[str, Any]:
         b = body if isinstance(body, dict) else {}
         return {
             "name": name,
-            "inflight": int(b.get("inflight", 0) or 0),
-            "per_min": float(b.get("per_min", 0) or 0),
+            "inflight": _as_int(b.get("inflight")),
+            "per_min": _as_float(b.get("per_min")),
             "busy": bool(b.get("busy", False)),
             "last_op": b.get("last_op"),
             "reachable": True,
@@ -142,7 +145,8 @@ async def activity() -> dict[str, Any]:
     )
     # The gateway answered, so include its own live work first (mirrors how the
     # comfyhelper health route prepends the gateway component).
-    gateway = {"name": "gateway", **gateway_tracker.snapshot().model_dump(), "reachable": True}
+    snapshot = cast(dict[str, JsonValue], gateway_tracker.snapshot().model_dump())
+    gateway: dict[str, JsonValue] = {"name": "gateway", **snapshot, "reachable": True}
     return {"services": [gateway, *downstream]}
 
 
@@ -150,7 +154,7 @@ async def activity() -> dict[str, Any]:
 # GET /detail/{sha256} — parallel fan-out, graceful degradation
 # ---------------------------------------------------------------------------
 @app.get("/detail/{sha256}")
-async def detail(sha256: str) -> dict[str, Any]:
+async def detail(sha256: str) -> dict[str, JsonValue]:
     """Aggregate the detail page from catalog + search + graph IN PARALLEL.
 
     catalog (the image record) is REQUIRED — a 404 there is a 404 here. The
@@ -173,7 +177,7 @@ async def detail(sha256: str) -> dict[str, Any]:
 # DELETE /images/{sha256} — un-index an image across the stores
 # ---------------------------------------------------------------------------
 @app.delete("/images/{sha256}")
-async def delete_image(sha256: str) -> dict[str, Any]:
+async def delete_image(sha256: str) -> dict[str, JsonValue]:
     """Delete an image's INDEXATION (catalog record + search vector + graph
     node), NOT the original file on disk.
 
@@ -203,7 +207,7 @@ class BatchDeleteRequest(BaseModel):
 
 
 @app.post("/images/batch-delete")
-async def batch_delete_images(req: BatchDeleteRequest) -> dict[str, Any]:
+async def batch_delete_images(req: BatchDeleteRequest) -> dict[str, JsonValue]:
     """Bulk un-index MANY images across the stores in ONE call per store.
 
     The batch counterpart to DELETE /images/{sha256}: catalog (truth) batch-delete
@@ -228,17 +232,17 @@ class SearchRequest(BaseModel):
     # Rank offset for server-side pagination over the WHOLE matching set (so the
     # UI never has to slice a fixed top-K client-side).
     offset: int = Field(default=0, ge=0)
-    filter: dict[str, Any] | None = None
+    filter: JsonValue = None
 
 
 @app.post("/search")
-async def search(req: SearchRequest) -> Any:
+async def search(req: SearchRequest) -> JsonValue:
     # search is a pure vector store; encode the text via vision first (an empty
     # query yields an empty result rather than a vectorless query that 422s).
     try:
         return await clients.search_by_text(req.query, req.limit, req.filter, req.offset)
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"search unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"search unavailable: {exc.detail}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -246,11 +250,11 @@ async def search(req: SearchRequest) -> Any:
 # ---------------------------------------------------------------------------
 @app.post("/search/by-image")
 async def search_by_image(
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
     limit: int = Form(24),
     offset: int = Form(0),
     filter: str | None = Form(None),
-) -> Any:
+) -> JsonValue:
     """Reverse-image search: embed an uploaded image, then dense-query search.
 
     comfyhelper is UI-only and may not call vision/search directly, so this
@@ -266,10 +270,12 @@ async def search_by_image(
     if not raw:
         raise HTTPException(status_code=400, detail="empty image upload")
 
-    facets: dict[str, Any] | None = None
+    facets: JsonValue = None
     if filter:
         try:
-            parsed = json.loads(filter)
+            # json.loads is untyped (returns Any); the wire contract is an
+            # arbitrary JSON body, so a JsonValue cast is the boundary here.
+            parsed = cast(JsonValue, json.loads(filter))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="filter must be a JSON object") from exc
         facets = parsed if isinstance(parsed, dict) else None
@@ -286,14 +292,14 @@ async def search_by_image(
     except DownstreamError as exc:
         raise HTTPException(
             status_code=502, detail=f"{exc.service} unavailable: {exc.detail}"
-        )
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
 # GET /stats — aggregated library stats (degrades to zeros)
 # ---------------------------------------------------------------------------
 @app.get("/stats")
-async def stats() -> dict[str, Any]:
+async def stats() -> dict[str, JsonValue]:
     """Aggregated library counts, sourced from catalog ``GET /stats`` (the owner
     of images/tags/notes/collections).
 
@@ -302,7 +308,7 @@ async def stats() -> dict[str, Any]:
     catalog is unreachable, degrades to a stable zero-filled shape rather than
     erroring so the dashboard/report tools stay renderable.
     """
-    base: dict[str, Any] = {
+    base: dict[str, JsonValue] = {
         "images": 0, "tags": 0, "collections": 0, "notes": 0,
         "folders": 0, "favorites": 0, "labeled": 0, "unlabeled": 0,
         "safety": {"sfw": 0, "nsfw": 0, "explicit": 0, "unclassified": 0},
@@ -317,7 +323,7 @@ async def stats() -> dict[str, Any]:
 
 
 @app.get("/reports/folders")
-async def reports_folders() -> Any:
+async def reports_folders() -> list[JsonValue]:
     """Per-folder coverage report (catalog proxy): path + label + image/labeled/
     unlabeled counts for each source folder. Degrades to [] when catalog down."""
     try:
@@ -331,7 +337,7 @@ async def reports_folders() -> Any:
 # /jobs — dispatch (POST) + list (GET), proxied to ingest
 # ---------------------------------------------------------------------------
 @app.post("/jobs", status_code=202)
-async def dispatch_job(payload: dict[str, Any]) -> JSONResponse:
+async def dispatch_job(payload: dict[str, JsonValue]) -> JSONResponse:
     """Dispatch an ingest/maintenance job to deedlit.ingest.
 
     A payload carrying ``folderPath`` is an ingest run (-> /ingest); anything
@@ -341,12 +347,12 @@ async def dispatch_job(payload: dict[str, Any]) -> JSONResponse:
     try:
         res = await clients.ingest("POST", path, json=payload)
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}") from exc
     return JSONResponse(status_code=202, content=res)
 
 
 @app.get("/jobs")
-async def list_jobs() -> Any:
+async def list_jobs() -> list[JsonValue]:
     try:
         res = await clients.ingest("GET", "/jobs")
     except DownstreamError:
@@ -355,7 +361,7 @@ async def list_jobs() -> Any:
 
 
 @app.get("/ingest/config")
-async def get_ingest_config() -> Any:
+async def get_ingest_config() -> JsonValue:
     """Live ingest producer config (folder-scan parallelism), proxied to ingest.
 
     Backs the settings panel's "Ingest & indexing" section. Degrades to an empty
@@ -367,16 +373,16 @@ async def get_ingest_config() -> Any:
 
 
 @app.put("/ingest/config")
-async def put_ingest_config(payload: dict[str, Any]) -> Any:
+async def put_ingest_config(payload: dict[str, JsonValue]) -> JsonValue:
     """Update the live ingest producer config (settings panel → ingest)."""
     try:
         return await clients.ingest("PUT", "/config", json=payload)
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}") from exc
 
 
 @app.get("/maintenance/missing-files")
-async def missing_files(limit: int = 500) -> Any:
+async def missing_files(limit: int = 500) -> JsonValue:
     """Scan for cataloged images whose on-disk source file vanished (proxy to
     ingest, which owns the host filesystem). Read-only — backs the admin's
     missing-file cleanup review. Degrades to an empty result when ingest is down
@@ -392,14 +398,14 @@ async def missing_files(limit: int = 500) -> Any:
 
 
 @app.get("/fs/browse")
-async def fs_browse(path: str | None = None) -> Any:
+async def fs_browse(path: str | None = None) -> JsonValue:
     """List a directory on the ingest host for the admin folder picker.
 
     Proxies to deedlit.ingest, which owns the host filesystem. A downstream 400
     (missing/denied/not-a-dir) is user-correctable, so it passes through as a
     400 the picker shows inline; any other failure surfaces as a 502.
     """
-    params = {"path": path} if path is not None else None
+    params: QueryParams | None = {"path": path} if path is not None else None
     try:
         return await clients.ingest("GET", "/fs/browse", params=params)
     except DownstreamError as exc:
@@ -418,7 +424,7 @@ async def fs_browse(path: str | None = None) -> Any:
 # other downstream failure (5xx / unreachable) surfaces as a 502 so the UI can
 # tell "not found" from "backend down".
 # ---------------------------------------------------------------------------
-async def _proxy_catalog(method: str, path: str, json_body: Any | None = None) -> Any:
+async def _proxy_catalog(method: str, path: str, json_body: JsonValue = None) -> JsonValue:
     try:
         return await clients.catalog(method, path, json=json_body)
     except DownstreamError as exc:
@@ -429,63 +435,63 @@ async def _proxy_catalog(method: str, path: str, json_body: Any | None = None) -
 
 # --- notes -----------------------------------------------------------------
 @app.post("/notes")
-async def create_note(payload: dict[str, Any]) -> Any:
+async def create_note(payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("POST", "/notes", payload)
 
 
 @app.get("/notes/by-image/{sha256}")
-async def notes_by_image(sha256: str) -> Any:
+async def notes_by_image(sha256: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/notes/by-image/{sha256}")
 
 
 @app.get("/notes/{note_id}")
-async def read_note(note_id: str) -> Any:
+async def read_note(note_id: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/notes/{note_id}")
 
 
 @app.put("/notes/{note_id}")
-async def update_note(note_id: str, payload: dict[str, Any]) -> Any:
+async def update_note(note_id: str, payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("PUT", f"/notes/{note_id}", payload)
 
 
 @app.get("/notes/{note_id}/export")
-async def export_note(note_id: str) -> Any:
+async def export_note(note_id: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/notes/{note_id}/export")
 
 
 # --- collections -----------------------------------------------------------
 @app.post("/collections")
-async def create_collection(payload: dict[str, Any]) -> Any:
+async def create_collection(payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("POST", "/collections", payload)
 
 
 @app.get("/collections")
-async def list_collections() -> Any:
+async def list_collections() -> JsonValue:
     return await _proxy_catalog("GET", "/collections")
 
 
 @app.get("/collections/by-image/{sha256}")
-async def collections_by_image(sha256: str) -> Any:
+async def collections_by_image(sha256: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/collections/by-image/{sha256}")
 
 
 @app.get("/collections/{collection_id}")
-async def read_collection(collection_id: str) -> Any:
+async def read_collection(collection_id: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/collections/{collection_id}")
 
 
 @app.put("/collections/{collection_id}")
-async def rename_collection(collection_id: str, payload: dict[str, Any]) -> Any:
+async def rename_collection(collection_id: str, payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("PUT", f"/collections/{collection_id}", payload)
 
 
 @app.delete("/collections/{collection_id}")
-async def delete_collection(collection_id: str) -> Any:
+async def delete_collection(collection_id: str) -> JsonValue:
     return await _proxy_catalog("DELETE", f"/collections/{collection_id}")
 
 
 @app.put("/collections/{collection_id}/images")
-async def set_collection_images(collection_id: str, payload: dict[str, Any]) -> Any:
+async def set_collection_images(collection_id: str, payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("PUT", f"/collections/{collection_id}/images", payload)
 
 
@@ -498,27 +504,27 @@ async def set_collection_images(collection_id: str, payload: dict[str, Any]) -> 
 # UI never has to know the path, only the folder id.
 # ---------------------------------------------------------------------------
 @app.post("/folders")
-async def create_folder(payload: dict[str, Any]) -> Any:
+async def create_folder(payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("POST", "/folders", payload)
 
 
 @app.get("/folders")
-async def list_folders() -> Any:
+async def list_folders() -> JsonValue:
     return await _proxy_catalog("GET", "/folders")
 
 
 @app.get("/folders/{folder_id}")
-async def read_folder(folder_id: str) -> Any:
+async def read_folder(folder_id: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/folders/{folder_id}")
 
 
 @app.patch("/folders/{folder_id}")
-async def patch_folder(folder_id: str, payload: dict[str, Any]) -> Any:
+async def patch_folder(folder_id: str, payload: dict[str, JsonValue]) -> JsonValue:
     return await _proxy_catalog("PATCH", f"/folders/{folder_id}", payload)
 
 
 @app.delete("/folders/{folder_id}")
-async def delete_folder(folder_id: str) -> Any:
+async def delete_folder(folder_id: str) -> JsonValue:
     return await _proxy_catalog("DELETE", f"/folders/{folder_id}")
 
 
@@ -531,18 +537,18 @@ async def scan_folder(folder_id: str) -> JSONResponse:
     each folder's interval; this is the on-demand button.
     """
     folder = await _proxy_catalog("GET", f"/folders/{folder_id}")
-    path = (folder or {}).get("path") if isinstance(folder, dict) else None
+    path = folder.get("path") if isinstance(folder, dict) else None
     if not path:
         raise HTTPException(status_code=404, detail="folder not found")
     try:
         res = await clients.ingest("POST", "/ingest", json={"folderPath": path})
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}") from exc
     return JSONResponse(status_code=202, content=res)
 
 
 @app.get("/images/unlabeled")
-async def list_unlabeled(limit: int = 500, offset: int = 0) -> Any:
+async def list_unlabeled(limit: int = 500, offset: int = 0) -> JsonValue:
     """sha256 of images missing a labelagent description (catalog proxy).
 
     Backs the UI's library-wide labeling-coverage readout; ingest's backfill
@@ -567,7 +573,7 @@ async def list_tasks(
     status: str | None = None,
     limit: int = 200,
     offset: int = 0,
-) -> Any:
+) -> list[JsonValue]:
     params = {
         "limit": str(int(limit)),
         "offset": str(int(offset)),
@@ -587,7 +593,7 @@ async def list_tasks(
 
 
 @app.get("/tasks/{task_id}")
-async def read_task(task_id: str) -> Any:
+async def read_task(task_id: str) -> JsonValue:
     return await _proxy_catalog("GET", f"/tasks/{task_id}")
 
 
@@ -621,7 +627,35 @@ def _vhost() -> str:
     return quote(clients.RABBITMQ_VHOST, safe="")
 
 
-def _idle_queue(name: str) -> dict[str, Any]:
+def _as_int(value: JsonValue, default: int = 0) -> int:
+    """Coerce a downstream JSON scalar to int; anything else -> ``default``."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_float(value: JsonValue, default: float = 0.0) -> float:
+    """Coerce a downstream JSON scalar to float; anything else -> ``default``."""
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _idle_queue(name: str) -> dict[str, JsonValue]:
     return {
         "name": name, "reachable": False, "messages": 0, "messages_ready": 0,
         "messages_unacknowledged": 0, "consumers": 0, "publish_rate": 0.0, "deliver_rate": 0.0,
@@ -629,28 +663,33 @@ def _idle_queue(name: str) -> dict[str, Any]:
 
 
 @app.get("/queues")
-async def list_queues() -> dict[str, Any]:
+async def list_queues() -> dict[str, JsonValue]:
     """Live stats for the task queues (depth / ready / unacked / consumers /
     rates), probed in parallel. A queue the broker can't report degrades to an
     idle, unreachable row so the board still renders."""
     vhost = _vhost()
 
-    async def one(name: str) -> dict[str, Any]:
+    async def one(name: str) -> dict[str, JsonValue]:
         try:
             body = await clients.rabbitmq_mgmt("GET", f"/api/queues/{vhost}/{name}")
         except DownstreamError:
             return _idle_queue(name)
         b = body if isinstance(body, dict) else {}
-        stats = b.get("message_stats") or {}
+        stats = b.get("message_stats")
+        stats_map = stats if isinstance(stats, dict) else {}
+        publish_details = stats_map.get("publish_details")
+        deliver_details = stats_map.get("deliver_get_details")
+        publish_map = publish_details if isinstance(publish_details, dict) else {}
+        deliver_map = deliver_details if isinstance(deliver_details, dict) else {}
         return {
             "name": name,
             "reachable": True,
-            "messages": int(b.get("messages", 0) or 0),
-            "messages_ready": int(b.get("messages_ready", 0) or 0),
-            "messages_unacknowledged": int(b.get("messages_unacknowledged", 0) or 0),
-            "consumers": int(b.get("consumers", 0) or 0),
-            "publish_rate": float((stats.get("publish_details") or {}).get("rate", 0.0) or 0.0),
-            "deliver_rate": float((stats.get("deliver_get_details") or {}).get("rate", 0.0) or 0.0),
+            "messages": _as_int(b.get("messages")),
+            "messages_ready": _as_int(b.get("messages_ready")),
+            "messages_unacknowledged": _as_int(b.get("messages_unacknowledged")),
+            "consumers": _as_int(b.get("consumers")),
+            "publish_rate": _as_float(publish_map.get("rate")),
+            "deliver_rate": _as_float(deliver_map.get("rate")),
         }
 
     rows = await asyncio.gather(*(one(n) for n in QUEUE_NAMES))
@@ -658,7 +697,7 @@ async def list_queues() -> dict[str, Any]:
 
 
 @app.get("/queues/{name}/messages")
-async def peek_queue(name: str, limit: int = 20) -> dict[str, Any]:
+async def peek_queue(name: str, limit: int = 20) -> dict[str, JsonValue]:
     """Non-destructively peek messages in a queue (ack_requeue_true).
 
     Works for ANY task queue — the live stages, their ``.retry``, and ``.dlq`` —
@@ -669,7 +708,7 @@ async def peek_queue(name: str, limit: int = 20) -> dict[str, Any]:
     queue depth left after the peek (the messages are requeued, not consumed)."""
     if name not in QUEUE_NAMES:
         raise HTTPException(status_code=404, detail="unknown queue")
-    body = {
+    body: dict[str, JsonValue] = {
         "count": int(limit), "ackmode": "ack_requeue_true",
         "encoding": "auto", "truncate": 50000,
     }
@@ -678,16 +717,17 @@ async def peek_queue(name: str, limit: int = 20) -> dict[str, Any]:
             "POST", f"/api/queues/{_vhost()}/{name}/get", json=body
         )
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}")
-    out: list[dict[str, Any]] = []
+        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}") from exc
+    out: list[JsonValue] = []
     remaining = 0
-    for m in (msgs or []):
+    for m in msgs if isinstance(msgs, list) else []:
         if not isinstance(m, dict):
             continue
-        props = m.get("properties") or {}
+        props = m.get("properties")
+        props_map = props if isinstance(props, dict) else {}
         # message_count is the queue depth remaining AFTER this message was read;
         # the last (lowest) one is the true count left once the peek requeues all.
-        remaining = int(m.get("message_count", remaining) or 0)
+        remaining = _as_int(m.get("message_count"), remaining)
         out.append({
             "payload": m.get("payload"),
             "payload_bytes": m.get("payload_bytes"),
@@ -695,27 +735,27 @@ async def peek_queue(name: str, limit: int = 20) -> dict[str, Any]:
             "redelivered": bool(m.get("redelivered", False)),
             "routing_key": m.get("routing_key"),
             "exchange": m.get("exchange"),
-            "properties": props,
+            "properties": props_map,
             # Top-level headers kept for back-compat with existing DLQ rendering.
-            "headers": props.get("headers", {}),
+            "headers": props_map.get("headers", {}),
         })
     return {"queue": name, "messages": out, "remaining": remaining}
 
 
 @app.post("/queues/{name}/purge")
-async def purge_queue(name: str) -> dict[str, Any]:
+async def purge_queue(name: str) -> dict[str, JsonValue]:
     """Purge all messages from a queue (destructive — UI confirms)."""
     if name not in QUEUE_NAMES:
         raise HTTPException(status_code=404, detail="unknown queue")
     try:
         await clients.rabbitmq_mgmt("DELETE", f"/api/queues/{_vhost()}/{name}/contents")
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}") from exc
     return {"status": "purged", "queue": name}
 
 
 @app.post("/dlq/{base}/requeue")
-async def requeue_dlq(base: str, limit: int = 100) -> dict[str, Any]:
+async def requeue_dlq(base: str, limit: int = 100) -> dict[str, JsonValue]:
     """Drain up to ``limit`` messages from ``<base>.dlq`` and republish them to
     the main ``<base>`` queue (the in-app "retry failed" action). Messages are
     removed from the DLQ (ack_requeue_false) then published to the default
@@ -725,7 +765,7 @@ async def requeue_dlq(base: str, limit: int = 100) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="unknown queue")
     vhost = _vhost()
     dlq = f"{base}.dlq"
-    get_body = {
+    get_body: dict[str, JsonValue] = {
         "count": int(limit), "ackmode": "ack_requeue_false",
         "encoding": "auto", "truncate": 1_000_000,
     }
@@ -734,10 +774,10 @@ async def requeue_dlq(base: str, limit: int = 100) -> dict[str, Any]:
             "POST", f"/api/queues/{vhost}/{dlq}/get", json=get_body
         )
         requeued = 0
-        for m in (msgs or []):
+        for m in msgs if isinstance(msgs, list) else []:
             if not isinstance(m, dict):
                 continue
-            pub = {
+            pub: dict[str, JsonValue] = {
                 "properties": {},  # drop headers (incl. x-attempt) -> fresh retries
                 "routing_key": base,
                 "payload": m.get("payload", ""),
@@ -748,7 +788,7 @@ async def requeue_dlq(base: str, limit: int = 100) -> dict[str, Any]:
             )
             requeued += 1
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"rabbitmq unavailable: {exc.detail}") from exc
     return {"status": "requeued", "queue": base, "count": requeued}
 
 
@@ -760,41 +800,54 @@ async def requeue_dlq(base: str, limit: int = 100) -> dict[str, Any]:
 # DELETE /images/{sha256} (defined above) is the fan-out un-index. Projection
 # stores (search/graph) are never edited here — they're rebuilt from truth.
 # ---------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class ImageFilterParams:
+    """The repeatable catalog browse/count filters, bundled as one FastAPI
+    dependency so `list_images`/`count_images` stay under the max-args limit."""
+
+    tag: Annotated[list[str] | None, Query()] = None
+    exclude_tag: Annotated[list[str] | None, Query()] = None
+    favorite: bool | None = None
+    rating_gte: Annotated[int | None, Query(ge=0, le=5)] = None
+    safety: Annotated[list[str] | None, Query()] = None
+    path: Annotated[str | None, Query()] = None
+
+
+def _image_filter_query_params(filters: ImageFilterParams) -> list[tuple[str, str]]:
+    """Translate :class:`ImageFilterParams` into catalog query params."""
+    params: list[tuple[str, str]] = []
+    for t in filters.tag or []:
+        params.append(("tag", t))
+    for t in filters.exclude_tag or []:
+        params.append(("exclude_tag", t))
+    if filters.favorite is not None:
+        params.append(("favorite", "true" if filters.favorite else "false"))
+    if filters.rating_gte is not None:
+        params.append(("rating_gte", str(int(filters.rating_gte))))
+    for s in filters.safety or []:
+        params.append(("safety", s))
+    if filters.path:
+        params.append(("path", filters.path))
+    return params
+
+
 @app.get("/images")
 async def list_images(
-    tag: list[str] | None = Query(default=None),
-    exclude_tag: list[str] | None = Query(default=None),
-    favorite: bool | None = None,
-    rating_gte: int | None = Query(default=None, ge=0, le=5),
-    safety: list[str] | None = Query(default=None),
-    path: str | None = Query(default=None),
+    filters: Annotated[ImageFilterParams, Depends()],
     sort: str = "newest",
     limit: int = 50,
     offset: int = 0,
-) -> Any:
+) -> list[JsonValue]:
     """Browse the catalog truth. `tag`/`exclude_tag`/`safety` are repeatable
     (?tag=a&tag=b); `path` substring-matches the on-disk file path; `sort` and
     `rating_gte` drive server-side ordering/filtering for the library browse
     grid. All filters are forwarded verbatim to catalog."""
-    from urllib.parse import urlencode
-
     params: list[tuple[str, str]] = [
         ("limit", str(int(limit))),
         ("offset", str(int(offset))),
         ("sort", sort),
+        *_image_filter_query_params(filters),
     ]
-    for t in tag or []:
-        params.append(("tag", t))
-    for t in exclude_tag or []:
-        params.append(("exclude_tag", t))
-    if favorite is not None:
-        params.append(("favorite", "true" if favorite else "false"))
-    if rating_gte is not None:
-        params.append(("rating_gte", str(int(rating_gte))))
-    for s in safety or []:
-        params.append(("safety", s))
-    if path:
-        params.append(("path", path))
     try:
         res = await clients.catalog("GET", f"/images?{urlencode(params)}")
     except DownstreamError:
@@ -803,32 +856,11 @@ async def list_images(
 
 
 @app.get("/images/count")
-async def count_images(
-    tag: list[str] | None = Query(default=None),
-    exclude_tag: list[str] | None = Query(default=None),
-    favorite: bool | None = None,
-    rating_gte: int | None = Query(default=None, ge=0, le=5),
-    safety: list[str] | None = Query(default=None),
-    path: str | None = Query(default=None),
-) -> Any:
+async def count_images(filters: Annotated[ImageFilterParams, Depends()]) -> dict[str, JsonValue]:
     """Total images matching a filter set (catalog proxy), for report tooling to
     size the export before paging GET /images. Same repeatable filters as the
     browse list; degrades to {count: 0} when catalog is down."""
-    from urllib.parse import urlencode
-
-    params: list[tuple[str, str]] = []
-    for t in tag or []:
-        params.append(("tag", t))
-    for t in exclude_tag or []:
-        params.append(("exclude_tag", t))
-    if favorite is not None:
-        params.append(("favorite", "true" if favorite else "false"))
-    if rating_gte is not None:
-        params.append(("rating_gte", str(int(rating_gte))))
-    for s in safety or []:
-        params.append(("safety", s))
-    if path:
-        params.append(("path", path))
+    params = _image_filter_query_params(filters)
     qs = f"?{urlencode(params)}" if params else ""
     try:
         res = await clients.catalog("GET", f"/images/count{qs}")
@@ -838,13 +870,11 @@ async def count_images(
 
 
 @app.get("/images/directories")
-async def list_directories(limit: int = 2000) -> Any:
+async def list_directories(limit: int = 2000) -> list[JsonValue]:
     """Distinct source directories with per-directory image counts (catalog
     proxy). Backs the library's split-by-source-directory section headers — true
     folder totals, not just the loaded page. Registered before /images/{sha256}
     so the literal segment wins. Degrades to [] when catalog is down."""
-    from urllib.parse import urlencode
-
     qs = urlencode({"limit": str(int(limit))})
     try:
         res = await clients.catalog("GET", f"/images/directories?{qs}")
@@ -854,13 +884,11 @@ async def list_directories(limit: int = 2000) -> Any:
 
 
 @app.get("/tags")
-async def suggest_tags(prefix: str = "", limit: int = 10) -> Any:
+async def suggest_tags(prefix: str = "", limit: int = 10) -> list[JsonValue]:
     """Tag-name autocomplete for the filter UI — proxies catalog GET /tags.
 
     Degrades to an empty list when catalog is unreachable so the type-ahead just
     goes quiet rather than erroring the whole search panel."""
-    from urllib.parse import urlencode
-
     params = urlencode({"prefix": prefix, "limit": int(limit)})
     try:
         res = await clients.catalog("GET", f"/tags?{params}")
@@ -870,13 +898,11 @@ async def suggest_tags(prefix: str = "", limit: int = 10) -> Any:
 
 
 @app.get("/tags/report")
-async def tags_report(prefix: str = "", limit: int = 200, offset: int = 0) -> Any:
+async def tags_report(prefix: str = "", limit: int = 200, offset: int = 0) -> dict[str, JsonValue]:
     """Full tag inventory with per-tag image counts, paged (catalog proxy).
 
     The report counterpart to GET /tags: every tag + how many live images carry
     it + a total for paging. Degrades to an empty report when catalog is down."""
-    from urllib.parse import urlencode
-
     params = urlencode({"prefix": prefix, "limit": int(limit), "offset": int(offset)})
     try:
         res = await clients.catalog("GET", f"/tags/report?{params}")
@@ -886,13 +912,11 @@ async def tags_report(prefix: str = "", limit: int = 200, offset: int = 0) -> An
 
 
 @app.get("/graph/entities")
-async def graph_entities(type: str, prefix: str = "", limit: int = 50) -> Any:
+async def graph_entities(type: str, prefix: str = "", limit: int = 50) -> list[JsonValue]:
     """Graph entity-name autocomplete (a :Tag, or an :Asset of a given kind),
     proxied to deedlit.graph. Backs the graph-filter value picker so every node
     type offers options instead of a blind free-text field. Degrades to an empty
     list when graph is unreachable so the picker just goes quiet."""
-    from urllib.parse import urlencode
-
     params = urlencode({"type": type, "prefix": prefix, "limit": int(limit)})
     try:
         res = await clients.graph("GET", f"/entities?{params}")
@@ -904,7 +928,7 @@ async def graph_entities(type: str, prefix: str = "", limit: int = 50) -> Any:
 # Registered AFTER the literal GET /images, /images/count, /images/unlabeled
 # above so those win the match; a 64-hex sha can't collide with them anyway.
 @app.get("/images/{sha256}")
-async def read_image(sha256: str, fields: str | None = None) -> Any:
+async def read_image(sha256: str, fields: str | None = None) -> JsonValue:
     """Read ONE image's catalog record directly — a pure catalog passthrough.
 
     Unlike GET /detail/{sha256} (which ALSO fans out a search /similar + a graph
@@ -913,7 +937,7 @@ async def read_image(sha256: str, fields: str | None = None) -> Any:
     inspector, and bulk export. ``?fields=light`` is forwarded to catalog to drop
     the heavy workflow_json/api_prompt_json graphs for the panels that render none
     of them. A catalog 404 surfaces as 404; any other failure as 502."""
-    params = {"fields": fields} if fields else None
+    params: QueryParams | None = {"fields": fields} if fields else None
     try:
         return await clients.catalog("GET", f"/images/{sha256}", params=params)
     except DownstreamError as exc:
@@ -925,7 +949,7 @@ async def read_image(sha256: str, fields: str | None = None) -> Any:
 
 
 @app.patch("/images/{sha256}")
-async def patch_image(sha256: str, payload: dict[str, Any]) -> Any:
+async def patch_image(sha256: str, payload: dict[str, JsonValue]) -> JsonValue:
     """Edit curated fields of one image (tags/safety/rating/favorite/prompt)."""
     return await _proxy_catalog("PATCH", f"/images/{sha256}", payload)
 
@@ -936,7 +960,7 @@ async def reindex_image(sha256: str) -> JSONResponse:
     try:
         res = await clients.ingest("POST", "/tasks/index", json={"sha256": sha256})
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}") from exc
     return JSONResponse(status_code=202, content=res)
 
 
@@ -946,7 +970,7 @@ async def relabel_image(sha256: str) -> JSONResponse:
     try:
         res = await clients.ingest("POST", "/tasks/label", json={"sha256": sha256})
     except DownstreamError as exc:
-        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}")
+        raise HTTPException(status_code=502, detail=f"ingest unavailable: {exc.detail}") from exc
     return JSONResponse(status_code=202, content=res)
 
 
@@ -987,7 +1011,9 @@ async def get_blob(request: Request, sha256: str, kind: str) -> Response:
 # ---------------------------------------------------------------------------
 @app.post("/mcp")
 async def mcp_endpoint(request: Request) -> JSONResponse:
-    body = await request.json()
+    # Request.json() is untyped (returns Any); the wire contract is a JSON-RPC
+    # message or batch, so a JsonValue cast is the boundary here.
+    body = cast(JsonValue, await request.json())
     result = await mcp.handle_body(body)
     if result is None:
         # JSON-RPC notification(s): no response body.

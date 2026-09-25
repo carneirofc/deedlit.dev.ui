@@ -2,7 +2,7 @@
 // Add a service here once it is clean.
 import { execSync } from "node:child_process";
 
-const SERVICES = ["deedlit.graph", "deedlit.labelagent", "deedlit.metadata", "deedlit.search"];
+const SERVICES = ["deedlit.api", "deedlit.graph", "deedlit.labelagent", "deedlit.metadata", "deedlit.search"];
 
 for (const service of SERVICES) {
   console.log(`\n== ${service}`);

@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Changed
+- `deedlit.api`: typed downstream clients, pydantic JSON-RPC envelope and per-tool argument models in the MCP registry, no `Any`; MCP now rejects non-object messages with `-32600` instead of a 500.
 - `deedlit.metadata`: `ExtractResult`/`GenerationParams`/`References`/`LoraRef` models (wire-identical `/extract`), `JsonValue` for the ComfyUI graph, split parsing hotspots.
 - `deedlit.graph`: typed Neo4j record extraction, response/rebuild models, split `upsert_edges`/`neighbors`/batch loop, no `Any`.
 - `deedlit.search`: typed Qdrant boundary (`UpsertItem`, `CatalogImage`, response models), split batch loop and hybrid-query helpers, no `Any`.

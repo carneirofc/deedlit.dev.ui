@@ -3,11 +3,10 @@ throughput / current op) into one payload for the comfyhelper system-activity
 board. Downstream HTTP is mocked so the test stays offline. Mirrors the /health
 fan-out shape + graceful degradation.
 """
-import httpx
-from fastapi.testclient import TestClient
-
 import app as app_module
 import clients
+import httpx
+from fastapi.testclient import TestClient
 
 
 def _client(monkeypatch, handler) -> TestClient:

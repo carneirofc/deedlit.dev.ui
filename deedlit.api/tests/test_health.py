@@ -4,11 +4,10 @@ GET /health is now a HealthDashboard that probes the four downstream services.
 Downstream HTTP is mocked so the test stays offline; with every downstream
 reporting ok the dashboard status is ok.
 """
-import httpx
-from fastapi.testclient import TestClient
-
 import app as app_module
 import clients
+import httpx
+from fastapi.testclient import TestClient
 
 
 def _client(monkeypatch) -> TestClient:
