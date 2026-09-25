@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
 import { getImageDetail } from "@/lib/library/repositories/image-repository";
@@ -30,8 +31,25 @@ import type { SearchFilters } from "@/lib/library/schemas";
 
 const logger = getLogger({ scope: "library-qdrant-service" });
 
+export const ScoredResultSchema = z.object({ id: z.string(), score: z.number() });
+export type ScoredResult = z.infer<typeof ScoredResultSchema>;
+
 export async function ensureImagesCollection(): Promise<void> {
   await ensureCollection();
+}
+
+function pushScalarConditions(must: unknown[], filters: SearchFilters): void {
+  if (filters.modelFamily) must.push({ key: "model_family", match: { value: filters.modelFamily } });
+  if (filters.checkpoint) must.push({ key: "checkpoint", match: { value: filters.checkpoint } });
+  if (filters.sourceTool) must.push({ key: "source_tool", match: { value: filters.sourceTool } });
+  if (filters.favorite) must.push({ key: "favorite", match: { value: true } });
+  if (typeof filters.ratingGte === "number") must.push({ key: "rating", range: { gte: filters.ratingGte } });
+}
+
+function pushListConditions(must: unknown[], mustNot: unknown[], filters: SearchFilters): void {
+  if (filters.tags) for (const t of filters.tags) must.push({ key: "tags", match: { value: t } });
+  if (filters.loras) for (const l of filters.loras) must.push({ key: "loras", match: { value: l } });
+  if (filters.excludeTags) for (const t of filters.excludeTags) mustNot.push({ key: "tags", match: { value: t } });
 }
 
 /**
@@ -47,14 +65,8 @@ export function buildQdrantFilter(
   const mustNot: unknown[] = [];
 
   if (filters) {
-    if (filters.modelFamily) must.push({ key: "model_family", match: { value: filters.modelFamily } });
-    if (filters.checkpoint) must.push({ key: "checkpoint", match: { value: filters.checkpoint } });
-    if (filters.sourceTool) must.push({ key: "source_tool", match: { value: filters.sourceTool } });
-    if (filters.favorite) must.push({ key: "favorite", match: { value: true } });
-    if (typeof filters.ratingGte === "number") must.push({ key: "rating", range: { gte: filters.ratingGte } });
-    if (filters.tags) for (const t of filters.tags) must.push({ key: "tags", match: { value: t } });
-    if (filters.loras) for (const l of filters.loras) must.push({ key: "loras", match: { value: l } });
-    if (filters.excludeTags) for (const t of filters.excludeTags) mustNot.push({ key: "tags", match: { value: t } });
+    pushScalarConditions(must, filters);
+    pushListConditions(must, mustNot, filters);
   }
   if (allowedIds && allowedIds.length > 0) must.push({ has_id: allowedIds });
 
@@ -119,11 +131,12 @@ export async function deleteImageVector(imageId: string): Promise<void> {
 }
 
 /** Tunables shared by the vector searches; `minScore` maps to Qdrant's score_threshold. */
-export interface SimilarityOptions {
-  minScore?: number;
-  hnswEf?: number;
-  exact?: boolean;
-}
+export const SimilarityOptionsSchema = z.object({
+  minScore: z.number().optional(),
+  hnswEf: z.number().optional(),
+  exact: z.boolean().optional(),
+});
+export type SimilarityOptions = z.infer<typeof SimilarityOptionsSchema>;
 
 export async function findSimilarImages(
   imageId: string,
@@ -131,7 +144,7 @@ export async function findSimilarImages(
   limit: number,
   allowedIds?: string[],
   options: SimilarityOptions = {},
-): Promise<Array<{ id: string; score: number }>> {
+): Promise<ScoredResult[]> {
   await ensureCollection();
   const vector = await retrieveVector(imageId);
   if (!vector) return [];
@@ -150,7 +163,7 @@ export async function semanticImageSearch(
   limit: number,
   allowedIds?: string[],
   options: SimilarityOptions = {},
-): Promise<Array<{ id: string; score: number }>> {
+): Promise<ScoredResult[]> {
   await ensureCollection();
   const vector = await generateTextEmbedding(query);
   return searchByVector(vector, buildQdrantFilter(filters, allowedIds), limit, {
@@ -171,7 +184,7 @@ export async function searchByImageBuffer(
   limit: number,
   allowedIds?: string[],
   options: SimilarityOptions = {},
-): Promise<Array<{ id: string; score: number }>> {
+): Promise<ScoredResult[]> {
   await ensureCollection();
   const vector = await generateImageEmbeddingFromBuffer(buffer, mime);
   return searchByVector(vector, buildQdrantFilter(filters, allowedIds), limit, {
@@ -185,7 +198,7 @@ export async function findNearDuplicates(
   imageId: string,
   threshold: number,
   limit: number,
-): Promise<Array<{ id: string; score: number }>> {
+): Promise<ScoredResult[]> {
   // Push the threshold into Qdrant instead of filtering after truncation, so a
   // strict cutoff still returns up to `limit` genuine duplicates.
   return findSimilarImages(imageId, undefined, limit, undefined, { minScore: threshold });
@@ -193,18 +206,95 @@ export async function findNearDuplicates(
 
 // --- diagnostics -----------------------------------------------------------
 
-export interface SimilarExplain {
-  query: {
-    imageId: string;
-    vectorFound: boolean;
-    stats: VectorStats | null;
-  };
-  collection: CollectionInfo;
-  embedding: EmbeddingDiagnostics;
-  params: { limit: number; minScore: number; hnswEf: number; exact: boolean };
-  hits: Array<{ id: string; score: number; isSelf: boolean; payload: Record<string, unknown> | null }>;
-  warnings: string[];
-  tookMs: number;
+const SimilarExplainQuerySchema = z.object({
+  imageId: z.string(),
+  vectorFound: z.boolean(),
+  stats: z.custom<VectorStats>().nullable(),
+});
+const SimilarExplainParamsSchema = z.object({
+  limit: z.number(),
+  minScore: z.number(),
+  hnswEf: z.number(),
+  exact: z.boolean(),
+});
+const SimilarExplainHitSchema = z.object({
+  id: z.string(),
+  score: z.number(),
+  isSelf: z.boolean(),
+  payload: z.record(z.string(), z.unknown()).nullable(),
+});
+
+export const SimilarExplainSchema = z.object({
+  query: SimilarExplainQuerySchema,
+  collection: z.custom<CollectionInfo>(),
+  embedding: z.custom<EmbeddingDiagnostics>(),
+  params: SimilarExplainParamsSchema,
+  hits: z.array(SimilarExplainHitSchema),
+  warnings: z.array(z.string()),
+  tookMs: z.number(),
+});
+export type SimilarExplain = z.infer<typeof SimilarExplainSchema>;
+
+/**
+ * Full diagnostic trace for "why did similar-search return this?". Reports the
+ * stored query vector's health, the live collection geometry, the active
+ * embedder, and every hit with its score + payload — so a bad ranking can be
+ * traced to local-fallback embeddings, a dim mismatch, or a poisoned vector.
+ */
+function collectExplainWarnings(collection: CollectionInfo, embedding: EmbeddingDiagnostics): string[] {
+  const warnings: string[] = [];
+  if (!embedding.hasExternalImageEmbeddings) {
+    warnings.push(
+      "CLIP_VISION_API_URL is not set — deedlit.vision is required for embeddings (no local fallback). Similarity search will error until it is configured.",
+    );
+  }
+  if (collection.exists && collection.vectorSize !== null && collection.vectorSize !== embedding.dimensions) {
+    warnings.push(
+      `Collection is ${collection.vectorSize}-dim but the embedder produces ${embedding.dimensions}-dim — rebuild Qdrant (/api/library/maintenance/rebuild-qdrant).`,
+    );
+  }
+  if (collection.distance && collection.distance.toLowerCase() !== "cosine") {
+    warnings.push(`Collection distance is ${collection.distance}; embeddings are L2-normalized for Cosine.`);
+  }
+  return warnings;
+}
+
+const VectorHitsScoringSchema = z.object({
+  minScore: z.number(),
+  hnswEf: z.number(),
+  exact: z.boolean(),
+});
+type VectorHitsScoring = z.infer<typeof VectorHitsScoringSchema>;
+
+const ExplainVectorHitsResultSchema = z.object({
+  hits: z.custom<ScoredHit[]>(),
+  stats: z.custom<VectorStats>().nullable(),
+  warning: z.string().nullable(),
+});
+type ExplainVectorHitsResult = z.infer<typeof ExplainVectorHitsResultSchema>;
+
+async function explainVectorHits(
+  imageId: string,
+  vector: number[] | null,
+  filters: SearchFilters | undefined,
+  limit: number,
+  scoring: VectorHitsScoring,
+): Promise<ExplainVectorHitsResult> {
+  if (!vector) {
+    return { hits: [], stats: null, warning: "No stored vector for this image — it is not indexed in Qdrant. Reindex it." };
+  }
+  const stats = vectorStats(vector);
+  const warning = stats.isZero
+    ? "Stored query vector is all zeros — this image was indexed from a failed embedding; reindex it."
+    : null;
+  const detailed = await searchByVectorDetailed(vector, buildQdrantFilter(filters), limit + 1, {
+    scoreThreshold: scoring.minScore,
+    hnswEf: scoring.hnswEf,
+    exact: scoring.exact,
+    withPayload: true,
+  });
+  const hits = detailed.filter((h) => h.id !== imageId).slice(0, limit);
+  return { hits, stats, warning };
 }
 
 /**
@@ -231,36 +321,9 @@ export async function explainSimilarImages(
     Promise.resolve(getEmbeddingDiagnostics()),
   ]);
 
-  const warnings: string[] = [];
-  if (!embedding.hasExternalImageEmbeddings) {
-    warnings.push(
-      "CLIP_VISION_API_URL is not set — deedlit.vision is required for embeddings (no local fallback). Similarity search will error until it is configured.",
-    );
-  }
-  if (collection.exists && collection.vectorSize !== null && collection.vectorSize !== embedding.dimensions) {
-    warnings.push(
-      `Collection is ${collection.vectorSize}-dim but the embedder produces ${embedding.dimensions}-dim — rebuild Qdrant (/api/library/maintenance/rebuild-qdrant).`,
-    );
-  }
-  if (collection.distance && collection.distance.toLowerCase() !== "cosine") {
-    warnings.push(`Collection distance is ${collection.distance}; embeddings are L2-normalized for Cosine.`);
-  }
-
-  let hits: ScoredHit[] = [];
-  let stats: VectorStats | null = null;
-  if (vector) {
-    stats = vectorStats(vector);
-    if (stats.isZero) warnings.push("Stored query vector is all zeros — this image was indexed from a failed embedding; reindex it.");
-    const detailed = await searchByVectorDetailed(vector, buildQdrantFilter(filters), limit + 1, {
-      scoreThreshold: minScore,
-      hnswEf,
-      exact,
-      withPayload: true,
-    });
-    hits = detailed.filter((h) => h.id !== imageId).slice(0, limit);
-  } else {
-    warnings.push("No stored vector for this image — it is not indexed in Qdrant. Reindex it.");
-  }
+  const warnings = collectExplainWarnings(collection, embedding);
+  const { hits, stats, warning } = await explainVectorHits(imageId, vector, filters, limit, { minScore, hnswEf, exact });
+  if (warning) warnings.push(warning);
 
   return {
     query: { imageId, vectorFound: vector !== null, stats },
@@ -273,9 +336,18 @@ export async function explainSimilarImages(
   };
 }
 
+export const RebuildQdrantResultSchema = z.object({
+  indexed: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+});
+export type RebuildQdrantResult = z.infer<typeof RebuildQdrantResultSchema>;
+
+const RebuildQdrantImageSchema = z.object({ id: z.string() });
+
 export async function rebuildQdrant(
-  allImages: Array<{ id: string }>,
-): Promise<{ indexed: number; skipped: number; failed: number }> {
+  allImages: z.infer<typeof RebuildQdrantImageSchema>[],
+): Promise<RebuildQdrantResult> {
   await recreateCollection();
   let indexed = 0;
   let skipped = 0;

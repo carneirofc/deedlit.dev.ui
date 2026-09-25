@@ -1,15 +1,18 @@
+import { z } from "zod";
+
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { getNote, updateNote, GatewayError, type NoteUpsert } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: Promise<{ noteId: string }> };
+const RouteContextSchema = z.object({ params: z.custom<Promise<Record<"noteId", string>>>() });
 
 /** Read a note. Proxies the gateway GET /notes/{id} (-> catalog). */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { noteId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { noteId } = await params;
     try {
       return jsonOk(await getNote(noteId));
     } catch (e) {
@@ -20,9 +23,10 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 /** Update a note. Proxies the gateway PUT /notes/{id} (-> catalog). */
-export async function PUT(request: Request, context: RouteContext) {
+export async function PUT(request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { noteId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { noteId } = await params;
     const body = (await request.json()) as NoteUpsert;
     try {
       return jsonOk(await updateNote(noteId, body));

@@ -1,3 +1,4 @@
+import { z } from "zod";
 /**
  * Pure activity/job logic — no React, no JSX. Lives apart from the provider
  * (`activity.tsx`) so the job→activity reducer and the small helpers can be
@@ -9,50 +10,54 @@
  * snapshot back onto its activity with {@link applyJobsToActivities}.
  */
 
-export type ActivityStatus = "pending" | "running" | "success" | "error";
+export const ActivityStatusSchema = z.enum(["pending", "running", "success", "error"]);
+export type ActivityStatus = z.infer<typeof ActivityStatusSchema>;
 
-export interface ActivityProgress {
-  processed: number;
-  total: number;
-  failed: number;
-}
+export const ActivityProgressSchema = z.object({
+  processed: z.number(),
+  total: z.number(),
+  failed: z.number(),
+});
+export type ActivityProgress = z.infer<typeof ActivityProgressSchema>;
 
-export interface Activity {
+export const ActivitySchema = z.object({
   /** Client-generated, monotonic, never reused. */
-  id: string;
+  id: z.string(),
   /** Human label shown in the dock, e.g. "Ingest folder", "Save rating". */
-  label: string;
-  status: ActivityStatus;
+  label: z.string(),
+  status: ActivityStatusSchema,
   /** Determinate progress — only present for job-linked activities. */
-  progress?: ActivityProgress;
+  progress: ActivityProgressSchema.optional(),
   /** Error text (on `error`) or short result detail. */
-  message?: string;
+  message: z.string().optional(),
   /** Links the activity to a backend job so the poller can drive it. */
-  jobId?: string;
+  jobId: z.string().optional(),
   /**
    * Current ingest pipeline stage of a job-linked activity, e.g. "vision:dense"
    * — the microservice doing work right now. Driven from the job snapshot.
    */
-  stage?: string | null;
+  stage: z.string().nullable().optional(),
   /** Per-stage reached-count for the job-linked staircase (stage → files). */
-  stageCounts?: Record<string, number>;
-  startedAt: number;
-  endedAt?: number;
-}
+  stageCounts: z.record(z.string(), z.number()).optional(),
+  startedAt: z.number(),
+  endedAt: z.number().optional(),
+});
+export type Activity = z.infer<typeof ActivitySchema>;
 
 /** The subset of a normalized `/api/library/jobs` row the reducer needs. */
-export interface JobSnapshot {
-  id: string;
-  status: string;
-  totalFiles: number;
-  processedFiles: number;
-  failedFiles: number;
-  errorMessage: string | null;
+export const JobSnapshotSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  totalFiles: z.number(),
+  processedFiles: z.number(),
+  failedFiles: z.number(),
+  errorMessage: z.string().nullable(),
   /** Current pipeline stage (null when not yet running / not an ingest job). */
-  stage: string | null;
+  stage: z.string().nullable(),
   /** Per-stage reached-count (e.g. { metadata: 45, vision:dense: 43, ... }). */
-  stageCounts: Record<string, number>;
-}
+  stageCounts: z.record(z.string(), z.number()),
+});
+export type JobSnapshot = z.infer<typeof JobSnapshotSchema>;
 
 /** Job statuses past which an activity is settled and no longer driven.
  * `interrupted` = the ingest service restarted mid-job (its in-memory worker is
@@ -74,6 +79,40 @@ export function isTerminal(status: ActivityStatus): boolean {
  * nothing changes so React can skip re-renders. An already-settled activity, or
  * one whose job has not appeared in the jobs list yet, is returned untouched.
  */
+function terminalFailureMessage(job: JobSnapshot): string | undefined {
+  if (job.status === "completed") return undefined;
+  if (job.errorMessage) return job.errorMessage;
+  if (job.status === "cancelled") return "cancelled";
+  if (job.status === "interrupted") return "interrupted (service restarted)";
+  return "failed";
+}
+
+function settleActivity(activity: Activity, job: JobSnapshot, progress: ActivityProgress, now: number): Activity {
+  const ok = job.status === "completed";
+  return {
+    ...activity,
+    progress,
+    status: ok ? "success" : "error",
+    message: terminalFailureMessage(job),
+    // Clear the live stage once settled — there is no service still working.
+    stage: null,
+    stageCounts: job.stageCounts,
+    endedAt: now,
+  };
+}
+
+// Treat a missing stage (undefined) and an explicit null as equal so an
+// unchanged poll still returns the SAME reference (lets React bail).
+function isUnchangedProgress(activity: Activity, job: JobSnapshot, progress: ActivityProgress): boolean {
+  return (
+    activity.status === "running" &&
+    activity.progress?.processed === progress.processed &&
+    activity.progress?.total === progress.total &&
+    activity.progress?.failed === progress.failed &&
+    (activity.stage ?? null) === (job.stage ?? null)
+  );
+}
+
 export function applyJobToActivity(
   activity: Activity,
   job: JobSnapshot | undefined,
@@ -88,37 +127,12 @@ export function applyJobToActivity(
   };
 
   if (TERMINAL_JOB_STATUSES.has(job.status)) {
-    const ok = job.status === "completed";
-    return {
-      ...activity,
-      progress,
-      status: ok ? "success" : "error",
-      message: ok
-        ? undefined
-        : job.errorMessage ??
-          (job.status === "cancelled"
-            ? "cancelled"
-            : job.status === "interrupted"
-              ? "interrupted (service restarted)"
-              : "failed"),
-      // Clear the live stage once settled — there is no service still working.
-      stage: null,
-      stageCounts: job.stageCounts,
-      endedAt: now,
-    };
+    return settleActivity(activity, job, progress, now);
   }
 
   // Still in flight: surface latest counts + the active stage and promote
   // pending → running. The stage tells the dock which microservice is busy now.
-  // Treat a missing stage (undefined) and an explicit null as equal so an
-  // unchanged poll still returns the SAME reference (lets React bail).
-  const same =
-    activity.status === "running" &&
-    activity.progress?.processed === progress.processed &&
-    activity.progress?.total === progress.total &&
-    activity.progress?.failed === progress.failed &&
-    (activity.stage ?? null) === (job.stage ?? null);
-  if (same) return activity;
+  if (isUnchangedProgress(activity, job, progress)) return activity;
   return { ...activity, status: "running", progress, stage: job.stage, stageCounts: job.stageCounts };
 }
 
@@ -182,8 +196,14 @@ export function errorMessage(e: unknown): string {
   return "failed";
 }
 
+const ErrorResponseInfoSchema = z.object({
+  status: z.number(),
+  statusText: z.string(),
+});
+type ErrorResponseInfo = z.infer<typeof ErrorResponseInfoSchema>;
+
 /** Pull an error string out of a JSON error body, falling back to the status. */
-export function extractError(body: unknown, res: { status: number; statusText: string }): string {
+export function extractError(body: unknown, res: ErrorResponseInfo): string {
   if (body && typeof body === "object") {
     const o = body as Record<string, unknown>;
     const m = o.error ?? o.detail ?? o.message;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { z } from "zod";
 import {
   IBM_Plex_Mono,
   Sora /*, Cinzel, Montserrat,*/,
@@ -7,6 +8,11 @@ import { ThemeToggleButton } from "@carneirofc/ui";
 import { AppSidebar } from "@/components/AppSidebar";
 import AppProviders from "@/lib/store/providers";
 import "./globals.css";
+
+const RootLayoutPropsSchema = z.object({
+  children: z.custom<React.ReactNode>(),
+});
+type RootLayoutProps = z.infer<typeof RootLayoutPropsSchema>;
 
 const displayFont = Sora({
   variable: "--font-display",
@@ -26,11 +32,7 @@ export const metadata: Metadata = {
     "Personal studio archive for browsing ComfyUI PNG outputs and generation metadata.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<RootLayoutProps>) {
   const initialThemeScript = `
     (() => {
       try {

@@ -1,8 +1,12 @@
+import { z } from "zod";
+
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { batchDeleteImages } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const BatchDeleteBodySchema = z.object({ ids: z.array(z.unknown()).optional() });
 
 /**
  * Bulk un-index images in ONE call. Proxies the gateway POST /images/batch-delete
@@ -12,10 +16,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   return handleRoute(async () => {
-    const body = (await request.json().catch(() => ({}))) as { ids?: unknown };
-    const ids = Array.isArray(body.ids)
-      ? body.ids.filter((x): x is string => typeof x === "string" && x.length > 0)
-      : [];
+    const body = BatchDeleteBodySchema.parse(await request.json().catch(() => ({})));
+    const ids = (body.ids ?? []).filter((x): x is string => typeof x === "string" && x.length > 0);
     if (ids.length === 0) return jsonError("no image ids provided", 400);
     if (ids.length > 1000) return jsonError("too many ids (max 1000)", 400);
     return jsonOk(await batchDeleteImages(ids));

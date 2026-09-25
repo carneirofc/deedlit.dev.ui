@@ -4,22 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { z } from "zod";
 
-type NavItem = {
-  href: string;
-  label: string;
-  testId: string;
-  icon: ReactNode;
+const NavItemSchema = z.object({
+  href: z.string(),
+  label: z.string(),
+  testId: z.string(),
+  icon: z.custom<ReactNode>(),
   /** Active when the current path matches. */
-  match: (pathname: string) => boolean;
-};
+  match: z.custom<(pathname: string) => boolean>(),
+});
+type NavItem = z.infer<typeof NavItemSchema>;
 
-type ExternalItem = {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  testId: string;
-};
+const ExternalItemSchema = z.object({
+  href: z.string(),
+  label: z.string(),
+  icon: z.custom<ReactNode>(),
+  testId: z.string(),
+});
+type ExternalItem = z.infer<typeof ExternalItemSchema>;
 
 // ── Icon set ──────────────────────────────────────────────────────────
 const icon = {
@@ -154,8 +157,14 @@ function navItemClass(isActive: boolean): string {
   return isActive ? `${base} app-sidebar-nav-item-active` : base;
 }
 
+const RailNavLinkPropsSchema = z.object({
+  item: NavItemSchema,
+  isActive: z.boolean(),
+});
+type RailNavLinkProps = z.infer<typeof RailNavLinkPropsSchema>;
+
 // ── Desktop rail (icon-only, hover tooltip) ───────────────────────────
-function RailNavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function RailNavLink({ item, isActive }: RailNavLinkProps) {
   return (
     <Link
       href={item.href}
@@ -177,7 +186,12 @@ function RailNavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   );
 }
 
-function RailExternalLink({ item }: { item: ExternalItem }) {
+const RailExternalLinkPropsSchema = z.object({
+  item: ExternalItemSchema,
+});
+type RailExternalLinkProps = z.infer<typeof RailExternalLinkPropsSchema>;
+
+function RailExternalLink({ item }: RailExternalLinkProps) {
   return (
     <a
       href={item.href}
@@ -196,24 +210,19 @@ function RailExternalLink({ item }: { item: ExternalItem }) {
   );
 }
 
+const SheetRowPropsSchema = z.object({
+  href: z.string(),
+  label: z.string(),
+  iconNode: z.custom<ReactNode>(),
+  isActive: z.boolean().optional(),
+  external: z.boolean().optional(),
+  onNavigate: z.custom<() => void>(),
+  testId: z.string().optional(),
+});
+type SheetRowProps = z.infer<typeof SheetRowPropsSchema>;
+
 // ── Mobile sheet (icon + label, full-width tap targets) ───────────────
-function SheetRow({
-  href,
-  label,
-  iconNode,
-  isActive,
-  external,
-  onNavigate,
-  testId,
-}: {
-  href: string;
-  label: string;
-  iconNode: ReactNode;
-  isActive?: boolean;
-  external?: boolean;
-  onNavigate: () => void;
-  testId?: string;
-}) {
+function SheetRow({ href, label, iconNode, isActive, external, onNavigate, testId }: SheetRowProps) {
   const className = `app-sidebar-nav-item flex items-center gap-3 rounded-xl border px-3 py-2.5 text-ui-sm font-medium transition ${
     isActive ? "app-sidebar-nav-item-active" : ""
   }`;
@@ -245,19 +254,132 @@ function SheetRow({
   );
 }
 
-export function AppSidebar() {
-  const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+const DesktopRailPropsSchema = z.object({
+  pathname: z.string(),
+});
+type DesktopRailProps = z.infer<typeof DesktopRailPropsSchema>;
 
-  // Esc closes the mobile sheet.
+// ── Desktop vertical rail (icons only) ────────────────────────────────
+function DesktopRail({ pathname }: DesktopRailProps) {
+  return (
+    <nav
+      id="primary-navigation"
+      data-testid="primary-navigation"
+      aria-label="Primary navigation"
+      className="hidden md:flex md:flex-col md:items-center md:gap-2"
+    >
+      {NAV_ITEMS.map((it) => (
+        <RailNavLink key={it.testId} item={it} isActive={it.match(pathname)} />
+      ))}
+      <div className="mx-1 my-1 h-px w-7 bg-ui-border/60 md:h-px md:w-7" aria-hidden="true" />
+      {EXTERNAL_ITEMS.map((it) => (
+        <RailExternalLink key={it.href} item={it} />
+      ))}
+    </nav>
+  );
+}
+
+const MobileSheetPropsSchema = z.object({
+  pathname: z.string(),
+  onNavigate: z.custom<() => void>(),
+});
+type MobileSheetProps = z.infer<typeof MobileSheetPropsSchema>;
+
+// ── Mobile sheet — labeled rows in a popover above the bar ────────────
+function MobileSheet({ pathname, onNavigate }: MobileSheetProps) {
+  return (
+    <div
+      id="mobile-nav-sheet"
+      className="app-sidebar-shell absolute bottom-[calc(100%+0.75rem)] left-1/2 w-[min(92vw,22rem)] -translate-x-1/2 rounded-2xl border p-2 shadow-panel-lg backdrop-blur-xl md:hidden"
+    >
+      <p className="px-2 pb-1.5 pt-1 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted">Navigate</p>
+      <div className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2">
+        {NAV_ITEMS.map((it) => (
+          <SheetRow
+            key={it.testId}
+            href={it.href}
+            label={it.label}
+            iconNode={it.icon}
+            isActive={it.match(pathname)}
+            onNavigate={onNavigate}
+            testId={`sheet-nav-link-${it.testId}`}
+          />
+        ))}
+      </div>
+      <p className="px-2 pb-1.5 pt-3 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted">
+        External tools
+      </p>
+      <div className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2">
+        {EXTERNAL_ITEMS.map((it) => (
+          <SheetRow
+            key={it.href}
+            href={it.href}
+            label={it.label}
+            iconNode={it.icon}
+            external
+            onNavigate={onNavigate}
+            testId={`sheet-nav-link-${it.testId}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Esc closes the mobile sheet. */
+function useCloseOnEscape(menuOpen: boolean, close: () => void) {
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [menuOpen, close]);
+}
+
+const MobileMenuTogglePropsSchema = z.object({
+  menuOpen: z.boolean(),
+  onToggle: z.custom<() => void>(),
+});
+type MobileMenuToggleProps = z.infer<typeof MobileMenuTogglePropsSchema>;
+
+/** Hamburger/close button that toggles the mobile sheet. */
+function MobileMenuToggle({ menuOpen, onToggle }: MobileMenuToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+      aria-expanded={menuOpen}
+      aria-controls="mobile-nav-sheet"
+      data-testid="app-sidebar-mobile-menu-toggle"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-ui-ink-muted transition hover:bg-ui-bg-soft hover:text-ui-ink-title md:hidden"
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {menuOpen ? (
+          <>
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </>
+        ) : (
+          <>
+            <path d="M3 12h18" />
+            <path d="M3 6h18" />
+            <path d="M3 18h18" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
+
+  useCloseOnEscape(menuOpen, closeMenu);
 
   return (
     <aside
@@ -270,7 +392,7 @@ export function AppSidebar() {
         <button
           type="button"
           aria-label="Close navigation"
-          onClick={() => setMenuOpen(false)}
+          onClick={closeMenu}
           className="pointer-events-auto fixed inset-0 -z-10 bg-ui-bg-deep/40 backdrop-blur-[2px] md:hidden"
         />
       )}
@@ -288,88 +410,11 @@ export function AppSidebar() {
           DL
         </Link>
 
-        {/* Mobile sheet trigger */}
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={menuOpen}
-          aria-controls="mobile-nav-sheet"
-          data-testid="app-sidebar-mobile-menu-toggle"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-ui-ink-muted transition hover:bg-ui-bg-soft hover:text-ui-ink-title md:hidden"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {menuOpen ? (
-              <>
-                <path d="M18 6L6 18" />
-                <path d="M6 6l12 12" />
-              </>
-            ) : (
-              <>
-                <path d="M3 12h18" />
-                <path d="M3 6h18" />
-                <path d="M3 18h18" />
-              </>
-            )}
-          </svg>
-        </button>
+        <MobileMenuToggle menuOpen={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
 
-        {/* Desktop vertical rail (icons only) */}
-        <nav
-          id="primary-navigation"
-          data-testid="primary-navigation"
-          aria-label="Primary navigation"
-          className="hidden md:flex md:flex-col md:items-center md:gap-2"
-        >
-          {NAV_ITEMS.map((it) => (
-            <RailNavLink key={it.testId} item={it} isActive={it.match(pathname)} />
-          ))}
-          <div className="mx-1 my-1 h-px w-7 bg-ui-border/60 md:h-px md:w-7" aria-hidden="true" />
-          {EXTERNAL_ITEMS.map((it) => (
-            <RailExternalLink key={it.href} item={it} />
-          ))}
-        </nav>
+        <DesktopRail pathname={pathname} />
 
-        {/* Mobile sheet — labeled rows in a popover above the bar */}
-        {menuOpen && (
-          <div
-            id="mobile-nav-sheet"
-            className="app-sidebar-shell absolute bottom-[calc(100%+0.75rem)] left-1/2 w-[min(92vw,22rem)] -translate-x-1/2 rounded-2xl border p-2 shadow-panel-lg backdrop-blur-xl md:hidden"
-          >
-            <p className="px-2 pb-1.5 pt-1 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted">
-              Navigate
-            </p>
-            <div className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2">
-              {NAV_ITEMS.map((it) => (
-                <SheetRow
-                  key={it.testId}
-                  href={it.href}
-                  label={it.label}
-                  iconNode={it.icon}
-                  isActive={it.match(pathname)}
-                  onNavigate={() => setMenuOpen(false)}
-                  testId={`sheet-nav-link-${it.testId}`}
-                />
-              ))}
-            </div>
-            <p className="px-2 pb-1.5 pt-3 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted">
-              External tools
-            </p>
-            <div className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2">
-              {EXTERNAL_ITEMS.map((it) => (
-                <SheetRow
-                  key={it.href}
-                  href={it.href}
-                  label={it.label}
-                  iconNode={it.icon}
-                  external
-                  onNavigate={() => setMenuOpen(false)}
-                  testId={`sheet-nav-link-${it.testId}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {menuOpen && <MobileSheet pathname={pathname} onNavigate={closeMenu} />}
       </div>
     </aside>
   );

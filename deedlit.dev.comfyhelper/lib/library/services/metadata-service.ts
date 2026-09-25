@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
@@ -10,44 +11,47 @@ import { normalizeTag } from "@/lib/prompt-tags";
 
 export const SUPPORTED_EXTENSIONS = new Set([".png", ".webp", ".jpg", ".jpeg"]);
 
-export interface ExtractedLora {
-  name: string;
-  weight: number | null;
-}
+export const ExtractedLoraSchema = z.object({
+  name: z.string(),
+  weight: z.number().nullable(),
+});
+export type ExtractedLora = z.infer<typeof ExtractedLoraSchema>;
 
-export interface ExtractedGenerationParams {
-  seed: number | null;
-  steps: number | null;
-  cfgScale: number | null;
-  sampler: string | null;
-  scheduler: string | null;
-  denoise: number | null;
-  width: number | null;
-  height: number | null;
-  clipSkip: number | null;
-}
+export const ExtractedGenerationParamsSchema = z.object({
+  seed: z.number().nullable(),
+  steps: z.number().nullable(),
+  cfgScale: z.number().nullable(),
+  sampler: z.string().nullable(),
+  scheduler: z.string().nullable(),
+  denoise: z.number().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  clipSkip: z.number().nullable(),
+});
+export type ExtractedGenerationParams = z.infer<typeof ExtractedGenerationParamsSchema>;
 
-export interface ExtractedImageRecord {
-  filePath: string;
-  filename: string;
-  extension: string;
-  sha256Hash: string;
-  perceptualHash: string | null;
-  width: number | null;
-  height: number | null;
-  fileSizeBytes: number;
-  createdAt: Date | null;
-  modifiedAt: Date | null;
-  sourceTool: string | null;
-  prompt: string | null;
-  negativePrompt: string | null;
-  model: string | null;
-  workflowJson: unknown;
-  metadataJson: unknown;
-  tags: string[];
-  loras: ExtractedLora[];
-  generationParams: ExtractedGenerationParams;
-}
+export const ExtractedImageRecordSchema = z.object({
+  filePath: z.string(),
+  filename: z.string(),
+  extension: z.string(),
+  sha256Hash: z.string(),
+  perceptualHash: z.string().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  fileSizeBytes: z.number(),
+  createdAt: z.custom<Date>().nullable(),
+  modifiedAt: z.custom<Date>().nullable(),
+  sourceTool: z.string().nullable(),
+  prompt: z.string().nullable(),
+  negativePrompt: z.string().nullable(),
+  model: z.string().nullable(),
+  workflowJson: z.unknown(),
+  metadataJson: z.unknown(),
+  tags: z.array(z.string()),
+  loras: z.array(ExtractedLoraSchema),
+  generationParams: ExtractedGenerationParamsSchema,
+});
+export type ExtractedImageRecord = z.infer<typeof ExtractedImageRecordSchema>;
 
 // ---------------------------------------------------------------------------
 // Hashing
@@ -149,16 +153,17 @@ export function normalizePromptTags(prompt: string | null | undefined): string[]
 // Metadata interpretation (delegated to the deedlit.metadata service)
 // ---------------------------------------------------------------------------
 
-interface InterpretedMetadata {
-  prompt: string | null;
-  negativePrompt: string | null;
-  model: string | null;
-  sourceTool: string | null;
-  workflowJson: unknown;
+const InterpretedMetadataSchema = z.object({
+  prompt: z.string().nullable(),
+  negativePrompt: z.string().nullable(),
+  model: z.string().nullable(),
+  sourceTool: z.string().nullable(),
+  workflowJson: z.unknown(),
   /** Tags already normalized by the metadata service. */
-  tags: string[];
-  params: Partial<ExtractedGenerationParams>;
-}
+  tags: z.array(z.string()),
+  params: ExtractedGenerationParamsSchema.partial(),
+});
+type InterpretedMetadata = z.infer<typeof InterpretedMetadataSchema>;
 
 /**
  * Map the deedlit.metadata `ExtractResult` into the monolith's interpreted
@@ -175,6 +180,20 @@ interface InterpretedMetadata {
  *   used as a fallback so ComfyUI images without an embedded UI graph still keep
  *   their node graph.
  */
+function mapExtractParams(params: ExtractResult["params"]): Partial<ExtractedGenerationParams> {
+  return {
+    seed: params.seed ?? null,
+    steps: params.steps ?? null,
+    cfgScale: params.cfg ?? null,
+    sampler: params.sampler ?? null,
+    scheduler: params.scheduler ?? null,
+    denoise: params.denoise ?? null,
+    width: params.width ?? null,
+    height: params.height ?? null,
+    clipSkip: params.clipskip ?? null,
+  };
+}
+
 export function mapExtractResult(extract: ExtractResult): InterpretedMetadata {
   const sourceTool = extract.sourceTool === "unknown" ? null : extract.sourceTool;
   const model = extract.references.checkpoints[0]?.name ?? null;
@@ -187,17 +206,7 @@ export function mapExtractResult(extract: ExtractResult): InterpretedMetadata {
     sourceTool,
     workflowJson,
     tags: extract.tags ?? [],
-    params: {
-      seed: extract.params.seed ?? null,
-      steps: extract.params.steps ?? null,
-      cfgScale: extract.params.cfg ?? null,
-      sampler: extract.params.sampler ?? null,
-      scheduler: extract.params.scheduler ?? null,
-      denoise: extract.params.denoise ?? null,
-      width: extract.params.width ?? null,
-      height: extract.params.height ?? null,
-      clipSkip: extract.params.clipskip ?? null,
-    },
+    params: mapExtractParams(extract.params),
   };
 }
 
@@ -219,34 +228,11 @@ function mimeForExtension(extension: string): string {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-export async function extractImageMetadata(filePath: string): Promise<ExtractedImageRecord> {
-  const extension = path.extname(filePath).toLowerCase();
-  const filename = path.basename(filePath);
-  const fileStat = await stat(filePath);
+const DimsSchema = z.object({ width: z.number().nullable(), height: z.number().nullable() });
+type Dims = z.infer<typeof DimsSchema>;
 
-  // Pixel work stays local (sha256 / phash / dims); metadata parsing is owned by
-  // the deedlit.metadata service. Read the bytes once and reuse for the upload.
-  const fileBuffer = await readFile(filePath);
-
-  const [sha256Hash, perceptualHash, dims, extract] = await Promise.all([
-    computeSha256(filePath),
-    computePerceptualHash(filePath),
-    sharp(filePath)
-      .metadata()
-      .then((m) => ({ width: m.width ?? null, height: m.height ?? null }))
-      .catch(() => ({ width: null, height: null })),
-    extractMetadataFromBuffer(fileBuffer, mimeForExtension(extension), filename),
-  ]);
-
-  const interpreted = mapExtractResult(extract);
-  // Prefer the service's normalized tags; only re-derive locally if the service
-  // returned none but we do have a prompt (defensive — shouldn't happen).
-  const tags =
-    interpreted.tags.length > 0 ? interpreted.tags : normalizePromptTags(interpreted.prompt);
-  // LoRAs are parsed from the prompt until the service populates references.loras (#7).
-  const loras = parseLorasFromPrompt(interpreted.prompt);
-
-  const generationParams: ExtractedGenerationParams = {
+function buildGenerationParams(interpreted: InterpretedMetadata, dims: Dims): ExtractedGenerationParams {
+  return {
     seed: interpreted.params.seed ?? null,
     steps: interpreted.params.steps ?? null,
     cfgScale: interpreted.params.cfgScale ?? null,
@@ -257,6 +243,58 @@ export async function extractImageMetadata(filePath: string): Promise<ExtractedI
     height: interpreted.params.height ?? dims.height,
     clipSkip: interpreted.params.clipSkip ?? null,
   };
+}
+
+const ExtractedFileFactsSchema = z.object({
+  sha256Hash: z.string(),
+  perceptualHash: z.string().nullable(),
+  dims: DimsSchema,
+  extract: z.custom<ExtractResult>(),
+});
+type ExtractedFileFacts = z.infer<typeof ExtractedFileFactsSchema>;
+
+async function extractFileFacts(
+  filePath: string,
+  fileBuffer: Buffer,
+  extension: string,
+  filename: string,
+): Promise<ExtractedFileFacts> {
+  const [sha256Hash, perceptualHash, dims, extract] = await Promise.all([
+    computeSha256(filePath),
+    computePerceptualHash(filePath),
+    sharp(filePath)
+      .metadata()
+      .then((m) => ({ width: m.width ?? null, height: m.height ?? null }))
+      .catch(() => ({ width: null, height: null })),
+    extractMetadataFromBuffer(fileBuffer, mimeForExtension(extension), filename),
+  ]);
+  return { sha256Hash, perceptualHash, dims, extract };
+}
+
+export async function extractImageMetadata(filePath: string): Promise<ExtractedImageRecord> {
+  const extension = path.extname(filePath).toLowerCase();
+  const filename = path.basename(filePath);
+  const fileStat = await stat(filePath);
+
+  // Pixel work stays local (sha256 / phash / dims); metadata parsing is owned by
+  // the deedlit.metadata service. Read the bytes once and reuse for the upload.
+  const fileBuffer = await readFile(filePath);
+
+  const { sha256Hash, perceptualHash, dims, extract } = await extractFileFacts(
+    filePath,
+    fileBuffer,
+    extension,
+    filename,
+  );
+
+  const interpreted = mapExtractResult(extract);
+  // Prefer the service's normalized tags; only re-derive locally if the service
+  // returned none but we do have a prompt (defensive — shouldn't happen).
+  const tags =
+    interpreted.tags.length > 0 ? interpreted.tags : normalizePromptTags(interpreted.prompt);
+  // LoRAs are parsed from the prompt until the service populates references.loras (#7).
+  const loras = parseLorasFromPrompt(interpreted.prompt);
+  const generationParams = buildGenerationParams(interpreted, dims);
 
   return {
     filePath,

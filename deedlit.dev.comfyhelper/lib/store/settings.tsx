@@ -9,20 +9,31 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { z } from "zod";
 
 const STORAGE_KEY = "comfyhelper-library-settings";
 
-export type BrowseMode = "browse" | "semantic" | "image";
-export type ViewMode = "grid" | "list" | "masonry";
-export type GridDensity = "compact" | "comfortable" | "spacious";
-export type ImageFit = "contain" | "cover";
+const BrowseModeSchema = z.enum(["browse", "semantic", "image"]);
+export type BrowseMode = z.infer<typeof BrowseModeSchema>;
+
+const ViewModeSchema = z.enum(["grid", "list", "masonry"]);
+export type ViewMode = z.infer<typeof ViewModeSchema>;
+
+const GridDensitySchema = z.enum(["compact", "comfortable", "spacious"]);
+export type GridDensity = z.infer<typeof GridDensitySchema>;
+
+const ImageFitSchema = z.enum(["contain", "cover"]);
+export type ImageFit = z.infer<typeof ImageFitSchema>;
+
 /** How browse results are sectioned. `none` = one flat grid; `folder` = split
  *  into collapsible sections by source directory (browse path only). */
-export type GroupByMode = "none" | "folder";
+const GroupByModeSchema = z.enum(["none", "folder"]);
+export type GroupByMode = z.infer<typeof GroupByModeSchema>;
 
 /** AI content-safety class. Mirrors the catalog/labelagent `safety` enum. */
-export type SafetyClass = "sfw" | "nsfw" | "explicit";
-export const SAFETY_CLASSES: readonly SafetyClass[] = ["sfw", "nsfw", "explicit"] as const;
+const SafetyClassSchema = z.enum(["sfw", "nsfw", "explicit"]);
+export type SafetyClass = z.infer<typeof SafetyClassSchema>;
+export const SAFETY_CLASSES: readonly SafetyClass[] = SafetyClassSchema.options;
 export const SAFETY_LABEL: Record<SafetyClass, string> = {
   sfw: "SFW",
   nsfw: "NSFW",
@@ -34,18 +45,7 @@ export const SAFETY_LABEL: Record<SafetyClass, string> = {
  * when there is a text/image query); the rest are server-side catalog sorts used
  * by the filter-only browse grid. Mirrors the catalog `sort` enum + relevance.
  */
-export type SortMode =
-  | "relevance"
-  | "newest"
-  | "oldest"
-  | "created_desc"
-  | "created_asc"
-  | "rating_desc"
-  | "rating_asc"
-  | "name_asc"
-  | "name_desc";
-
-export const SORT_MODES: readonly SortMode[] = [
+const SortModeSchema = z.enum([
   "relevance",
   "newest",
   "oldest",
@@ -55,82 +55,86 @@ export const SORT_MODES: readonly SortMode[] = [
   "rating_asc",
   "name_asc",
   "name_desc",
-] as const;
+]);
+export type SortMode = z.infer<typeof SortModeSchema>;
+
+export const SORT_MODES: readonly SortMode[] = SortModeSchema.options;
 
 /**
  * User-tunable preferences for the image library UI.  Persisted to
  * localStorage (survives across sessions) and consumed by the browse page,
  * the image viewer, and the suggestion / related-item panels.
  */
-export interface LibrarySettings {
+export const LibrarySettingsSchema = z.object({
   // --- Browsing & pagination ---
   /** Results fetched per page / "load more" step. */
-  pageSize: number;
+  pageSize: z.number(),
   /** Which search tab the browse page opens on. */
-  defaultMode: BrowseMode;
+  defaultMode: BrowseModeSchema,
   /** Auto-load the next page when the grid bottom scrolls into view. */
-  infiniteScroll: boolean;
+  infiniteScroll: z.boolean(),
   /** How result cards are laid out. */
-  viewMode: ViewMode;
+  viewMode: ViewModeSchema,
   /** Result ordering. Defaults to newest-first for browse; relevance is applied
    * automatically when a text/image query is active. */
-  sortMode: SortMode;
+  sortMode: SortModeSchema,
   /** Split browse results into collapsible sections by source directory.
    * `none` = one flat grid (default). Only applies on the filter-only browse
    * path; the vector-search results have no directory to group by. */
-  groupBy: GroupByMode;
+  groupBy: GroupByModeSchema,
   /** Card size / column count for grid & masonry views. */
-  gridDensity: GridDensity;
+  gridDensity: GridDensitySchema,
   /** Show the similarity-score chip on cards. */
-  showScores: boolean;
+  showScores: z.boolean(),
   /** Show summary / model / rating metadata under each card. */
-  showCardMeta: boolean;
+  showCardMeta: z.boolean(),
 
   // --- Image viewer (detail page) ---
   /** Fit the main viewer image inside its box (contain) or fill it (cover). */
-  viewerImageFit: ImageFit;
+  viewerImageFit: ImageFitSchema,
   /** Load the full-resolution original instead of the thumbnail in the viewer. */
-  viewerFullResolution: boolean;
-  showPrompt: boolean;
+  viewerFullResolution: z.boolean(),
+  showPrompt: z.boolean(),
   /** Show the AI-generated description panel on the detail page. */
-  showDescription: boolean;
-  showGenerationParams: boolean;
-  showRelationshipGraph: boolean;
+  showDescription: z.boolean(),
+  showGenerationParams: z.boolean(),
+  showRelationshipGraph: z.boolean(),
   /** Relationship-graph hop depth (1–3). */
-  graphDepth: number;
+  graphDepth: z.number(),
 
   // --- Suggestions & related items ---
-  showSimilar: boolean;
+  showSimilar: z.boolean(),
   /** Number of "similar images" suggestions on the viewer. */
-  similarCount: number;
+  similarCount: z.number(),
   /** Drop suggestions below this similarity score (0 = keep all). */
-  similarMinScore: number;
+  similarMinScore: z.number(),
   /** Fetch suggestions automatically on open vs. on demand. */
-  autoLoadSuggestions: boolean;
-  showRelatedTags: boolean;
+  autoLoadSuggestions: z.boolean(),
+  showRelatedTags: z.boolean(),
   /** Number of co-occurring tags to surface in the related panel. */
-  relatedTagsCount: number;
+  relatedTagsCount: z.number(),
 
   // --- Search defaults ---
-  defaultMinRating: number;
-  defaultFavoritesOnly: boolean;
+  defaultMinRating: z.number(),
+  defaultFavoritesOnly: z.boolean(),
   /** Default minimum score for semantic / similar / by-image searches. */
-  defaultMinScore: number;
+  defaultMinScore: z.number(),
   /**
    * Content-safety classes the browse/search grid shows by default. All three
    * (or none) selected = no filter (everything, incl. unclassified); a strict
    * subset hides the unlisted classes. Seeds the library page's safety chips.
    */
-  defaultSafety: SafetyClass[];
+  defaultSafety: z.array(SafetyClassSchema),
 
   // --- Slideshow (fullscreen viewer) ---
   /** Seconds each image is shown before the slideshow auto-advances. */
-  slideshowInterval: number;
+  slideshowInterval: z.number(),
   /** Loop back to the first image after the last one. */
-  slideshowLoop: boolean;
+  slideshowLoop: z.boolean(),
   /** Advance to a random image instead of the next in order. */
-  slideshowShuffle: boolean;
-}
+  slideshowShuffle: z.boolean(),
+});
+export type LibrarySettings = z.infer<typeof LibrarySettingsSchema>;
 
 export const DEFAULT_SETTINGS: LibrarySettings = {
   pageSize: 40,
@@ -171,79 +175,94 @@ export const DEFAULT_SETTINGS: LibrarySettings = {
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+// Field builders for the lenient, storage-parsing schema below: each one always
+// succeeds (falling back to the matching DEFAULT_SETTINGS value), and number
+// fields additionally clamp into their valid range.
+const boolField = (fallback: boolean) => z.boolean().catch(fallback);
+const numField = (min: number, max: number, fallback: number) =>
+  z
+    .number()
+    .catch(fallback)
+    .transform((value) => clamp(value, min, max));
+// Sanitize a stored multi-select against the allowed set (drop junk, de-dupe);
+// a non-array (or entirely-invalid array) falls back to the default.
+const subsetField = <T extends string>(schema: z.ZodEnum<Record<string, T>>, fallback: readonly T[]) =>
+  z
+    .preprocess(
+      (value) =>
+        Array.isArray(value)
+          ? Array.from(new Set(value.filter((x): x is T => schema.safeParse(x).success)))
+          : value,
+      z.array(schema),
+    )
+    .catch([...fallback]);
+
 /**
- * Merge a possibly-stale / partial stored blob over the defaults, coercing and
- * clamping each field.  Unknown keys are dropped; missing keys inherit the
- * default, so adding a new setting never breaks an old persisted payload.
+ * Lenient counterpart of {@link LibrarySettingsSchema} used to parse a possibly
+ * stale / partial stored blob: every field falls back to its default instead of
+ * failing the whole parse, so adding a new setting never breaks an old
+ * persisted payload. Unknown keys are dropped by the plain z.object() parse.
  */
+const StoredLibrarySettingsSchema = z.object({
+  pageSize: numField(10, 200, DEFAULT_SETTINGS.pageSize),
+  defaultMode: BrowseModeSchema.catch(DEFAULT_SETTINGS.defaultMode),
+  infiniteScroll: boolField(DEFAULT_SETTINGS.infiniteScroll),
+  viewMode: ViewModeSchema.catch(DEFAULT_SETTINGS.viewMode),
+  sortMode: SortModeSchema.catch(DEFAULT_SETTINGS.sortMode),
+  groupBy: GroupByModeSchema.catch(DEFAULT_SETTINGS.groupBy),
+  gridDensity: GridDensitySchema.catch(DEFAULT_SETTINGS.gridDensity),
+  showScores: boolField(DEFAULT_SETTINGS.showScores),
+  showCardMeta: boolField(DEFAULT_SETTINGS.showCardMeta),
+
+  viewerImageFit: ImageFitSchema.catch(DEFAULT_SETTINGS.viewerImageFit),
+  viewerFullResolution: boolField(DEFAULT_SETTINGS.viewerFullResolution),
+  showPrompt: boolField(DEFAULT_SETTINGS.showPrompt),
+  showDescription: boolField(DEFAULT_SETTINGS.showDescription),
+  showGenerationParams: boolField(DEFAULT_SETTINGS.showGenerationParams),
+  showRelationshipGraph: boolField(DEFAULT_SETTINGS.showRelationshipGraph),
+  graphDepth: numField(1, 3, DEFAULT_SETTINGS.graphDepth),
+
+  showSimilar: boolField(DEFAULT_SETTINGS.showSimilar),
+  similarCount: numField(0, 48, DEFAULT_SETTINGS.similarCount),
+  similarMinScore: numField(0, 1, DEFAULT_SETTINGS.similarMinScore),
+  autoLoadSuggestions: boolField(DEFAULT_SETTINGS.autoLoadSuggestions),
+  showRelatedTags: boolField(DEFAULT_SETTINGS.showRelatedTags),
+  relatedTagsCount: numField(0, 40, DEFAULT_SETTINGS.relatedTagsCount),
+
+  defaultMinRating: numField(0, 5, DEFAULT_SETTINGS.defaultMinRating),
+  defaultFavoritesOnly: boolField(DEFAULT_SETTINGS.defaultFavoritesOnly),
+  defaultMinScore: numField(0, 1, DEFAULT_SETTINGS.defaultMinScore),
+  defaultSafety: subsetField(SafetyClassSchema, DEFAULT_SETTINGS.defaultSafety),
+
+  slideshowInterval: numField(1, 60, DEFAULT_SETTINGS.slideshowInterval),
+  slideshowLoop: boolField(DEFAULT_SETTINGS.slideshowLoop),
+  slideshowShuffle: boolField(DEFAULT_SETTINGS.slideshowShuffle),
+});
+
 function mergeSettings(raw: unknown): LibrarySettings {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_SETTINGS };
-  const r = raw as Record<string, unknown>;
-  const bool = (k: keyof LibrarySettings): boolean =>
-    typeof r[k] === "boolean" ? (r[k] as boolean) : (DEFAULT_SETTINGS[k] as boolean);
-  const num = (k: keyof LibrarySettings, min: number, max: number): number =>
-    typeof r[k] === "number" && Number.isFinite(r[k])
-      ? clamp(r[k] as number, min, max)
-      : (DEFAULT_SETTINGS[k] as number);
-  const oneOf = <T extends string>(k: keyof LibrarySettings, allowed: readonly T[]): T =>
-    allowed.includes(r[k] as T) ? (r[k] as T) : (DEFAULT_SETTINGS[k] as unknown as T);
-  // Sanitize a stored multi-select against the allowed set (drop junk, de-dupe);
-  // a non-array falls back to the default.
-  const subsetOf = <T extends string>(k: keyof LibrarySettings, allowed: readonly T[]): T[] => {
-    const v = r[k];
-    if (!Array.isArray(v)) return [...(DEFAULT_SETTINGS[k] as T[])];
-    return Array.from(new Set(v.filter((x): x is T => allowed.includes(x as T))));
-  };
-
-  return {
-    pageSize: num("pageSize", 10, 200),
-    defaultMode: oneOf("defaultMode", ["browse", "semantic", "image"] as const),
-    infiniteScroll: bool("infiniteScroll"),
-    viewMode: oneOf("viewMode", ["grid", "list", "masonry"] as const),
-    sortMode: oneOf("sortMode", SORT_MODES),
-    groupBy: oneOf("groupBy", ["none", "folder"] as const),
-    gridDensity: oneOf("gridDensity", ["compact", "comfortable", "spacious"] as const),
-    showScores: bool("showScores"),
-    showCardMeta: bool("showCardMeta"),
-
-    viewerImageFit: oneOf("viewerImageFit", ["contain", "cover"] as const),
-    viewerFullResolution: bool("viewerFullResolution"),
-    showPrompt: bool("showPrompt"),
-    showDescription: bool("showDescription"),
-    showGenerationParams: bool("showGenerationParams"),
-    showRelationshipGraph: bool("showRelationshipGraph"),
-    graphDepth: num("graphDepth", 1, 3),
-
-    showSimilar: bool("showSimilar"),
-    similarCount: num("similarCount", 0, 48),
-    similarMinScore: num("similarMinScore", 0, 1),
-    autoLoadSuggestions: bool("autoLoadSuggestions"),
-    showRelatedTags: bool("showRelatedTags"),
-    relatedTagsCount: num("relatedTagsCount", 0, 40),
-
-    defaultMinRating: num("defaultMinRating", 0, 5),
-    defaultFavoritesOnly: bool("defaultFavoritesOnly"),
-    defaultMinScore: num("defaultMinScore", 0, 1),
-    defaultSafety: subsetOf("defaultSafety", SAFETY_CLASSES),
-
-    slideshowInterval: num("slideshowInterval", 1, 60),
-    slideshowLoop: bool("slideshowLoop"),
-    slideshowShuffle: bool("slideshowShuffle"),
-  };
+  const parsed = StoredLibrarySettingsSchema.safeParse(raw);
+  return parsed.success ? parsed.data : { ...DEFAULT_SETTINGS };
 }
 
-interface SettingsValue {
-  settings: LibrarySettings;
+const SettingsValueSchema = z.object({
+  settings: LibrarySettingsSchema,
   /** True once the stored payload has been read on the client. */
-  hydrated: boolean;
-  setKey: <K extends keyof LibrarySettings>(key: K, value: LibrarySettings[K]) => void;
-  update: (patch: Partial<LibrarySettings>) => void;
-  reset: () => void;
-}
+  hydrated: z.boolean(),
+  setKey: z.custom<<K extends keyof LibrarySettings>(key: K, value: LibrarySettings[K]) => void>(),
+  update: z.custom<(patch: Partial<LibrarySettings>) => void>(),
+  reset: z.custom<() => void>(),
+});
+type SettingsValue = z.infer<typeof SettingsValueSchema>;
 
 const SettingsContext = createContext<SettingsValue | null>(null);
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
+const SettingsProviderPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+});
+type SettingsProviderProps = z.infer<typeof SettingsProviderPropsSchema>;
+
+export function SettingsProvider({ children }: SettingsProviderProps) {
   const [settings, setSettings] = useState<LibrarySettings>(DEFAULT_SETTINGS);
   const [hydrated, setHydrated] = useState(false);
 
@@ -251,6 +270,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
+      // Syncing React state from an external system (localStorage) on mount,
+      // not state derived from props/state — the sanctioned effect pattern.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setSettings(mergeSettings(JSON.parse(raw)));
     } catch {
       // ignore malformed / unavailable storage

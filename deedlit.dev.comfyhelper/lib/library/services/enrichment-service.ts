@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { readFile } from "node:fs/promises";
 
 import { getLogger } from "@/lib/logger";
@@ -8,21 +9,23 @@ import { linkImageTag, upsertTag } from "@/lib/library/repositories/tag-reposito
 
 const logger = getLogger({ scope: "library-enrichment" });
 
-export interface SuggestedTag {
-  name: string;
-  confidence: number;
-  category: string;
-}
+export const SuggestedTagSchema = z.object({
+  name: z.string(),
+  confidence: z.number(),
+  category: z.string(),
+});
+export type SuggestedTag = z.infer<typeof SuggestedTagSchema>;
 
-export interface EnrichmentResult {
-  caption: string;
-  description: string;
-  suggested_tags: SuggestedTag[];
-  characters: string[];
-  styles: string[];
-  quality_notes: string[];
-  metadata: Record<string, unknown>;
-}
+export const EnrichmentResultSchema = z.object({
+  caption: z.string(),
+  description: z.string(),
+  suggested_tags: z.array(SuggestedTagSchema),
+  characters: z.array(z.string()),
+  styles: z.array(z.string()),
+  quality_notes: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+});
+export type EnrichmentResult = z.infer<typeof EnrichmentResultSchema>;
 
 /** Enrichment is strictly opt-in via configuration. */
 export function shouldRunVisionEnrichment(): boolean {
@@ -39,6 +42,72 @@ async function imageToDataUri(filePath: string): Promise<string> {
   return `data:image/${ext};base64,${buffer.toString("base64")}`;
 }
 
+function buildVisionRequestBody(
+  enrichment: ReturnType<typeof getLibraryConfig>["enrichment"],
+  dataUri: string,
+  existingPrompt: string | null,
+): Record<string, unknown> {
+  return {
+    model: enrichment.visionModel || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: OUTPUT_INSTRUCTIONS },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: `Existing prompt context: ${existingPrompt ?? "(none)"}` },
+          { type: "image_url", image_url: { url: dataUri } },
+        ],
+      },
+    ],
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+  };
+}
+
+const VisionChatResponseSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        message: z.object({ content: z.string().optional() }).optional(),
+      }),
+    )
+    .optional(),
+});
+
+function normalizeEnrichmentResult(parsed: Partial<EnrichmentResult>): EnrichmentResult {
+  return {
+    caption: parsed.caption ?? "",
+    description: parsed.description ?? "",
+    suggested_tags: parsed.suggested_tags ?? [],
+    characters: parsed.characters ?? [],
+    styles: parsed.styles ?? [],
+    quality_notes: parsed.quality_notes ?? [],
+    metadata: parsed.metadata ?? {},
+  };
+}
+
+async function requestVisionCompletion(
+  enrichment: ReturnType<typeof getLibraryConfig>["enrichment"],
+  dataUri: string,
+  existingPrompt: string | null,
+): Promise<string | undefined> {
+  const body = buildVisionRequestBody(enrichment, dataUri, existingPrompt);
+  const res = await fetch(enrichment.visionApiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(enrichment.visionApiKey ? { authorization: `Bearer ${enrichment.visionApiKey}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    logger.warn({ status: res.status }, "Vision provider returned non-OK status");
+    return undefined;
+  }
+  const json = VisionChatResponseSchema.parse(await res.json());
+  return json.choices?.[0]?.message?.content;
+}
+
 /**
  * Call the configured vision provider.  Uses an OpenAI-compatible chat shape by
  * default (works with OpenAI, Ollama, LM Studio, vLLM, etc.).  Returns the raw
@@ -48,46 +117,10 @@ async function callVisionProvider(filePath: string, existingPrompt: string | nul
   const { enrichment } = getLibraryConfig();
   try {
     const dataUri = await imageToDataUri(filePath);
-    const body = {
-      model: enrichment.visionModel || "gpt-4o-mini",
-      messages: [
-        { role: "system", content: OUTPUT_INSTRUCTIONS },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: `Existing prompt context: ${existingPrompt ?? "(none)"}` },
-            { type: "image_url", image_url: { url: dataUri } },
-          ],
-        },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    };
-    const res = await fetch(enrichment.visionApiUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(enrichment.visionApiKey ? { authorization: `Bearer ${enrichment.visionApiKey}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      logger.warn({ status: res.status }, "Vision provider returned non-OK status");
-      return null;
-    }
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content;
+    const content = await requestVisionCompletion(enrichment, dataUri, existingPrompt);
     if (!content) return null;
     const parsed = JSON.parse(content) as Partial<EnrichmentResult>;
-    return {
-      caption: parsed.caption ?? "",
-      description: parsed.description ?? "",
-      suggested_tags: parsed.suggested_tags ?? [],
-      characters: parsed.characters ?? [],
-      styles: parsed.styles ?? [],
-      quality_notes: parsed.quality_notes ?? [],
-      metadata: parsed.metadata ?? {},
-    };
+    return normalizeEnrichmentResult(parsed);
   } catch (error) {
     logger.warn({ err: error }, "Vision enrichment call failed");
     return null;

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import {
   getImage,
@@ -11,11 +13,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: Promise<{ imageId: string }> };
+const RouteContextSchema = z.object({ params: z.custom<Promise<Record<"imageId", string>>>() });
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { imageId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { imageId } = await params;
     try {
       // Light catalog passthrough — the panel/detail page render only curated
       // fields, so skip the /detail fan-out (search+graph) AND the heavy
@@ -37,9 +40,10 @@ export async function GET(_request: Request, context: RouteContext) {
  * negative. Proxies the gateway PATCH /images/{sha} (catalog truth). A gateway
  * 404 means the image is not in the library.
  */
-export async function PATCH(request: Request, context: RouteContext) {
+export async function PATCH(request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { imageId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { imageId } = await params;
     const body = (await request.json()) as ImagePatchBody;
     try {
       return jsonOk(await patchImage(imageId, body));
@@ -57,9 +61,10 @@ export async function PATCH(request: Request, context: RouteContext) {
  * the catalog record + search vector + graph node — NOT the source file on
  * disk. A gateway 404 means the image is not in the library.
  */
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(_request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { imageId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { imageId } = await params;
     try {
       return jsonOk(await deleteImage(imageId));
     } catch (e) {

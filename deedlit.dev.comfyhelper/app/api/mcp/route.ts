@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { mcpRpc } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ToolsListResponseSchema = z.object({
+  result: z
+    .object({
+      tools: z.array(z.object({ name: z.string(), description: z.string() })).optional(),
+    })
+    .optional(),
+});
 
 /**
  * MCP-over-HTTP endpoint. comfyhelper is UI-only; the MCP tool surface now lives
@@ -29,13 +38,11 @@ export async function POST(request: Request) {
 
 /** Discovery: list the gateway's MCP tools without JSON-RPC framing. */
 export async function GET() {
-  const res = (await mcpRpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })) as {
-    result?: { tools?: Array<{ name: string; description: string }> };
-  };
+  const res = ToolsListResponseSchema.parse(await mcpRpc({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
   return NextResponse.json({
     server: "comfyhelper-image-library",
     transport: "http-jsonrpc",
     proxiedTo: "deedlit.api",
-    tools: (res?.result?.tools ?? []).map((t) => ({ name: t.name, description: t.description })),
+    tools: (res.result?.tools ?? []).map((t) => ({ name: t.name, description: t.description })),
   });
 }

@@ -1,10 +1,12 @@
+import { z } from "zod";
+
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { getImage, GatewayError } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: Promise<{ imageId: string }> };
+const RouteContextSchema = z.object({ params: z.custom<Promise<Record<"imageId", string>>>() });
 
 /**
  * RAW full catalog record for ONE image — the heavy fields the lightweight
@@ -14,9 +16,10 @@ type RouteContext = { params: Promise<{ imageId: string }> };
  * every browse page. Resolves via the gateway detail fan-out and returns just
  * its `image` (the catalog truth). A gateway 404 means the image is gone.
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { imageId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { imageId } = await params;
     try {
       // Full catalog record (incl. workflow_json/api_prompt_json) for the raw-JSON
       // inspector — but a pure catalog read, not the /detail fan-out, so opening a

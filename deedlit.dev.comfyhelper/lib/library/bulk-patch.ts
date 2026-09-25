@@ -12,53 +12,78 @@
  * grid rows) and which did not.
  */
 
-import type { ImagePatchBody } from "@/lib/api-client";
+import { z } from "zod";
+import { ImagePatchBodySchema } from "@/lib/api-client";
 
-export interface BulkPatchOutcome {
+export const BulkPatchFailureSchema = z.object({
+  id: z.string(),
+  error: z.string(),
+});
+export type BulkPatchFailure = z.infer<typeof BulkPatchFailureSchema>;
+
+export const BulkPatchOutcomeSchema = z.object({
   /** Ids whose catalog record was updated. */
-  updated: string[];
+  updated: z.array(z.string()),
   /** Ids that could not be updated, with the surfaced reason. */
-  failed: { id: string; error: string }[];
-}
+  failed: z.array(BulkPatchFailureSchema),
+});
+export type BulkPatchOutcome = z.infer<typeof BulkPatchOutcomeSchema>;
 
-export interface BulkPatchOptions {
+export const BulkPatchOptionsSchema = z.object({
   /** Max in-flight patches. Clamped to >= 1. Default 4. */
-  concurrency?: number;
-  signal?: AbortSignal;
+  concurrency: z.number().optional(),
+  signal: z.custom<AbortSignal>().optional(),
+});
+export type BulkPatchOptions = z.infer<typeof BulkPatchOptionsSchema>;
+
+export const BulkPatchRequestSchema = z.object({
+  id: z.string(),
+  body: ImagePatchBodySchema,
+});
+export type BulkPatchRequest = z.infer<typeof BulkPatchRequestSchema>;
+
+const PatchErrorResponseSchema = z.object({
+  error: z.string().optional(),
+});
+
+async function patchOne(
+  p: BulkPatchRequest,
+  signal: AbortSignal | undefined,
+  updated: string[],
+  failed: BulkPatchFailure[],
+): Promise<void> {
+  try {
+    const res = await fetch(`/api/library/images/${encodeURIComponent(p.id)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(p.body),
+      signal,
+    });
+    if (res.ok) {
+      updated.push(p.id);
+      return;
+    }
+    const parsed = PatchErrorResponseSchema.safeParse(await res.json().catch(() => ({})));
+    const error = (parsed.success ? parsed.data.error : undefined) ?? `HTTP ${res.status}`;
+    failed.push({ id: p.id, error });
+  } catch (e) {
+    failed.push({ id: p.id, error: e instanceof Error ? e.message : "Request failed" });
+  }
 }
 
 export async function patchImages(
-  patches: { id: string; body: ImagePatchBody }[],
+  patches: BulkPatchRequest[],
   opts: BulkPatchOptions = {},
 ): Promise<BulkPatchOutcome> {
   const updated: string[] = [];
-  const failed: { id: string; error: string }[] = [];
+  const failed: BulkPatchFailure[] = [];
   const queue = [...patches];
-
-  const patchOne = async (p: { id: string; body: ImagePatchBody }): Promise<void> => {
-    try {
-      const res = await fetch(`/api/library/images/${encodeURIComponent(p.id)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(p.body),
-        signal: opts.signal,
-      });
-      if (res.ok) {
-        updated.push(p.id);
-        return;
-      }
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      failed.push({ id: p.id, error: body.error ?? `HTTP ${res.status}` });
-    } catch (e) {
-      failed.push({ id: p.id, error: e instanceof Error ? e.message : "Request failed" });
-    }
-  };
 
   // Each worker drains the shared queue; `shift()` is synchronous so no id is
   // patched twice.
   const worker = async (): Promise<void> => {
     for (let p = queue.shift(); p !== undefined; p = queue.shift()) {
-      await patchOne(p);
+      await patchOne(p, opts.signal, updated, failed);
     }
   };
   const lanes = Math.min(Math.max(1, opts.concurrency ?? 4), patches.length || 1);

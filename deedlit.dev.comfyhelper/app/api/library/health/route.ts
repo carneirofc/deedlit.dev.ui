@@ -1,21 +1,24 @@
+import { z } from "zod";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { getHealth, GatewayError, type ServiceHealth } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ComponentStatus = "ok" | "degraded" | "down";
+const ComponentStatusSchema = z.enum(["ok", "degraded", "down"]);
 
-interface Dependency {
-  name: string;
-  ready: boolean;
-}
+const DependencySchema = z.object({
+  name: z.string(),
+  ready: z.boolean(),
+});
+type Dependency = z.infer<typeof DependencySchema>;
 
-interface ComponentHealth {
-  name: string;
-  status: ComponentStatus;
-  dependencies: Dependency[];
-}
+const ComponentHealthSchema = z.object({
+  name: z.string(),
+  status: ComponentStatusSchema,
+  dependencies: z.array(DependencySchema),
+});
+type ComponentHealth = z.infer<typeof ComponentHealthSchema>;
 
 /**
  * Maps a downstream readiness flag (as forwarded by the gateway in
@@ -39,7 +42,7 @@ function dependencies(detail: ServiceHealth["detail"]): Dependency[] {
   const deps: Dependency[] = [];
   for (const [key, value] of Object.entries(detail)) {
     if (typeof value !== "boolean") continue;
-    deps.push({ name: DEP_LABELS[key] ?? key, ready: value });
+    deps.push(DependencySchema.parse({ name: DEP_LABELS[key] ?? key, ready: value }));
   }
   return deps;
 }
@@ -59,7 +62,7 @@ export async function GET() {
       const health = await getHealth();
       const upstream = health.services ?? [];
 
-      const components: ComponentHealth[] = [
+      const components: ComponentHealth[] = z.array(ComponentHealthSchema).parse([
         // The gateway answered, so it is up by definition.
         { name: "gateway", status: "ok", dependencies: [] },
         ...upstream.map((s) => ({
@@ -67,7 +70,7 @@ export async function GET() {
           status: s.status,
           dependencies: dependencies(s.detail),
         })),
-      ];
+      ]);
 
       const services: Record<string, boolean> = {};
       for (const s of upstream) services[s.name] = s.status === "ok";

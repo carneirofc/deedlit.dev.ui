@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Changed
+- `deedlit.dev.comfyhelper`: all props and data derived from zod schemas, route handlers/stores/fetches parse at the boundary, large pages (`library`, `[imageId]`, `admin`, `admin/db`, `compare`, `settings`, `Lightbox`) split into hooks and subcomponents.
 - `deedlit.ingest`: queue payloads, catalog records, job snapshots and config as pydantic models (wire formats unchanged), split `_run_reconcile`/`_run_folder`/pipeline hotspots, no `Any`; malformed stored blobs and queue payloads are still tolerated.
 - `deedlit.catalog`: typed row mapping and response models in the repository/routers, `ImageListQuery` query model for `GET /images` (same query params), split `upsert_image`/`library_stats`/migration `reconcile`, `JsonValue` for opaque JSON columns, no `Any`.
 - `deedlit.vision`: typed embedding boundary over torch/open_clip (concrete `list[float]` outputs), split model loading, no `Any`.

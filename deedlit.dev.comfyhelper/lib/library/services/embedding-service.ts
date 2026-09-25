@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -27,17 +28,32 @@ export function isZeroVector(vec: number[]): boolean {
   return true;
 }
 
-export interface VectorStats {
-  dims: number;
+const VisionHealthResponseSchema = z.object({
+  model_preset: z.string().optional(),
+  expected_dim: z.number().optional(),
+  device: z.string().optional(),
+});
+
+const VisionEmbeddingResponseSchema = z.object({
+  embedding: z.array(z.number()),
+});
+
+const CachedEmbeddingSchema = z.object({
+  vector: z.array(z.number()).optional(),
+});
+
+export const VectorStatsSchema = z.object({
+  dims: z.number(),
   /** L2 magnitude before normalization (≈1 for a healthy stored vector). */
-  norm: number;
-  isZero: boolean;
-  nonZero: number;
-  min: number;
-  max: number;
+  norm: z.number(),
+  isZero: z.boolean(),
+  nonZero: z.number(),
+  min: z.number(),
+  max: z.number(),
   /** First few components, for eyeballing. */
-  sample: number[];
-}
+  sample: z.array(z.number()),
+});
+export type VectorStats = z.infer<typeof VectorStatsSchema>;
 
 /** Cheap diagnostics for a single embedding vector (debug surface). */
 export function vectorStats(vec: number[]): VectorStats {
@@ -62,13 +78,14 @@ export function vectorStats(vec: number[]): VectorStats {
   };
 }
 
-export interface EmbeddingDiagnostics {
-  provider: string;
-  dimensions: number;
+export const EmbeddingDiagnosticsSchema = z.object({
+  provider: z.string(),
+  dimensions: z.number(),
   /** True only when a learned image embedder (CLIP) is configured. */
-  hasExternalImageEmbeddings: boolean;
-  clipVisionApiUrl: string | null;
-}
+  hasExternalImageEmbeddings: z.boolean(),
+  clipVisionApiUrl: z.string().nullable(),
+});
+export type EmbeddingDiagnostics = z.infer<typeof EmbeddingDiagnosticsSchema>;
 
 export function getEmbeddingDiagnostics(): EmbeddingDiagnostics {
   const { clipVisionApiUrl, embeddingDimensions } = getLibraryConfig();
@@ -80,18 +97,19 @@ export function getEmbeddingDiagnostics(): EmbeddingDiagnostics {
   };
 }
 
-export interface VisionApiHealth {
+export const VisionApiHealthSchema = z.object({
   /** Whether CLIP_VISION_API_URL is set at all. */
-  configured: boolean;
-  url: string | null;
+  configured: z.boolean(),
+  url: z.string().nullable(),
   /** Whether the vision /health endpoint actually answered. */
-  reachable: boolean;
-  modelPreset?: string;
+  reachable: z.boolean(),
+  modelPreset: z.string().optional(),
   /** Embedding dim the vision model produces (must equal EMBEDDING_DIMENSIONS). */
-  expectedDim?: number;
-  device?: string;
-  detail?: string;
-}
+  expectedDim: z.number().optional(),
+  device: z.string().optional(),
+  detail: z.string().optional(),
+});
+export type VisionApiHealth = z.infer<typeof VisionApiHealthSchema>;
 
 /**
  * Actively probe the deedlit.vision CLIP API. Unlike {@link hasExternalImageEmbeddings}
@@ -113,7 +131,7 @@ export async function pingVisionApi(): Promise<VisionApiHealth> {
     if (!res.ok) {
       return { configured: true, url: clipVisionApiUrl, reachable: false, detail: `vision /health HTTP ${res.status}` };
     }
-    const json = (await res.json()) as { model_preset?: string; expected_dim?: number; device?: string };
+    const json = VisionHealthResponseSchema.parse(await res.json());
     return {
       configured: true,
       url: clipVisionApiUrl,
@@ -155,7 +173,7 @@ async function callVisionApiImageBuffer(
     const text = await res.text().catch(() => "");
     throw new Error(`deedlit.vision /embed/image ${res.status}: ${text}`);
   }
-  const json = await res.json() as { embedding: number[] };
+  const json = VisionEmbeddingResponseSchema.parse(await res.json());
   return json.embedding;
 }
 
@@ -184,7 +202,7 @@ async function callVisionApiText(text: string): Promise<number[]> {
     const t = await res.text().catch(() => "");
     throw new Error(`deedlit.vision /embed/text ${res.status}: ${t}`);
   }
-  const json = await res.json() as { embedding: number[] };
+  const json = VisionEmbeddingResponseSchema.parse(await res.json());
   return json.embedding;
 }
 
@@ -260,7 +278,7 @@ export async function getOrComputeImageEmbedding(imagePath: string, sha256: stri
   const cached = await getObjectBuffer(key);
   if (cached) {
     try {
-      const parsed = JSON.parse(cached.toString("utf8")) as { vector?: number[] };
+      const parsed = CachedEmbeddingSchema.parse(JSON.parse(cached.toString("utf8")));
       // Reject cached zero vectors — legacy poison from the old "return zeros on
       // failure" path. Recompute instead of serving a dead embedding.
       if (

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { z } from "zod";
 
 /**
  * Central configuration for the image-library stack (PostgreSQL + Neo4j +
@@ -26,13 +27,45 @@ function envBool(key: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
-export type VisionProvider = "none" | "openai" | "anthropic" | "ollama" | "custom";
+export const VisionProviderSchema = z.enum(["none", "openai", "anthropic", "ollama", "custom"]);
+export type VisionProvider = z.infer<typeof VisionProviderSchema>;
 
-export interface LibraryConfig {
-  databaseUrl: string;
-  neo4j: { uri: string; user: string; password: string };
-  qdrantUrl: string;
-  qdrantApiKey: string | undefined;
+const Neo4jConfigSchema = z.object({
+  uri: z.string(),
+  user: z.string(),
+  password: z.string(),
+});
+
+const EnrichmentConfigSchema = z.object({
+  enabled: z.boolean(),
+  visionProvider: VisionProviderSchema,
+  visionApiUrl: z.string(),
+  visionApiKey: z.string(),
+  visionModel: z.string(),
+  textEmbeddingProvider: z.string(),
+  imageEmbeddingProvider: z.string(),
+});
+
+const ThumbnailSizesSchema = z.object({
+  small: z.number(),
+  medium: z.number(),
+});
+
+const ObjectStoreConfigSchema = z.object({
+  enabled: z.boolean(),
+  endpoint: z.string(),
+  region: z.string(),
+  accessKey: z.string(),
+  secretKey: z.string(),
+  bucket: z.string(),
+  forcePathStyle: z.boolean(),
+});
+
+export const LibraryConfigSchema = z.object({
+  databaseUrl: z.string(),
+  neo4j: Neo4jConfigSchema,
+  qdrantUrl: z.string(),
+  qdrantApiKey: z.string().optional(),
   /**
    * Public, browser-reachable base URL of this comfyhelper instance (no
    * trailing slash).  Used to build absolute proxy URLs stored in the Qdrant
@@ -40,59 +73,68 @@ export interface LibraryConfig {
    * instead of pointing at an unreachable local filesystem path.
    * Example: http://localhost:3000
    */
-  publicBaseUrl: string;
-  imageLibraryRoot: string;
-  thumbnailRoot: string;
-  enrichment: {
-    enabled: boolean;
-    visionProvider: VisionProvider;
-    visionApiUrl: string;
-    visionApiKey: string;
-    visionModel: string;
-    textEmbeddingProvider: string;
-    imageEmbeddingProvider: string;
-  };
-  mcpEnabled: boolean;
+  publicBaseUrl: z.string(),
+  imageLibraryRoot: z.string(),
+  thumbnailRoot: z.string(),
+  enrichment: EnrichmentConfigSchema,
+  mcpEnabled: z.boolean(),
   /**
    * deedlit.vision CLIP embedding API endpoint.  Image and text embeddings are
    * generated exclusively by this external service — there is no in-process
    * fallback, so this MUST be set for ingest / search to work.
    * Example: http://localhost:8000
    */
-  clipVisionApiUrl: string;
+  clipVisionApiUrl: z.string(),
   /**
    * deedlit.metadata extraction API endpoint.  Ingest sends image bytes here to
    * parse PNG text chunks (A1111 `parameters` / ComfyUI node graph) instead of
    * parsing in-process.  Example: http://localhost:8005 (local) /
    * http://metadata:8000 (compose).
    */
-  metadataApiUrl: string;
+  metadataApiUrl: z.string(),
   /**
    * Dimensionality of embedding vectors stored in Qdrant.  Must match the
    * model output — 1024 for deedlit.vision vit_h, 1280 for big_g, 512 for
    * the local pixel-histogram fallback.  Changing this requires a Qdrant
    * rebuild (/api/library/maintenance/rebuild-qdrant).
    */
-  embeddingDimensions: number;
-  thumbnailSizes: { small: number; medium: number };
-  qdrantCollection: string;
+  embeddingDimensions: z.number(),
+  thumbnailSizes: ThumbnailSizesSchema,
+  qdrantCollection: z.string(),
   /**
    * RustFS / S3-compatible object storage for thumbnails and cached artifacts
    * (embeddings) so they are not recomputed at runtime.  When disabled, those
    * artifacts fall back to the local filesystem.
    */
-  objectStore: {
-    enabled: boolean;
-    endpoint: string;
-    region: string;
-    accessKey: string;
-    secretKey: string;
-    bucket: string;
-    forcePathStyle: boolean;
+  objectStore: ObjectStoreConfigSchema,
+});
+export type LibraryConfig = z.infer<typeof LibraryConfigSchema>;
+
+let cached: LibraryConfig | null = null;
+
+function buildEnrichmentConfig(): LibraryConfig["enrichment"] {
+  return {
+    enabled: envBool("ENABLE_EXTERNAL_VISION_ENRICHMENT", false),
+    visionProvider: VisionProviderSchema.parse(envString("EXTERNAL_VISION_PROVIDER", "none")),
+    visionApiUrl: envString("EXTERNAL_VISION_API_URL", ""),
+    visionApiKey: envString("EXTERNAL_VISION_API_KEY", ""),
+    visionModel: envString("EXTERNAL_VISION_MODEL", ""),
+    textEmbeddingProvider: envString("EXTERNAL_TEXT_EMBEDDING_PROVIDER", "local"),
+    imageEmbeddingProvider: envString("EXTERNAL_IMAGE_EMBEDDING_PROVIDER", "local"),
   };
 }
 
-let cached: LibraryConfig | null = null;
+function buildObjectStoreConfig(): LibraryConfig["objectStore"] {
+  return {
+    enabled: envBool("OBJECT_STORE_ENABLED", true),
+    endpoint: envString("OBJECT_STORE_ENDPOINT", "http://localhost:9000"),
+    region: envString("OBJECT_STORE_REGION", "us-east-1"),
+    accessKey: envString("OBJECT_STORE_ACCESS_KEY", "rustfsadmin"),
+    secretKey: envString("OBJECT_STORE_SECRET_KEY", "rustfsadmin"),
+    bucket: envString("OBJECT_STORE_BUCKET", "comfyhelper"),
+    forcePathStyle: envBool("OBJECT_STORE_FORCE_PATH_STYLE", true),
+  };
+}
 
 export function getLibraryConfig(): LibraryConfig {
   if (cached) {
@@ -117,15 +159,7 @@ export function getLibraryConfig(): LibraryConfig {
     publicBaseUrl: envString("COMFYHELPER_PUBLIC_URL", "http://localhost:3000").replace(/\/+$/, ""),
     imageLibraryRoot: path.resolve(envString("IMAGE_LIBRARY_ROOT", path.join(process.cwd(), "data", "library"))),
     thumbnailRoot: path.resolve(envString("THUMBNAIL_ROOT", path.join(process.cwd(), "data", "thumbnails"))),
-    enrichment: {
-      enabled: envBool("ENABLE_EXTERNAL_VISION_ENRICHMENT", false),
-      visionProvider: envString("EXTERNAL_VISION_PROVIDER", "none") as VisionProvider,
-      visionApiUrl: envString("EXTERNAL_VISION_API_URL", ""),
-      visionApiKey: envString("EXTERNAL_VISION_API_KEY", ""),
-      visionModel: envString("EXTERNAL_VISION_MODEL", ""),
-      textEmbeddingProvider: envString("EXTERNAL_TEXT_EMBEDDING_PROVIDER", "local"),
-      imageEmbeddingProvider: envString("EXTERNAL_IMAGE_EMBEDDING_PROVIDER", "local"),
-    },
+    enrichment: buildEnrichmentConfig(),
     mcpEnabled: envBool("MCP_ENABLED", true),
     clipVisionApiUrl,
     metadataApiUrl: envString("METADATA_API_URL", "http://localhost:8005").replace(/\/+$/, ""),
@@ -135,15 +169,7 @@ export function getLibraryConfig(): LibraryConfig {
     // class; `small` feeds dense grids/filmstrips.
     thumbnailSizes: { small: 256, medium: 1080 },
     qdrantCollection: envString("QDRANT_COLLECTION", "images"),
-    objectStore: {
-      enabled: envBool("OBJECT_STORE_ENABLED", true),
-      endpoint: envString("OBJECT_STORE_ENDPOINT", "http://localhost:9000"),
-      region: envString("OBJECT_STORE_REGION", "us-east-1"),
-      accessKey: envString("OBJECT_STORE_ACCESS_KEY", "rustfsadmin"),
-      secretKey: envString("OBJECT_STORE_SECRET_KEY", "rustfsadmin"),
-      bucket: envString("OBJECT_STORE_BUCKET", "comfyhelper"),
-      forcePathStyle: envBool("OBJECT_STORE_FORCE_PATH_STYLE", true),
-    },
+    objectStore: buildObjectStoreConfig(),
   };
 
   return cached;

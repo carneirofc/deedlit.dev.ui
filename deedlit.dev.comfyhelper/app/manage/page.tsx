@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Manage hub — one landing page for every control/management surface, collapsed
@@ -7,13 +8,14 @@ import type { ReactNode } from "react";
 // deep-links to the dedicated page that owns that concern.
 // ---------------------------------------------------------------------------
 
-interface ManageDestination {
-  href: string;
-  title: string;
-  description: string;
-  icon: ReactNode;
-  testId: string;
-}
+const ManageDestinationSchema = z.object({
+  href: z.string(),
+  title: z.string(),
+  description: z.string(),
+  icon: z.custom<ReactNode>(),
+  testId: z.string(),
+});
+type ManageDestination = z.infer<typeof ManageDestinationSchema>;
 
 const iconCls = "h-6 w-6 shrink-0 fill-none stroke-accent-cyan";
 

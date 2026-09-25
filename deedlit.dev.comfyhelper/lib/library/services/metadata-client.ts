@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -13,45 +14,49 @@ import { getLibraryConfig } from "@/lib/library/config";
  */
 
 /** One referenced asset resolved from the ComfyUI node graph. */
-export interface ExtractAssetRef {
-  name: string;
-  hash?: string | null;
-}
+export const ExtractAssetRefSchema = z.object({
+  name: z.string(),
+  hash: z.string().nullable().optional(),
+});
+export type ExtractAssetRef = z.infer<typeof ExtractAssetRefSchema>;
 
 /** Full asset-reference graph (all six categories always present). */
-export interface ExtractReferences {
-  checkpoints: ExtractAssetRef[];
-  loras: ExtractAssetRef[];
-  embeddings: ExtractAssetRef[];
-  vae: ExtractAssetRef[];
-  controlnets: ExtractAssetRef[];
-  upscalers: ExtractAssetRef[];
-}
+export const ExtractReferencesSchema = z.object({
+  checkpoints: z.array(ExtractAssetRefSchema),
+  loras: z.array(ExtractAssetRefSchema),
+  embeddings: z.array(ExtractAssetRefSchema),
+  vae: z.array(ExtractAssetRefSchema),
+  controlnets: z.array(ExtractAssetRefSchema),
+  upscalers: z.array(ExtractAssetRefSchema),
+});
+export type ExtractReferences = z.infer<typeof ExtractReferencesSchema>;
 
 /** Generation params as produced by the metadata service (snake-ish contract). */
-export interface ExtractParams {
-  seed?: number | null;
-  steps?: number | null;
-  cfg?: number | null;
-  sampler?: string | null;
-  scheduler?: string | null;
-  denoise?: number | null;
-  clipskip?: number | null;
-  width?: number | null;
-  height?: number | null;
-}
+export const ExtractParamsSchema = z.object({
+  seed: z.number().nullable().optional(),
+  steps: z.number().nullable().optional(),
+  cfg: z.number().nullable().optional(),
+  sampler: z.string().nullable().optional(),
+  scheduler: z.string().nullable().optional(),
+  denoise: z.number().nullable().optional(),
+  clipskip: z.number().nullable().optional(),
+  width: z.number().nullable().optional(),
+  height: z.number().nullable().optional(),
+});
+export type ExtractParams = z.infer<typeof ExtractParamsSchema>;
 
 /** The `ExtractResult` payload returned by `POST /extract` (200). */
-export interface ExtractResult {
-  sourceTool: "a1111" | "comfyui" | "unknown";
-  prompt?: string | null;
-  negative?: string | null;
-  tags: string[];
-  params: ExtractParams;
-  references: ExtractReferences;
-  workflow_json?: Record<string, unknown> | null;
-  api_prompt_json?: Record<string, unknown> | null;
-}
+export const ExtractResultSchema = z.object({
+  sourceTool: z.enum(["a1111", "comfyui", "unknown"]),
+  prompt: z.string().nullable().optional(),
+  negative: z.string().nullable().optional(),
+  tags: z.array(z.string()),
+  params: ExtractParamsSchema,
+  references: ExtractReferencesSchema,
+  workflow_json: z.record(z.string(), z.unknown()).nullable().optional(),
+  api_prompt_json: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type ExtractResult = z.infer<typeof ExtractResultSchema>;
 
 /** Thrown when the metadata service is not configured. */
 export class MetadataServiceNotConfiguredError extends Error {

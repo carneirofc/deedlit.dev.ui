@@ -1,4 +1,8 @@
 import type { PoolClient } from "pg";
+import { z } from "zod";
+
+const IdRowSchema = z.object({ id: z.string() });
+type IdRow = z.infer<typeof IdRowSchema>;
 
 /**
  * Infer a coarse model family from a checkpoint/model name so search filters
@@ -19,7 +23,7 @@ export async function upsertModel(
   name: string,
   family: string | null = null,
 ): Promise<string> {
-  const result = await client.query<{ id: string }>(
+  const result = await client.query<IdRow>(
     `INSERT INTO models (name, family)
      VALUES ($1, $2)
      ON CONFLICT (name) DO UPDATE SET family = COALESCE(models.family, EXCLUDED.family)
@@ -34,7 +38,7 @@ export async function upsertCheckpoint(
   name: string,
   modelId: string | null = null,
 ): Promise<string> {
-  const result = await client.query<{ id: string }>(
+  const result = await client.query<IdRow>(
     `INSERT INTO checkpoints (name, model_id)
      VALUES ($1, $2)
      ON CONFLICT (name) DO UPDATE SET model_id = COALESCE(checkpoints.model_id, EXCLUDED.model_id)
@@ -45,7 +49,7 @@ export async function upsertCheckpoint(
 }
 
 export async function upsertLora(client: PoolClient, name: string): Promise<string> {
-  const result = await client.query<{ id: string }>(
+  const result = await client.query<IdRow>(
     `INSERT INTO loras (name)
      VALUES ($1)
      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name

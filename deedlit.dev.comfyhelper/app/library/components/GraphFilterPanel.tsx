@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { z } from "zod";
 
 import type { GraphScope } from "@/lib/library/schemas";
 
@@ -23,31 +24,26 @@ const btn =
  * for one value. Suggestions come from Neo4j via /api/library/graph/entities,
  * ranked most-used first; the user can still type a value that isn't listed.
  */
-function EntitySuggest({
-  type,
-  value,
-  onChange,
-  onSelect,
-  placeholder,
-  disabled,
-}: {
+const EntitySuggestPropsSchema = z.object({
   /** Lowercased graph type/kind to fetch options for (tag, checkpoint, lora, …). */
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
+  type: z.string(),
+  value: z.string(),
+  onChange: z.custom<(v: string) => void>(),
   /** Commit a chosen/typed value (click a suggestion or press Enter). */
-  onSelect: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const [options, setOptions] = useState<string[]>([]);
-  const listId = useId();
+  onSelect: z.custom<(v: string) => void>(),
+  placeholder: z.string().optional(),
+  disabled: z.boolean().optional(),
+});
+type EntitySuggestProps = z.infer<typeof EntitySuggestPropsSchema>;
 
-  // Debounced, server-backed options for the current (type, prefix). The latest
-  // result wins; a stale in-flight one is dropped. Refetches when the type
-  // changes too, so switching Tag → LoRA reloads that type's options.
+/**
+ * Debounced, server-backed options for the current (type, prefix). The latest
+ * result wins; a stale in-flight one is dropped. Refetches when the type
+ * changes too, so switching Tag → LoRA reloads that type's options.
+ */
+function useEntitySuggestOptions(type: string, value: string, open: boolean, disabled?: boolean) {
+  const [options, setOptions] = useState<string[]>([]);
+
   useEffect(() => {
     if (disabled || !open || !type) return;
     let alive = true;
@@ -64,9 +60,69 @@ function EntitySuggest({
     return () => { alive = false; ac.abort(); clearTimeout(handle); };
   }, [type, value, open, disabled]);
 
+  return options;
+}
+
+const EntitySuggestListPropsSchema = z.object({
+  listId: z.string(),
+  options: z.array(z.string()),
+  active: z.number(),
+  onChoose: z.custom<(v: string) => void>(),
+  onHover: z.custom<(i: number) => void>(),
+});
+type EntitySuggestListProps = z.infer<typeof EntitySuggestListPropsSchema>;
+
+function EntitySuggestList({ listId, options, active, onChoose, onHover }: EntitySuggestListProps) {
+  return (
+    <ul
+      id={listId}
+      role="listbox"
+      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-ui-border/70 bg-ui-bg-soft p-1 shadow-lg"
+    >
+      {options.map((o, i) => (
+        <li key={o} role="option" aria-selected={i === active}>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onChoose(o); }}
+            onMouseEnter={() => onHover(i)}
+            className={`w-full truncate rounded-md px-2 py-1 text-left text-ui-xs transition ${
+              i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg"
+            }`}
+            data-testid={`graph-filter-entity-option-${o}`}
+          >
+            {o}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function EntitySuggest({ type, value, onChange, onSelect, placeholder, disabled }: EntitySuggestProps) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const listId = useId();
+  const options = useEntitySuggestOptions(type, value, open, disabled);
+
   const choose = (v: string) => {
     onSelect(v);
     setOpen(false);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      choose(open && options[active] ? options[active] : value);
+    } else if (e.key === "ArrowDown" && options.length) {
+      e.preventDefault();
+      setOpen(true);
+      setActive((a) => Math.min(a + 1, options.length - 1));
+    } else if (e.key === "ArrowUp" && options.length) {
+      e.preventDefault();
+      setActive((a) => Math.max(a - 1, 0));
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
   };
 
   return (
@@ -79,21 +135,7 @@ function EntitySuggest({
         onChange={(e) => { onChange(e.target.value); setOpen(true); setActive(0); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            choose(open && options[active] ? options[active] : value);
-          } else if (e.key === "ArrowDown" && options.length) {
-            e.preventDefault();
-            setOpen(true);
-            setActive((a) => Math.min(a + 1, options.length - 1));
-          } else if (e.key === "ArrowUp" && options.length) {
-            e.preventDefault();
-            setActive((a) => Math.max(a - 1, 0));
-          } else if (e.key === "Escape") {
-            setOpen(false);
-          }
-        }}
+        onKeyDown={onKeyDown}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
@@ -101,27 +143,7 @@ function EntitySuggest({
         data-testid="graph-filter-entity-input"
       />
       {open && !disabled && options.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-ui-border/70 bg-ui-bg-soft p-1 shadow-lg"
-        >
-          {options.map((o, i) => (
-            <li key={o} role="option" aria-selected={i === active}>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); choose(o); }}
-                onMouseEnter={() => setActive(i)}
-                className={`w-full truncate rounded-md px-2 py-1 text-left text-ui-xs transition ${
-                  i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg"
-                }`}
-                data-testid={`graph-filter-entity-option-${o}`}
-              >
-                {o}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <EntitySuggestList listId={listId} options={options} active={active} onChoose={choose} onHover={setActive} />
       )}
     </div>
   );
@@ -134,15 +156,14 @@ function EntitySuggest({
  * instead of guessing its exact spelling. Previews the match count via the graph
  * neighbours endpoint so the user sees how constraining the scope is.
  */
-export function GraphFilterPanel({
-  value,
-  onChange,
-  relatedImageId,
-}: {
-  value: GraphScope | null;
-  onChange: (scope: GraphScope | null) => void;
-  relatedImageId?: string;
-}) {
+const GraphFilterPanelPropsSchema = z.object({
+  value: z.custom<GraphScope | null>(),
+  onChange: z.custom<(scope: GraphScope | null) => void>(),
+  relatedImageId: z.string().optional(),
+});
+type GraphFilterPanelProps = z.infer<typeof GraphFilterPanelPropsSchema>;
+
+function useGraphFilterState({ value, onChange, relatedImageId }: GraphFilterPanelProps) {
   const [nodeType, setNodeType] = useState<NodeType>((value?.node?.type as NodeType) ?? "Tag");
   const [text, setText] = useState(value?.node?.value ?? "");
   const [useRelated, setUseRelated] = useState(Boolean(value?.relatedToImageId));
@@ -187,6 +208,45 @@ export function GraphFilterPanel({
     setCount(null);
   };
 
+  return { nodeType, setNodeType, text, setText, useRelated, setUseRelated, count, checking, apply, clear };
+}
+
+const GraphFilterEntityRowPropsSchema = z.object({
+  state: z.custom<ReturnType<typeof useGraphFilterState>>(),
+});
+type GraphFilterEntityRowProps = z.infer<typeof GraphFilterEntityRowPropsSchema>;
+
+function GraphFilterEntityRow({ state }: GraphFilterEntityRowProps) {
+  return (
+    <div className={`flex flex-wrap items-start gap-2 ${state.useRelated ? "opacity-40" : ""}`}>
+      <select
+        className={input}
+        value={state.nodeType}
+        onChange={(e) => { state.setNodeType(e.target.value as NodeType); state.setText(""); }}
+        disabled={state.useRelated}
+        data-testid="graph-filter-node-type-select"
+      >
+        {NODE_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+      <EntitySuggest
+        type={state.nodeType.toLowerCase()}
+        value={state.text}
+        onChange={state.setText}
+        onSelect={(v) => { state.setText(v); void state.apply(v); }}
+        placeholder={`${state.nodeType.toLowerCase()} name — pick from the list, or type…`}
+        disabled={state.useRelated}
+      />
+    </div>
+  );
+}
+
+export function GraphFilterPanel(props: GraphFilterPanelProps) {
+  const { value, relatedImageId } = props;
+  const state = useGraphFilterState(props);
   const active = value !== null;
 
   return (
@@ -195,7 +255,7 @@ export function GraphFilterPanel({
         <span className="text-ui-xs font-semibold text-ui-ink-title">Graph filter (Neo4j)</span>
         {active && (
           <span className="rounded-full bg-accent-cyan/15 px-2 py-0.5 text-ui-2xs text-accent-cyan">
-            {checking ? "…" : count != null ? `${count} match${count === 1 ? "" : "es"}` : "active"}
+            {state.checking ? "…" : state.count != null ? `${state.count} match${state.count === 1 ? "" : "es"}` : "active"}
           </span>
         )}
       </div>
@@ -204,8 +264,8 @@ export function GraphFilterPanel({
         <label className="mb-2 flex cursor-pointer items-center gap-1.5 text-ui-xs text-ui-ink">
           <input
             type="checkbox"
-            checked={useRelated}
-            onChange={(e) => setUseRelated(e.target.checked)}
+            checked={state.useRelated}
+            onChange={(e) => state.setUseRelated(e.target.checked)}
             className="rounded"
             data-testid="graph-filter-use-related-checkbox"
           />
@@ -213,36 +273,14 @@ export function GraphFilterPanel({
         </label>
       )}
 
-      <div className={`flex flex-wrap items-start gap-2 ${useRelated ? "opacity-40" : ""}`}>
-        <select
-          className={input}
-          value={nodeType}
-          onChange={(e) => { setNodeType(e.target.value as NodeType); setText(""); }}
-          disabled={useRelated}
-          data-testid="graph-filter-node-type-select"
-        >
-          {NODE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <EntitySuggest
-          type={nodeType.toLowerCase()}
-          value={text}
-          onChange={setText}
-          onSelect={(v) => { setText(v); void apply(v); }}
-          placeholder={`${nodeType.toLowerCase()} name — pick from the list, or type…`}
-          disabled={useRelated}
-        />
-      </div>
+      <GraphFilterEntityRow state={state} />
 
       <div className="mt-2 flex gap-2">
-        <button className={btn} onClick={() => apply()} disabled={checking} data-testid="graph-filter-apply">
+        <button className={btn} onClick={() => state.apply()} disabled={state.checking} data-testid="graph-filter-apply">
           Apply filter
         </button>
         {active && (
-          <button className={btn} onClick={clear} data-testid="graph-filter-clear">
+          <button className={btn} onClick={state.clear} data-testid="graph-filter-clear">
             Clear
           </button>
         )}

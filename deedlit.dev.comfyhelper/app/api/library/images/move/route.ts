@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { rename } from "node:fs/promises";
 import path from "node:path";
 
@@ -7,10 +8,13 @@ import { getImage, imageToUiDetail } from "@/lib/api-client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface MoveBody {
-  imageIds: string[];
-  targetFolder: string;
-}
+const MoveBodySchema = z.object({
+  imageIds: z.array(z.string()).optional(),
+  targetFolder: z.string().optional(),
+});
+
+const FailedEntrySchema = z.object({ id: z.string(), error: z.string() });
+type FailedEntry = z.infer<typeof FailedEntrySchema>;
 
 /**
  * Bulk filesystem move — relocates image files on disk and returns per-id
@@ -21,15 +25,13 @@ interface MoveBody {
  */
 export async function POST(request: Request) {
   return handleRoute(async () => {
-    const body = (await request.json()) as MoveBody;
-    const { imageIds, targetFolder } = body ?? {};
+    const { imageIds, targetFolder } = MoveBodySchema.parse(await request.json());
 
-    if (!Array.isArray(imageIds) || imageIds.length === 0)
-      return jsonError("imageIds required.", 400);
+    if (!imageIds || imageIds.length === 0) return jsonError("imageIds required.", 400);
     if (!targetFolder?.trim()) return jsonError("targetFolder required.", 400);
 
     const moved: string[] = [];
-    const failed: { id: string; error: string }[] = [];
+    const failed: FailedEntry[] = [];
 
     for (const imageId of imageIds) {
       try {

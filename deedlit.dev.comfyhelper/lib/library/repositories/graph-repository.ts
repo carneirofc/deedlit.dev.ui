@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { runCypher } from "@/lib/library/db/neo4j";
 import type { Graph, GraphScope } from "@/lib/library/schemas";
 
@@ -9,18 +10,19 @@ type GraphEdge = Graph["edges"][number];
  * MERGE nodes/relationships so syncing the same image repeatedly is idempotent.
  */
 
-export interface GraphImageInput {
-  imageId: string;
-  filename: string;
-  thumbnailPath: string | null;
-  rating: number | null;
-  tags: string[];
-  loras: string[];
-  model: string | null;
-  checkpoint: string | null;
-  modelFamily: string | null;
-  folder: string | null;
-}
+export const GraphImageInputSchema = z.object({
+  imageId: z.string(),
+  filename: z.string(),
+  thumbnailPath: z.string().nullable(),
+  rating: z.number().nullable(),
+  tags: z.array(z.string()),
+  loras: z.array(z.string()),
+  model: z.string().nullable(),
+  checkpoint: z.string().nullable(),
+  modelFamily: z.string().nullable(),
+  folder: z.string().nullable(),
+});
+export type GraphImageInput = z.infer<typeof GraphImageInputSchema>;
 
 export async function upsertImageNode(input: GraphImageInput): Promise<void> {
   await runCypher(
@@ -72,6 +74,49 @@ export async function clearGraph(): Promise<void> {
   await runCypher(`MATCH (n) DETACH DELETE n`);
 }
 
+const Neo4jNodeRecordSchema = z.object({
+  identity: z.union([z.number(), z.string()]),
+  labels: z.array(z.string()),
+  properties: z.record(z.string(), z.unknown()),
+});
+type Neo4jNodeRecord = z.infer<typeof Neo4jNodeRecordSchema>;
+
+const Neo4jRelRecordSchema = z.object({
+  type: z.string(),
+  start: z.union([z.number(), z.string()]),
+  end: z.union([z.number(), z.string()]),
+  properties: z.record(z.string(), z.unknown()),
+});
+type Neo4jRelRecord = z.infer<typeof Neo4jRelRecordSchema>;
+
+function idOfNode(n: Pick<Neo4jNodeRecord, "identity" | "properties">): string {
+  return String(n.properties.id ?? n.properties.name ?? n.properties.path ?? n.identity);
+}
+
+function collectSubgraphNodes(nodes: Neo4jNodeRecord[], graph: Graph): Map<string, string> {
+  const internalToId = new Map<string, string>();
+  const seenNodes = new Set<string>();
+  for (const n of nodes) {
+    const id = idOfNode(n);
+    internalToId.set(String(n.identity), id);
+    if (seenNodes.has(id)) continue;
+    seenNodes.add(id);
+    const label = String(n.properties.filename ?? n.properties.name ?? n.properties.path ?? id);
+    graph.nodes.push({ id, label, type: n.labels[0] ?? "Node", properties: n.properties });
+  }
+  return internalToId;
+}
+
+function collectSubgraphEdges(rels: Neo4jRelRecord[], internalToId: Map<string, string>, graph: Graph): void {
+  for (const r of rels) {
+    const from = internalToId.get(String(r.start));
+    const to = internalToId.get(String(r.end));
+    if (from && to) {
+      graph.edges.push({ from, to, type: r.type, properties: r.properties });
+    }
+  }
+}
+
 /** Subgraph around an image up to `depth`, optionally restricted to rel types. */
 export async function getImageSubgraph(
   imageId: string,
@@ -94,34 +139,16 @@ export async function getImageSubgraph(
   );
 
   const graph: Graph = { nodes: [], edges: [] };
-  const seenNodes = new Set<string>();
   const record = result.records[0];
   if (!record) {
     return graph;
   }
 
-  const nodes = record.get("nodes") as Array<{ identity: number | string; labels: string[]; properties: Record<string, unknown> }>;
-  const rels = record.get("rels") as Array<{ type: string; start: number | string; end: number | string; properties: Record<string, unknown> }>;
+  const nodes = record.get("nodes") as Neo4jNodeRecord[];
+  const rels = record.get("rels") as Neo4jRelRecord[];
 
-  const idOf = (n: { identity: number | string; properties: Record<string, unknown> }) =>
-    String(n.properties.id ?? n.properties.name ?? n.properties.path ?? n.identity);
-  const internalToId = new Map<string, string>();
-
-  for (const n of nodes) {
-    const id = idOf(n);
-    internalToId.set(String(n.identity), id);
-    if (seenNodes.has(id)) continue;
-    seenNodes.add(id);
-    const label = String(n.properties.filename ?? n.properties.name ?? n.properties.path ?? id);
-    graph.nodes.push({ id, label, type: n.labels[0] ?? "Node", properties: n.properties });
-  }
-  for (const r of rels) {
-    const from = internalToId.get(String(r.start));
-    const to = internalToId.get(String(r.end));
-    if (from && to) {
-      graph.edges.push({ from, to, type: r.type, properties: r.properties });
-    }
-  }
+  const internalToId = collectSubgraphNodes(nodes, graph);
+  collectSubgraphEdges(rels, internalToId, graph);
   return graph;
 }
 

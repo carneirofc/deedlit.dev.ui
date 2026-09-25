@@ -1,9 +1,14 @@
+import { z } from "zod";
+
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { ExportRequestSchema } from "@/lib/library/schemas";
 import { getImage, GatewayError, type CatalogImage } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ExportErrorSchema = z.object({ id: z.string(), error: z.string() });
+type ExportError = z.infer<typeof ExportErrorSchema>;
 
 /**
  * Bulk export the canonical catalog records for a set of selected images. Fans
@@ -21,7 +26,7 @@ export async function POST(request: Request) {
     const { ids } = ExportRequestSchema.parse(await request.json());
 
     const images: CatalogImage[] = [];
-    const errors: { id: string; error: string }[] = [];
+    const errors: ExportError[] = [];
     const queue = [...ids];
 
     const fetchOne = async (id: string): Promise<void> => {

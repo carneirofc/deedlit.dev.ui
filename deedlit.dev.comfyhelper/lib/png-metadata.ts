@@ -1,16 +1,26 @@
-import { open } from "node:fs/promises";
+import { open, type FileHandle } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
 
-type TextChunk = {
-  keyword: string;
-  chunkType: "tEXt" | "zTXt" | "iTXt";
-  text: string;
-};
+import { z } from "zod";
 
-type EmbeddedMetadataResult = {
-  metadata?: unknown;
-  error?: string;
-};
+const TextChunkSchema = z.object({
+  keyword: z.string(),
+  chunkType: z.enum(["tEXt", "zTXt", "iTXt"]),
+  text: z.string(),
+});
+type TextChunk = z.infer<typeof TextChunkSchema>;
+
+const EmbeddedMetadataResultSchema = z.object({
+  metadata: z.unknown().optional(),
+  error: z.string().optional(),
+});
+type EmbeddedMetadataResult = z.infer<typeof EmbeddedMetadataResultSchema>;
+
+const ChunkHeaderSchema = z.object({
+  length: z.number(),
+  type: z.string(),
+});
+type ChunkHeader = z.infer<typeof ChunkHeaderSchema>;
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -145,52 +155,65 @@ function toMetadataObject(chunks: TextChunk[]): unknown {
   };
 }
 
+async function verifyPngSignature(handle: FileHandle): Promise<boolean> {
+  const signature = Buffer.alloc(8);
+  const { bytesRead } = await handle.read(signature, 0, 8, 0);
+  return bytesRead >= 8 && signature.equals(PNG_SIGNATURE);
+}
+
+async function readChunkHeader(handle: FileHandle, offset: number): Promise<ChunkHeader | null> {
+  const header = Buffer.alloc(8);
+  const { bytesRead } = await handle.read(header, 0, 8, offset);
+  if (bytesRead < 8) {
+    return null;
+  }
+
+  return { length: header.readUInt32BE(0), type: header.subarray(4, 8).toString("ascii") };
+}
+
+// Stream chunks without loading the entire file into memory: only text chunks'
+// data is read; everything else is skipped via the offset arithmetic below.
+async function collectTextChunks(handle: FileHandle): Promise<TextChunk[]> {
+  const chunks: TextChunk[] = [];
+  let offset = 8;
+
+  for (;;) {
+    const header = await readChunkHeader(handle, offset);
+    if (!header) {
+      break;
+    }
+    const { length, type } = header;
+
+    if (type === "tEXt" || type === "zTXt" || type === "iTXt") {
+      const data = Buffer.alloc(length);
+      await handle.read(data, 0, length, offset + 8);
+      const parsed = parseChunk(type, data);
+      if (parsed) {
+        chunks.push(parsed);
+      }
+    }
+
+    if (type === "IEND") {
+      break;
+    }
+
+    // Move to next chunk: header (8) + data (length) + CRC (4)
+    offset += 8 + length + 4;
+  }
+
+  return chunks;
+}
+
 export async function readEmbeddedMetadataFromPng(imagePath: string): Promise<EmbeddedMetadataResult> {
   let handle;
   try {
     handle = await open(imagePath, "r");
 
-    // Read and verify PNG signature (8 bytes)
-    const signature = Buffer.alloc(8);
-    const { bytesRead: sigBytesRead } = await handle.read(signature, 0, 8, 0);
-    if (sigBytesRead < 8 || !signature.equals(PNG_SIGNATURE)) {
+    if (!(await verifyPngSignature(handle))) {
       return {};
     }
 
-    const chunks: TextChunk[] = [];
-    let offset = 8;
-    let foundIEND = false;
-
-    // Stream chunks without loading entire file into memory
-    while (!foundIEND) {
-      // Read chunk header (length + type = 8 bytes)
-      const header = Buffer.alloc(8);
-      const { bytesRead } = await handle.read(header, 0, 8, offset);
-      if (bytesRead < 8) {
-        break;
-      }
-
-      const length = header.readUInt32BE(0);
-      const type = header.subarray(4, 8).toString("ascii");
-
-      // Only read data for text chunks (significant memory savings)
-      if (type === "tEXt" || type === "zTXt" || type === "iTXt") {
-        const data = Buffer.alloc(length);
-        await handle.read(data, 0, length, offset + 8);
-        const parsed = parseChunk(type, data);
-        if (parsed) {
-          chunks.push(parsed);
-        }
-      }
-
-      if (type === "IEND") {
-        foundIEND = true;
-      }
-
-      // Move to next chunk: header (8) + data (length) + CRC (4)
-      offset += 8 + length + 4;
-    }
-
+    const chunks = await collectTextChunks(handle);
     return chunks.length > 0 ? { metadata: toMetadataObject(chunks) } : {};
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown PNG metadata parse error";

@@ -1,9 +1,15 @@
+import { z } from "zod";
+
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { SimilarSearchRequestSchema } from "@/lib/library/schemas";
-import { callMcpTool, hitsToCompactResults, type SearchHit } from "@/lib/api-client";
+import { callMcpTool, hitsToCompactResults, SearchHitSchema } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const StructuredContentSchema = z.object({
+  results: z.array(SearchHitSchema).optional(),
+});
 
 /**
  * Find images similar to a selected one. Proxies to the gateway MCP tool
@@ -25,7 +31,7 @@ export async function POST(request: Request) {
       // vector path; the gateway translates them to a Qdrant filter).
       ...(body.filters ? { filters: body.filters } : {}),
     });
-    const structured = (tool.structuredContent ?? {}) as { results?: SearchHit[] };
+    const structured = StructuredContentSchema.parse(tool.structuredContent ?? {});
     const raw = hitsToCompactResults(structured.results ?? []);
     let results = raw;
     // minScore is a client-side cutoff; the gateway has no minScore knob. Hits

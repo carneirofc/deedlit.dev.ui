@@ -1,5 +1,7 @@
 import { Readable } from "node:stream";
 
+import { z } from "zod";
+
 import {
   CreateBucketCommand,
   GetObjectCommand,
@@ -59,7 +61,13 @@ export function objectUri(key: string): string {
   return `s3://${getLibraryConfig().objectStore.bucket}/${key}`;
 }
 
-export function parseObjectUri(uri: string): { bucket: string; key: string } | null {
+const ObjectUriPartsSchema = z.object({
+  bucket: z.string(),
+  key: z.string(),
+});
+type ObjectUriParts = z.infer<typeof ObjectUriPartsSchema>;
+
+export function parseObjectUri(uri: string): ObjectUriParts | null {
   const match = /^s3:\/\/([^/]+)\/(.+)$/.exec(uri);
   if (!match) return null;
   return { bucket: match[1], key: match[2] };
@@ -84,6 +92,10 @@ export async function objectExists(key: string): Promise<boolean> {
   }
 }
 
+const ByteArrayBodySchema = z.object({
+  transformToByteArray: z.custom<() => Promise<Uint8Array>>(),
+});
+
 async function getBody(bucket: string, key: string) {
   const res = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   return res.Body;
@@ -94,7 +106,7 @@ export async function getObjectBuffer(key: string): Promise<Buffer | null> {
   try {
     const body = await getBody(objectStore.bucket, key);
     if (!body) return null;
-    const bytes = await (body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+    const bytes = await (body as z.infer<typeof ByteArrayBodySchema>).transformToByteArray();
     return Buffer.from(bytes);
   } catch {
     return null;

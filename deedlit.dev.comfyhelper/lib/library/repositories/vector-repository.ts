@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getLibraryConfig } from "@/lib/library/config";
 import { getQdrant } from "@/lib/library/db/qdrant";
 
@@ -5,28 +6,29 @@ declare global {
   var __comfyhelperQdrantReady: boolean | undefined;
 }
 
-export interface ImageVectorPayload {
-  image_id: string;
-  file_path: string;
-  thumbnail_path: string | null;
+export const ImageVectorPayloadSchema = z.object({
+  image_id: z.string(),
+  file_path: z.string(),
+  thumbnail_path: z.string().nullable(),
   /**
-   * Browser-reachable proxy URLs (absolute) served by comfyhelper.  Stored so
-   * the Qdrant dashboard / deedlit.vision test UI can render the image instead
-   * of choking on `file_path`, which is a server-local filesystem path.
-   */
-  thumbnail_url: string;
-  image_url: string;
-  tags: string[];
-  model_family: string | null;
-  checkpoint: string | null;
-  loras: string[];
-  rating: number | null;
-  width: number | null;
-  height: number | null;
-  created_at: string | null;
-  source_tool: string | null;
-  favorite: boolean;
-}
+  * Browser-reachable proxy URLs (absolute) served by comfyhelper.  Stored so
+  * the Qdrant dashboard / deedlit.vision test UI can render the image instead
+  * of choking on `file_path`, which is a server-local filesystem path.
+  */
+  thumbnail_url: z.string(),
+  image_url: z.string(),
+  tags: z.array(z.string()),
+  model_family: z.string().nullable(),
+  checkpoint: z.string().nullable(),
+  loras: z.array(z.string()),
+  rating: z.number().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  created_at: z.string().nullable(),
+  source_tool: z.string().nullable(),
+  favorite: z.boolean(),
+});
+export type ImageVectorPayload = z.infer<typeof ImageVectorPayloadSchema>;
 
 export async function ensureCollection(): Promise<void> {
   if (globalThis.__comfyhelperQdrantReady) return;
@@ -84,12 +86,20 @@ export async function retrieveVectors(ids: string[]): Promise<Map<string, number
   return map;
 }
 
-export interface SimilarityMatrix {
+export const SimilarityPairSchema = z.object({
+  a: z.string(),
+  b: z.string(),
+  score: z.number(),
+});
+export type SimilarityPair = z.infer<typeof SimilarityPairSchema>;
+
+export const SimilarityMatrixSchema = z.object({
   /** Point ids in the order the matrix offsets reference. */
-  ids: string[];
+  ids: z.array(z.string()),
   /** Sparse similarity edges (higher score = more similar, Cosine). */
-  pairs: Array<{ a: string; b: string; score: number }>;
-}
+  pairs: z.array(SimilarityPairSchema),
+});
+export type SimilarityMatrix = z.infer<typeof SimilarityMatrixSchema>;
 
 /**
  * Qdrant Distance Matrix API — samples `sample` points from the (optionally
@@ -112,7 +122,7 @@ export async function searchSimilarityMatrix(
   const rows = res.offsets_row ?? [];
   const cols = res.offsets_col ?? [];
   const scores = res.scores ?? [];
-  const pairs: Array<{ a: string; b: string; score: number }> = [];
+  const pairs: SimilarityPair[] = [];
   for (let k = 0; k < rows.length; k++) {
     const a = ids[rows[k]];
     const b = ids[cols[k]];
@@ -121,41 +131,50 @@ export async function searchSimilarityMatrix(
   return { ids, pairs };
 }
 
-export interface QdrantFilter {
-  must?: unknown[];
-  must_not?: unknown[];
-}
+export const QdrantFilterSchema = z.object({
+  must: z.array(z.unknown()).optional(),
+  must_not: z.array(z.unknown()).optional(),
+});
+export type QdrantFilter = z.infer<typeof QdrantFilterSchema>;
 
 /** Default HNSW `ef` for search — higher = better recall, slower. */
 export const DEFAULT_HNSW_EF = 128;
 
-export interface VectorSearchOptions {
+export const VectorSearchOptionsSchema = z.object({
   /**
-   * Cosine cutoff pushed into Qdrant as `score_threshold`. Unlike filtering in
-   * JS after the fact, this lets Qdrant keep scanning so it can still return up
-   * to `limit` results that clear the bar. 0 / undefined disables it.
-   */
-  scoreThreshold?: number;
+  * Cosine cutoff pushed into Qdrant as `score_threshold`. Unlike filtering in
+  * JS after the fact, this lets Qdrant keep scanning so it can still return up
+  * to `limit` results that clear the bar. 0 / undefined disables it.
+  */
+  scoreThreshold: z.number().optional(),
   /** HNSW search beam width. Raise for recall on larger collections. */
-  hnswEf?: number;
+  hnswEf: z.number().optional(),
   /** Bypass the HNSW index for an exact (slow) brute-force scan — debug/ground-truth. */
-  exact?: boolean;
+  exact: z.boolean().optional(),
   /** Return the stored payload alongside each hit (debug). */
-  withPayload?: boolean;
-}
+  withPayload: z.boolean().optional(),
+});
+export type VectorSearchOptions = z.infer<typeof VectorSearchOptionsSchema>;
 
-export interface ScoredHit {
-  id: string;
-  score: number;
-  payload?: Record<string, unknown> | null;
-}
+export const ScoredHitSchema = z.object({
+  id: z.string(),
+  score: z.number(),
+  payload: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+export type ScoredHit = z.infer<typeof ScoredHitSchema>;
+
+export const IdScorePairSchema = z.object({
+  id: z.string(),
+  score: z.number(),
+});
+export type IdScorePair = z.infer<typeof IdScorePairSchema>;
 
 export async function searchByVector(
   vector: number[],
   filter: QdrantFilter | undefined,
   limit: number,
   options: VectorSearchOptions = {},
-): Promise<Array<{ id: string; score: number }>> {
+): Promise<IdScorePair[]> {
   const hits = await searchByVectorDetailed(vector, filter, limit, options);
   return hits.map((h) => ({ id: h.id, score: h.score }));
 }
@@ -184,11 +203,40 @@ export async function searchByVectorDetailed(
   }));
 }
 
-export interface CollectionInfo {
-  exists: boolean;
-  vectorSize: number | null;
-  distance: string | null;
-  pointsCount: number | null;
+export const CollectionInfoSchema = z.object({
+  exists: z.boolean(),
+  vectorSize: z.number().nullable(),
+  distance: z.string().nullable(),
+  pointsCount: z.number().nullable(),
+});
+export type CollectionInfo = z.infer<typeof CollectionInfoSchema>;
+
+const VectorSizeInfoSchema = z.object({
+  size: z.number().optional(),
+  distance: z.string().optional(),
+});
+type VectorSizeInfo = z.infer<typeof VectorSizeInfoSchema>;
+
+const ResolvedVectorSizeSchema = z.object({
+  size: z.number().nullable(),
+  distance: z.string().nullable(),
+});
+type ResolvedVectorSize = z.infer<typeof ResolvedVectorSizeSchema>;
+
+function toResolvedVectorSize(info: VectorSizeInfo | undefined): ResolvedVectorSize {
+  return { size: info?.size ?? null, distance: info?.distance ?? null };
+}
+
+function resolveVectorSizeInfo(
+  vectors: VectorSizeInfo | Record<string, VectorSizeInfo> | undefined,
+): ResolvedVectorSize {
+  if (!vectors || typeof vectors !== "object") {
+    return toResolvedVectorSize(undefined);
+  }
+
+  const isSingle = "size" in vectors && typeof (vectors as VectorSizeInfo).size === "number";
+  const info = isSingle ? (vectors as VectorSizeInfo) : (Object.values(vectors)[0] as VectorSizeInfo | undefined);
+  return toResolvedVectorSize(info);
 }
 
 /** Inspect the live Qdrant collection (dim / metric / size) for diagnostics. */
@@ -197,23 +245,10 @@ export async function getCollectionInfo(): Promise<CollectionInfo> {
   try {
     const info = await getQdrant().getCollection(qdrantCollection);
     const vectors = info.config?.params?.vectors as
-      | { size?: number; distance?: string }
-      | Record<string, { size?: number; distance?: string }>
+      | VectorSizeInfo
+      | Record<string, VectorSizeInfo>
       | undefined;
-    let size: number | null = null;
-    let distance: string | null = null;
-    if (vectors && typeof vectors === "object") {
-      if ("size" in vectors && typeof vectors.size === "number") {
-        size = vectors.size;
-        distance = (vectors.distance as string) ?? null;
-      } else {
-        const first = Object.values(vectors)[0] as { size?: number; distance?: string } | undefined;
-        if (first) {
-          size = first.size ?? null;
-          distance = first.distance ?? null;
-        }
-      }
-    }
+    const { size, distance } = resolveVectorSizeInfo(vectors);
     return { exists: true, vectorSize: size, distance, pointsCount: info.points_count ?? null };
   } catch {
     return { exists: false, vectorSize: null, distance: null, pointsCount: null };

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export function normalizeTag(tag: string): string {
   return tag.trim().toLowerCase();
 }
@@ -32,9 +34,10 @@ function toExcludedTagSet(exclude?: ReadonlySet<string> | readonly string[]): Re
   return new Set<string>();
 }
 
-export type ExtractTagsFromPromptOptions = {
-  exclude?: ReadonlySet<string> | readonly string[];
-};
+const ExtractTagsFromPromptOptionsSchema = z.object({
+  exclude: z.custom<ReadonlySet<string> | readonly string[]>().optional(),
+});
+export type ExtractTagsFromPromptOptions = z.infer<typeof ExtractTagsFromPromptOptionsSchema>;
 
 export function extractTagsFromPrompt(
   prompt?: string,

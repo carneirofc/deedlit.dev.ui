@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { handleRoute, jsonError } from "@/lib/library/http";
 import { blobUrl } from "@/lib/api-client";
 import { getCachedImage, setCachedImage, IMAGE_CACHE_CONTROL } from "@/lib/library/image-cache";
@@ -5,7 +7,7 @@ import { getCachedImage, setCachedImage, IMAGE_CACHE_CONTROL } from "@/lib/libra
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: Promise<{ imageId: string }> };
+const RouteContextSchema = z.object({ params: z.custom<Promise<Record<"imageId", string>>>() });
 
 /**
  * Stream the full-resolution image.
@@ -16,9 +18,10 @@ type RouteContext = { params: Promise<{ imageId: string }> };
  * otherwise.
  * TODO(#17): serve originals once the gateway/catalog expose original bytes.
  */
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(request: Request, context: unknown) {
   return handleRoute(async () => {
-    const { imageId } = await context.params;
+    const { params } = RouteContextSchema.parse(context);
+    const { imageId } = await params;
 
     // Content-addressed by sha256 -> immutable. A matching If-None-Match returns
     // a 0-byte 304 without touching Redis or the gateway.

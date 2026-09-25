@@ -1,5 +1,5 @@
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
-import { createSourceFolder, listSourceFolders } from "@/lib/api-client";
+import { createSourceFolder, listSourceFolders, SourceFolderUpsertSchema } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,11 +19,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   return handleRoute(async () => {
-    const body = (await request.json()) as { path?: unknown };
-    if (typeof body.path !== "string" || body.path.trim() === "") {
+    const body = SourceFolderUpsertSchema.parse(await request.json());
+    if (body.path.trim() === "") {
       return jsonError("A folder path is required.", 400);
     }
-    const folder = await createSourceFolder(body as Parameters<typeof createSourceFolder>[0]);
+    const folder = await createSourceFolder(body);
     return jsonOk(folder, { status: 201 });
   });
 }

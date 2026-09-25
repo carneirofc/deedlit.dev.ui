@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Bulk image deletion — un-indexes a list of images in ONE batch call to
  * `POST /api/library/images/batch-delete`, which proxies the gateway batch
@@ -12,16 +14,33 @@
  * library", which an already-gone image satisfies.
  */
 
-export interface BulkDeleteOutcome {
-  /** Ids that are no longer in the library (deleted now, or already gone). */
-  deleted: string[];
-  /** Ids that could not be removed, with the surfaced reason. */
-  failed: { id: string; error: string }[];
-}
+export const BulkDeleteFailureSchema = z.object({
+  id: z.string(),
+  error: z.string(),
+});
+export type BulkDeleteFailure = z.infer<typeof BulkDeleteFailureSchema>;
 
-export interface BulkDeleteOptions {
-  signal?: AbortSignal;
-}
+export const BulkDeleteOutcomeSchema = z.object({
+  /** Ids that are no longer in the library (deleted now, or already gone). */
+  deleted: z.array(z.string()),
+  /** Ids that could not be removed, with the surfaced reason. */
+  failed: z.array(BulkDeleteFailureSchema),
+});
+export type BulkDeleteOutcome = z.infer<typeof BulkDeleteOutcomeSchema>;
+
+export const BulkDeleteOptionsSchema = z.object({
+  signal: z.custom<AbortSignal>().optional(),
+});
+export type BulkDeleteOptions = z.infer<typeof BulkDeleteOptionsSchema>;
+
+const DeleteErrorResponseSchema = z.object({
+  error: z.string().optional(),
+});
+
+const BatchDeleteResponseSchema = z.object({
+  deleted: z.array(z.string()).optional(),
+  missing: z.array(z.string()).optional(),
+});
 
 export async function deleteImages(
   ids: string[],
@@ -42,10 +61,11 @@ export async function deleteImages(
       signal: opts.signal,
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return fail(body.error ?? `HTTP ${res.status}`);
+      const parsed = DeleteErrorResponseSchema.safeParse(await res.json().catch(() => ({})));
+      const error = (parsed.success ? parsed.data.error : undefined) ?? `HTTP ${res.status}`;
+      return fail(error);
     }
-    const j = (await res.json()) as { deleted?: string[]; missing?: string[] };
+    const j = BatchDeleteResponseSchema.parse(await res.json());
     // `missing` (already absent) satisfies the goal state, so count it as deleted.
     const deleted = [...(j.deleted ?? []), ...(j.missing ?? [])];
     const gone = new Set(deleted);

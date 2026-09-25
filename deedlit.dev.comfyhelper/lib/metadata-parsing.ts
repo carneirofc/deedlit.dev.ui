@@ -1,14 +1,23 @@
-export type PromptMetadataInsights = {
-  positivePrompt?: string;
-  negativePrompt?: string;
-  model?: string;
-  sampler?: string;
-  cfgScale?: string;
-  steps?: string;
-  seed?: string;
-  scheduler?: string;
-  size?: string;
-};
+import { z } from "zod";
+
+export const PromptMetadataInsightsSchema = z.object({
+  positivePrompt: z.string().optional(),
+  negativePrompt: z.string().optional(),
+  model: z.string().optional(),
+  sampler: z.string().optional(),
+  cfgScale: z.string().optional(),
+  steps: z.string().optional(),
+  seed: z.string().optional(),
+  scheduler: z.string().optional(),
+  size: z.string().optional(),
+});
+export type PromptMetadataInsights = z.infer<typeof PromptMetadataInsightsSchema>;
+
+const ComfyNodeSchema = z.object({
+  classType: z.string().optional(),
+  inputs: z.record(z.string(), z.unknown()).optional(),
+});
+type ComfyNode = z.infer<typeof ComfyNodeSchema>;
 
 const metadataSearchCache = new WeakMap<object, Map<string, unknown>>();
 
@@ -62,20 +71,7 @@ export function getSearchableMetadata(metadata: unknown): unknown {
   return isRecord(metadata) && isRecord(metadata.fields) ? metadata.fields : metadata;
 }
 
-export function findFirstValueByKeys(root: unknown, keys: string[]): unknown {
-  if (!root) {
-    return undefined;
-  }
-
-  if (isRecord(root)) {
-    const cache = metadataSearchCache.get(root);
-    const cacheKey = getCacheKey(keys);
-    if (cache?.has(cacheKey)) {
-      return cache.get(cacheKey);
-    }
-  }
-
-  const keySet = new Set(keys.map((key) => normalizeKey(key)));
+function visitForKeys(root: unknown, keySet: Set<string>): unknown {
   const seen = new WeakSet<object>();
 
   const visit = (value: unknown): unknown => {
@@ -91,11 +87,7 @@ export function findFirstValueByKeys(root: unknown, keys: string[]): unknown {
       return undefined;
     }
 
-    if (!isRecord(parsed)) {
-      return undefined;
-    }
-
-    if (seen.has(parsed)) {
+    if (!isRecord(parsed) || seen.has(parsed)) {
       return undefined;
     }
     seen.add(parsed);
@@ -116,10 +108,27 @@ export function findFirstValueByKeys(root: unknown, keys: string[]): unknown {
     return undefined;
   };
 
-  const result = visit(root);
+  return visit(root);
+}
+
+export function findFirstValueByKeys(root: unknown, keys: string[]): unknown {
+  if (!root) {
+    return undefined;
+  }
+
+  const cacheKey = getCacheKey(keys);
 
   if (isRecord(root)) {
-    const cacheKey = getCacheKey(keys);
+    const cache = metadataSearchCache.get(root);
+    if (cache?.has(cacheKey)) {
+      return cache.get(cacheKey);
+    }
+  }
+
+  const keySet = new Set(keys.map((key) => normalizeKey(key)));
+  const result = visitForKeys(root, keySet);
+
+  if (isRecord(root)) {
     const cache = metadataSearchCache.get(root) ?? new Map<string, unknown>();
     cache.set(cacheKey, result);
     metadataSearchCache.set(root, cache);
@@ -147,10 +156,7 @@ function resolveNodeReference(value: unknown): string | null {
   return null;
 }
 
-function extractTextFromPromptNode(
-  nodeId: string | null,
-  nodes: Record<string, { classType?: string; inputs?: Record<string, unknown> }>,
-): string | undefined {
+function extractTextFromPromptNode(nodeId: string | null, nodes: Record<string, ComfyNode>): string | undefined {
   if (!nodeId) {
     return undefined;
   }
@@ -173,13 +179,8 @@ function extractTextFromPromptNode(
   return parts.join("\n");
 }
 
-export function extractFromComfyPromptGraph(promptValue: unknown): Partial<PromptMetadataInsights> {
-  const parsedPrompt = maybeParseJsonString(promptValue);
-  if (!isRecord(parsedPrompt)) {
-    return {};
-  }
-
-  const nodes: Record<string, { classType?: string; inputs?: Record<string, unknown> }> = {};
+function buildNodeMap(parsedPrompt: Record<string, unknown>): Record<string, ComfyNode> {
+  const nodes: Record<string, ComfyNode> = {};
 
   for (const [nodeId, nodeValue] of Object.entries(parsedPrompt)) {
     if (!isRecord(nodeValue)) {
@@ -195,8 +196,18 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
     nodes[nodeId] = { classType, inputs };
   }
 
-  let kSamplerEntry: [string, { classType?: string; inputs?: Record<string, unknown> }] | undefined;
-  let loaderNode: { classType?: string; inputs?: Record<string, unknown> } | undefined;
+  return nodes;
+}
+
+export const SamplerAndLoaderSchema = z.object({
+  kSamplerEntry: z.custom<[string, ComfyNode]>().optional(),
+  loaderNode: ComfyNodeSchema.optional(),
+});
+type SamplerAndLoader = z.infer<typeof SamplerAndLoaderSchema>;
+
+function findSamplerAndLoader(nodes: Record<string, ComfyNode>): SamplerAndLoader {
+  let kSamplerEntry: [string, ComfyNode] | undefined;
+  let loaderNode: ComfyNode | undefined;
 
   for (const [nodeId, node] of Object.entries(nodes)) {
     const classType = (node.classType ?? "").toLowerCase();
@@ -214,6 +225,45 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
     }
   }
 
+  return { kSamplerEntry, loaderNode };
+}
+
+function isLoaderNode(node: ComfyNode): boolean {
+  const classType = (node.classType ?? "").toLowerCase();
+  return classType.includes("checkpointloader") || classType.includes("unetloader");
+}
+
+function readModelInputName(inputs: Record<string, unknown> | undefined): string | undefined {
+  if (!inputs) {
+    return undefined;
+  }
+
+  return toDisplayValue(inputs.ckpt_name) ?? toDisplayValue(inputs.model_name) ?? toDisplayValue(inputs.unet_name);
+}
+
+function resolveModelName(
+  nodes: Record<string, ComfyNode>,
+  modelRef: string | null,
+  loaderNode: ComfyNode | undefined,
+): string | undefined {
+  const modelFromRef = modelRef ? readModelInputName(nodes[modelRef]?.inputs) : undefined;
+  if (modelFromRef) {
+    return modelFromRef;
+  }
+
+  const fallbackLoader = loaderNode ?? Object.values(nodes).find(isLoaderNode);
+  return readModelInputName(fallbackLoader?.inputs);
+}
+
+export function extractFromComfyPromptGraph(promptValue: unknown): Partial<PromptMetadataInsights> {
+  const parsedPrompt = maybeParseJsonString(promptValue);
+  if (!isRecord(parsedPrompt)) {
+    return {};
+  }
+
+  const nodes = buildNodeMap(parsedPrompt);
+  const { kSamplerEntry, loaderNode } = findSamplerAndLoader(nodes);
+
   if (!kSamplerEntry) {
     return {};
   }
@@ -223,29 +273,7 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
   const positiveRef = resolveNodeReference(inputs.positive);
   const negativeRef = resolveNodeReference(inputs.negative);
   const modelRef = resolveNodeReference(inputs.model);
-
-  let modelName: string | undefined;
-  if (modelRef && nodes[modelRef]?.inputs) {
-    const modelInputs = nodes[modelRef].inputs ?? {};
-    modelName =
-      toDisplayValue(modelInputs.ckpt_name) ??
-      toDisplayValue(modelInputs.model_name) ??
-      toDisplayValue(modelInputs.unet_name);
-  }
-
-  if (!modelName && !loaderNode) {
-    loaderNode = Object.values(nodes).find((node) => {
-      const classType = (node.classType ?? "").toLowerCase();
-      return classType.includes("checkpointloader") || classType.includes("unetloader");
-    });
-  }
-
-  if (!modelName && loaderNode?.inputs) {
-    modelName =
-      toDisplayValue(loaderNode.inputs.ckpt_name) ??
-      toDisplayValue(loaderNode.inputs.model_name) ??
-      toDisplayValue(loaderNode.inputs.unet_name);
-  }
+  const modelName = resolveModelName(nodes, modelRef, loaderNode);
 
   return {
     positivePrompt: extractTextFromPromptNode(positiveRef, nodes),
@@ -259,20 +287,16 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
   };
 }
 
-type ParseAutomatic1111ParametersOptions = {
-  includeFirstLineAsPositive?: boolean;
-};
+export const ParseAutomatic1111ParametersOptionsSchema = z.object({
+  includeFirstLineAsPositive: z.boolean().optional(),
+});
+type ParseAutomatic1111ParametersOptions = z.infer<typeof ParseAutomatic1111ParametersOptionsSchema>;
 
-export function parseAutomatic1111Parameters(
-  parameters: string,
-  options: ParseAutomatic1111ParametersOptions = {},
-): Partial<PromptMetadataInsights> {
-  const result: Partial<PromptMetadataInsights> = {};
-  const text = parameters.trim();
-
-  if (!text) {
-    return result;
-  }
+function parsePositiveAndNegative(
+  text: string,
+  options: ParseAutomatic1111ParametersOptions,
+): Pick<PromptMetadataInsights, "positivePrompt" | "negativePrompt"> {
+  const result: Pick<PromptMetadataInsights, "positivePrompt" | "negativePrompt"> = {};
 
   const negativeLabel = "Negative prompt:";
   const negativeIndex = text.indexOf(negativeLabel);
@@ -294,6 +318,21 @@ export function parseAutomatic1111Parameters(
       result.positivePrompt = firstLine;
     }
   }
+
+  return result;
+}
+
+export function parseAutomatic1111Parameters(
+  parameters: string,
+  options: ParseAutomatic1111ParametersOptions = {},
+): Partial<PromptMetadataInsights> {
+  const text = parameters.trim();
+
+  if (!text) {
+    return {};
+  }
+
+  const result: Partial<PromptMetadataInsights> = parsePositiveAndNegative(text, options);
 
   const capture = (pattern: RegExp): string | undefined => text.match(pattern)?.[1]?.trim();
 

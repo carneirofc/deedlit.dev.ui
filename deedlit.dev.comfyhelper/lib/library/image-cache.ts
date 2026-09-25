@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { getRedisClient } from "@/lib/library/db/redis";
 
 const TTL = 7 * 24 * 60 * 60; // 7 days
@@ -16,10 +18,11 @@ export const IMAGE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 // lightbox uses; "orig" reserved for a true original (not served today).
 type ImageKind = "thumb" | "orig" | "grid";
 
-export interface CachedImage {
-  data: Buffer;
-  contentType: string;
-}
+export const CachedImageSchema = z.object({
+  data: z.custom<Buffer>(),
+  contentType: z.string(),
+});
+export type CachedImage = z.infer<typeof CachedImageSchema>;
 
 function dataKey(sha256: string, kind: ImageKind): string {
   return `img:${sha256}:${kind}:data`;

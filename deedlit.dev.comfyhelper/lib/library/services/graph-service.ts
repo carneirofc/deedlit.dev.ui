@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { z } from "zod";
+
 import { getImageDetail, listAllForReindex } from "@/lib/library/repositories/image-repository";
 import {
   clearGraph,
@@ -30,8 +32,11 @@ export async function syncImageToGraph(imageId: string): Promise<void> {
   });
 }
 
+const RebuildGraphResultSchema = z.object({ synced: z.number() });
+type RebuildGraphResult = z.infer<typeof RebuildGraphResultSchema>;
+
 /** Wipe and rebuild the whole Neo4j projection from PostgreSQL. */
-export async function rebuildGraph(): Promise<{ synced: number }> {
+export async function rebuildGraph(): Promise<RebuildGraphResult> {
   await clearGraph();
   const all = await listAllForReindex();
   let synced = 0;
@@ -72,9 +77,15 @@ export async function findRelatedTags(tag: string, limit: number) {
   return findRelatedTagsSql(tag, limit);
 }
 
+const RelatedLoraRowSchema = z.object({
+  name: z.string(),
+  coOccurrence: z.number(),
+});
+type RelatedLoraRow = z.infer<typeof RelatedLoraRowSchema>;
+
 /** LoRAs frequently used together with the given LoRA. */
-export async function findRelatedLoras(lora: string, limit: number) {
-  return rows<{ name: string; coOccurrence: number }>(
+export async function findRelatedLoras(lora: string, limit: number): Promise<RelatedLoraRow[]> {
+  return rows<RelatedLoraRow>(
     `WITH target AS (SELECT id FROM loras WHERE name = $1),
      target_images AS (SELECT il.image_id FROM image_loras il JOIN target ON il.lora_id = target.id)
      SELECT l.name AS name, COUNT(*)::int AS "coOccurrence"
@@ -87,16 +98,30 @@ export async function findRelatedLoras(lora: string, limit: number) {
   );
 }
 
+const LineageRowSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  relation: z.string(),
+});
+type LineageRow = z.infer<typeof LineageRowSchema>;
+
+export const ImageLineageSchema = z.object({
+  imageId: z.string(),
+  ancestors: z.array(LineageRowSchema),
+  descendants: z.array(LineageRowSchema),
+});
+export type ImageLineage = z.infer<typeof ImageLineageSchema>;
+
 /** Original/variant/upscale/inpaint relationships from PostgreSQL. */
-export async function findImageLineage(imageId: string) {
+export async function findImageLineage(imageId: string): Promise<ImageLineage> {
   const [ancestors, descendants] = await Promise.all([
-    rows<{ id: string; filename: string; relation: string }>(
+    rows<LineageRow>(
       `SELECT i.id, i.filename, v.relation_type AS relation
          FROM image_variants v JOIN images i ON i.id = v.source_image_id
         WHERE v.derived_image_id = $1`,
       [imageId],
     ),
-    rows<{ id: string; filename: string; relation: string }>(
+    rows<LineageRow>(
       `SELECT i.id, i.filename, v.relation_type AS relation
          FROM image_variants v JOIN images i ON i.id = v.derived_image_id
         WHERE v.source_image_id = $1`,

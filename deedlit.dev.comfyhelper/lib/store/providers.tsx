@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { z } from "zod";
+
 import { ActivityDock, ActivityToasts } from "@carneirofc/ui";
 
 import { ActivityProvider, useActivity } from "@/lib/store/activity";
@@ -30,7 +32,12 @@ function ActivityOverlay() {
  * page. The activity dock + toasts are mounted once so progress for any tracked
  * backend interaction is visible on every route.
  */
-export default function AppProviders({ children }: { children: ReactNode }) {
+const AppProvidersPropsSchema = z.object({
+  children: z.custom<ReactNode>(),
+});
+type AppProvidersProps = z.infer<typeof AppProvidersPropsSchema>;
+
+export default function AppProviders({ children }: AppProvidersProps) {
   return (
     <SettingsProvider>
       <ActivityProvider>

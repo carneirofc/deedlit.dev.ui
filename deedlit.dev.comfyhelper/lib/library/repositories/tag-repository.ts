@@ -1,7 +1,23 @@
 import type { PoolClient } from "pg";
+import { z } from "zod";
 
 import { rows } from "@/lib/library/db/postgres";
 import { normalizeTag } from "@/lib/prompt-tags";
+
+const TagIdRowSchema = z.object({ id: z.string() });
+type TagIdRow = z.infer<typeof TagIdRowSchema>;
+
+const LinkImageTagOptionsSchema = z.object({
+  confidence: z.number().nullable().optional(),
+  source: z.string().optional(),
+});
+type LinkImageTagOptions = z.infer<typeof LinkImageTagOptionsSchema>;
+
+const RelatedTagRowSchema = z.object({
+  name: z.string(),
+  coOccurrence: z.number(),
+});
+type RelatedTagRow = z.infer<typeof RelatedTagRowSchema>;
 
 /** Canonical tag normalization for the library: lowercase, spaces -> underscore. */
 export function canonicalTagName(raw: string): string {
@@ -16,7 +32,7 @@ export async function upsertTag(
 ): Promise<string> {
   const name = rawName.trim();
   const normalized = canonicalTagName(rawName);
-  const result = await client.query<{ id: string }>(
+  const result = await client.query<TagIdRow>(
     `INSERT INTO tags (name, normalized_name, category, source)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (normalized_name)
@@ -31,7 +47,7 @@ export async function linkImageTag(
   client: PoolClient,
   imageId: string,
   tagId: string,
-  options: { confidence?: number | null; source?: string } = {},
+  options: LinkImageTagOptions = {},
 ): Promise<void> {
   await client.query(
     `INSERT INTO image_tags (image_id, tag_id, confidence, source)
@@ -55,9 +71,9 @@ export async function clearImageTags(client: PoolClient, imageId: string, source
 export async function findRelatedTags(
   tag: string,
   limit: number,
-): Promise<Array<{ name: string; coOccurrence: number }>> {
+): Promise<RelatedTagRow[]> {
   const normalized = canonicalTagName(tag);
-  return rows<{ name: string; coOccurrence: number }>(
+  return rows<RelatedTagRow>(
     `WITH target AS (
        SELECT id FROM tags WHERE normalized_name = $1
      ),

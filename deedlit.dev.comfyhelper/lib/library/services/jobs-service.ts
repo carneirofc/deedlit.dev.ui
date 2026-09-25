@@ -1,30 +1,33 @@
+import { z } from "zod";
 import { maybeRow, rows } from "@/lib/library/db/postgres";
 
-export interface JobSummary {
-  id: string;
-  folderPath: string | null;
-  status: string;
-  totalFiles: number;
-  processedFiles: number;
-  failedFiles: number;
-  errorMessage: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  createdAt: string;
-}
+export const JobSummarySchema = z.object({
+  id: z.string(),
+  folderPath: z.string().nullable(),
+  status: z.string(),
+  totalFiles: z.number(),
+  processedFiles: z.number(),
+  failedFiles: z.number(),
+  errorMessage: z.string().nullable(),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type JobSummary = z.infer<typeof JobSummarySchema>;
 
-interface JobRow {
-  id: string;
-  folder_path: string | null;
-  status: string;
-  total_files: number;
-  processed_files: number;
-  failed_files: number;
-  error_message: string | null;
-  started_at: Date | null;
-  finished_at: Date | null;
-  created_at: Date;
-}
+const JobRowSchema = z.object({
+  id: z.string(),
+  folder_path: z.string().nullable(),
+  status: z.string(),
+  total_files: z.number(),
+  processed_files: z.number(),
+  failed_files: z.number(),
+  error_message: z.string().nullable(),
+  started_at: z.custom<Date>().nullable(),
+  finished_at: z.custom<Date>().nullable(),
+  created_at: z.custom<Date>(),
+});
+type JobRow = z.infer<typeof JobRowSchema>;
 
 function toSummary(r: JobRow): JobSummary {
   return {
@@ -49,10 +52,28 @@ export async function listJobs(limit = 50): Promise<JobSummary[]> {
   return result.map(toSummary);
 }
 
-export async function getJob(jobId: string): Promise<{ job: JobSummary; failedFiles: Array<{ filePath: string; error: string | null }> } | null> {
+const FailedJobFileRowSchema = z.object({
+  file_path: z.string(),
+  error: z.string().nullable(),
+});
+type FailedJobFileRow = z.infer<typeof FailedJobFileRowSchema>;
+
+export const JobFailedFileSchema = z.object({
+  filePath: z.string(),
+  error: z.string().nullable(),
+});
+export type JobFailedFile = z.infer<typeof JobFailedFileSchema>;
+
+export const JobDetailSchema = z.object({
+  job: JobSummarySchema,
+  failedFiles: z.array(JobFailedFileSchema),
+});
+export type JobDetail = z.infer<typeof JobDetailSchema>;
+
+export async function getJob(jobId: string): Promise<JobDetail | null> {
   const row = await maybeRow<JobRow>(`SELECT * FROM ingestion_jobs WHERE id = $1`, [jobId]);
   if (!row) return null;
-  const failed = await rows<{ file_path: string; error: string | null }>(
+  const failed = await rows<FailedJobFileRow>(
     `SELECT file_path, error FROM ingestion_job_files WHERE job_id = $1 AND status = 'failed' LIMIT 200`,
     [jobId],
   );
@@ -62,8 +83,11 @@ export async function getJob(jobId: string): Promise<{ job: JobSummary; failedFi
   };
 }
 
+const CancelledJobRowSchema = z.object({ id: z.string() });
+type CancelledJobRow = z.infer<typeof CancelledJobRowSchema>;
+
 export async function cancelJob(jobId: string): Promise<boolean> {
-  const row = await maybeRow<{ id: string }>(
+  const row = await maybeRow<CancelledJobRow>(
     `UPDATE ingestion_jobs SET status='cancelled', finished_at=now()
       WHERE id=$1 AND status IN ('pending','running') RETURNING id`,
     [jobId],

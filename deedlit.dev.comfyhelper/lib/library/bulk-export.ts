@@ -1,3 +1,4 @@
+import { z } from "zod";
 /**
  * Bulk export — POST the selected ids to `/api/library/export` (which fans the
  * gateway detail reads out server-side) and download the returned canonical
@@ -6,7 +7,7 @@
  * ids resolved and which did not).
  */
 
-import type { CatalogImage } from "@/lib/api-client";
+import { CatalogImageSchema, type CatalogImage } from "@/lib/api-client";
 
 /**
  * The chosen export flavour. `complete-*` dump the full canonical catalog record
@@ -14,22 +15,48 @@ import type { CatalogImage } from "@/lib/api-client";
  * scannable fields — enough to identify and locate an image. CSV is simple-only
  * (the full record is too nested to flatten into a table sensibly).
  */
-export type ExportKind =
-  | "complete-json"
-  | "complete-jsonl"
-  | "simple-json"
-  | "simple-jsonl"
-  | "simple-csv";
+export const ExportKindSchema = z.enum([
+  "complete-json",
+  "complete-jsonl",
+  "simple-json",
+  "simple-jsonl",
+  "simple-csv",
+]);
+export type ExportKind = z.infer<typeof ExportKindSchema>;
 
-export interface BulkExportResult {
-  exportedAt: string;
+export const BulkExportErrorSchema = z.object({
+  id: z.string(),
+  error: z.string(),
+});
+export type BulkExportError = z.infer<typeof BulkExportErrorSchema>;
+
+export const BulkExportResultSchema = z.object({
+  exportedAt: z.string(),
   /** How many ids were requested. */
-  requested: number;
+  requested: z.number(),
   /** How many records actually resolved (`images.length`). */
-  count: number;
-  images: CatalogImage[];
+  count: z.number(),
+  images: z.array(CatalogImageSchema),
   /** Ids that could not be exported, with the surfaced reason. */
-  errors: { id: string; error: string }[];
+  errors: z.array(BulkExportErrorSchema),
+});
+export type BulkExportResult = z.infer<typeof BulkExportResultSchema>;
+
+const BulkExportResponseSchema = BulkExportResultSchema.partial().extend({
+  error: z.string().optional(),
+});
+
+function normalizeBulkExportResult(
+  body: z.infer<typeof BulkExportResponseSchema>,
+  requestedIds: string[],
+): BulkExportResult {
+  return {
+    exportedAt: body.exportedAt ?? new Date().toISOString(),
+    requested: body.requested ?? requestedIds.length,
+    count: body.count ?? body.images?.length ?? 0,
+    images: body.images ?? [],
+    errors: body.errors ?? [],
+  };
 }
 
 export async function exportImages(ids: string[], signal?: AbortSignal): Promise<BulkExportResult> {
@@ -39,15 +66,10 @@ export async function exportImages(ids: string[], signal?: AbortSignal): Promise
     body: JSON.stringify({ ids }),
     signal,
   });
-  const body = (await res.json().catch(() => ({}))) as Partial<BulkExportResult> & { error?: string };
+  const parsed = BulkExportResponseSchema.safeParse(await res.json().catch(() => ({})));
+  const body = parsed.success ? parsed.data : {};
   if (!res.ok) throw new Error(body.error ?? `Export failed (HTTP ${res.status})`);
-  return {
-    exportedAt: body.exportedAt ?? new Date().toISOString(),
-    requested: body.requested ?? ids.length,
-    count: body.count ?? body.images?.length ?? 0,
-    images: body.images ?? [],
-    errors: body.errors ?? [],
-  };
+  return normalizeBulkExportResult(body, ids);
 }
 
 /**
@@ -56,39 +78,46 @@ export async function exportImages(ids: string[], signal?: AbortSignal): Promise
  * rating, favorite, safety, source tool, tags, date) an image — without the
  * full canonical record's prompts, params, workflow JSON and references.
  */
-export interface SimpleExportRecord {
+export const SimpleExportRecordSchema = z.object({
   /** Catalog id — the sha256 (kept under `id` too for convenience). */
-  id: string;
-  sha256: string;
-  filePath: string | null;
-  filename: string | null;
-  width: number | null;
-  height: number | null;
-  rating: number | null;
-  favorite: boolean;
-  safety: string | null;
-  sourceTool: string | null;
-  createdAt: string | null;
-  tags: string[];
+  id: z.string(),
+  sha256: z.string(),
+  filePath: z.string().nullable(),
+  filename: z.string().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  rating: z.number().nullable(),
+  favorite: z.boolean(),
+  safety: z.string().nullable(),
+  sourceTool: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  tags: z.array(z.string()),
+});
+export type SimpleExportRecord = z.infer<typeof SimpleExportRecordSchema>;
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+// The contract spells it `filepath`; tolerate a camelCase forward too. Both are
+// caught by the catalog schema's `.catchall(unknown())`, so narrow defensively.
+function resolveExportFilePath(image: CatalogImage): string | null {
+  return asNullableString(image.filepath) ?? asNullableString(image.filePath);
 }
 
 /** Project a full canonical catalog record down to the simple export subset. */
 export function toSimpleRecord(image: CatalogImage): SimpleExportRecord {
-  // The contract spells it `filepath`; tolerate a camelCase forward too.
-  const filePath =
-    (image.filepath as string | null | undefined) ??
-    (image.filePath as string | null | undefined) ??
-    null;
+  const filePath = resolveExportFilePath(image);
   return {
     id: image.sha256,
     sha256: image.sha256,
-    filePath: filePath ?? null,
-    filename: filePath ? filePath.split(/[\\/]/).pop() ?? null : null,
+    filePath,
+    filename: filePath ? (filePath.split(/[\\/]/).pop() ?? null) : null,
     width: image.width ?? null,
     height: image.height ?? null,
     rating: image.rating ?? null,
     favorite: image.favorite ?? false,
-    safety: (image.safety as string | null | undefined) ?? null,
+    safety: asNullableString(image.safety),
     sourceTool: image.sourceTool ?? null,
     createdAt: image.created_at ?? null,
     tags: image.tags ?? [],
