@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
 
@@ -43,8 +43,8 @@ class ImageUpsert(BaseModel):
     tags: list[str] = Field(default_factory=list)
     params: Params | None = None
     references: list[AssetRef] = Field(default_factory=list)
-    workflow_json: dict[str, Any] | None = None
-    api_prompt_json: dict[str, Any] | None = None
+    workflow_json: dict[str, JsonValue] | None = None
+    api_prompt_json: dict[str, JsonValue] | None = None
     safety: Safety | None = None
     # Original on-disk creation time of the source file (ingest captures the
     # file mtime). Distinct from ``imported_at`` (when the catalog first saw it):
@@ -193,6 +193,67 @@ class BatchDeleteRequest(BaseModel):
     sha256s: list[str] = Field(min_length=1, max_length=1000)
 
 
+class StatusResult(BaseModel):
+    """Bare ``{"status": "ok"}`` acknowledgement for mutation endpoints."""
+
+    status: str = "ok"
+
+
+class BatchDeleteResult(StatusResult):
+    """Result of POST /images/batch-delete: which sha256s were removed vs
+    already gone."""
+
+    deleted: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+
+
+class UnlabeledResult(BaseModel):
+    """GET /images/unlabeled: sha256 of images missing a labelagent
+    description."""
+
+    sha256: list[str] = Field(default_factory=list)
+
+
+class BlobPutResult(StatusResult):
+    """Result of PUT /blobs/{sha256}/{kind}: the object-store URI written."""
+
+    uri: str
+
+
+class InterruptStaleResult(BaseModel):
+    """Result of POST /jobs/interrupt-stale: ids flipped to interrupted."""
+
+    interrupted: list[str] = Field(default_factory=list)
+
+
+class ImageQueryFilters(BaseModel):
+    """Shared browse filters for GET /images and GET /images/count, bound as a
+    FastAPI query-parameter model so the route signatures stay under the
+    max-args lint limit. Field names ARE the query-string keys."""
+
+    tag: list[str] | None = None
+    exclude_tag: list[str] | None = None
+    favorite: bool | None = None
+    rating_gte: int | None = Field(default=None, ge=0, le=5)
+    safety: list[str] | None = None
+    path: str | None = None
+
+
+class ImageListQuery(ImageQueryFilters):
+    """GET /images query params: the shared filters plus sort/paging.
+
+    A FastAPI query-parameter model mixing a BaseModel with plain ``Query()``
+    params on the same route does NOT flatten (FastAPI then expects a single
+    literal ``filters`` key instead of the individual query keys), so
+    sort/limit/offset are folded into one model with the filters instead of
+    staying separate route parameters.
+    """
+
+    sort: str = "newest"
+    limit: int = 50
+    offset: int = 0
+
+
 class RatingBody(BaseModel):
     rating: int = Field(ge=0, le=5)
 
@@ -205,7 +266,7 @@ class NoteUpsert(BaseModel):
     title: str | None = None
     positive: str | None = None
     negative: str | None = None
-    blocks: dict[str, Any]
+    blocks: dict[str, JsonValue]
     imageRefs: list[str] = Field(default_factory=list)
 
 
@@ -350,7 +411,7 @@ class JobUpsert(BaseModel):
     error: str | None = None
     current_stage: str | None = None
     stage_counts: dict[str, int] = Field(default_factory=dict)
-    report: dict[str, Any] | None = None
+    report: dict[str, JsonValue] | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
@@ -367,10 +428,10 @@ class Job(JobUpsert):
 # edits) so a UI change survives an ingest restart.
 # ---------------------------------------------------------------------------
 class SettingPut(BaseModel):
-    value: dict[str, Any]
+    value: dict[str, JsonValue]
 
 
 class Setting(BaseModel):
     key: str
-    value: dict[str, Any]
+    value: dict[str, JsonValue]
     updated_at: datetime | None = None

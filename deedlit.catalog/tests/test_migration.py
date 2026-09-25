@@ -8,6 +8,7 @@ database is never touched.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import psycopg
@@ -57,7 +58,7 @@ def _test_db_url() -> str:
 
 
 @pytest.fixture()
-def empty_db() -> str:
+def empty_db() -> Iterator[str]:
     """Create a fresh empty database, yield its URL, drop it afterward."""
     with _admin_conn() as conn, conn.cursor() as cur:
         cur.execute(

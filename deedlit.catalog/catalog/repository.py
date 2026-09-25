@@ -16,10 +16,15 @@ import os
 import random
 import re
 import time
-from typing import Any, Callable, TypeVar
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TypeVar, cast
 
+from pydantic import JsonValue
 from sqlalchemy import bindparam, text
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, CursorResult, RowMapping
 from sqlalchemy.exc import OperationalError
 
 from catalog.db import get_engine
@@ -37,6 +42,7 @@ from catalog.schemas import (
     Note,
     NoteUpsert,
     Params,
+    Safety,
     SafetyBreakdown,
     Setting,
     SourceFolder,
@@ -46,8 +52,90 @@ from catalog.schemas import (
     TagCount,
     TagReport,
     Task,
+    TaskStatus,
+    TaskType,
     TaskUpsert,
 )
+
+# ---------------------------------------------------------------------------
+# row-mapping helpers
+#
+# ``RowMapping`` values are typed ``Any`` by SQLAlchemy (it has no way to know
+# the Postgres column types), so every raw row access is narrowed through one
+# of these before it feeds a pydantic model — keeps the Any confined to this
+# one boundary instead of leaking into every ``_row_to_*``/``_*_from_row``.
+# ---------------------------------------------------------------------------
+
+# A `text()` query result before `.mappings()`/`.scalar_one()` narrows it —
+# SQLAlchemy has no column-type info for a raw SQL string, so this is the
+# widest scalar-row shape any query in this module can produce.
+_AnyResult = CursorResult[tuple[object, ...]]
+
+_ColT = TypeVar("_ColT")
+
+
+def _col(row: RowMapping, key: str, expected: type[_ColT]) -> _ColT | None:
+    """Read ``row[key]``, narrowed to ``expected`` or ``None``."""
+    # RowMapping values are untyped (`Any`) at the SQLAlchemy boundary; this is
+    # the one place that Any is narrowed away before it can leak further.
+    value = row[key]  # pyright: ignore[reportAny] -- sqlalchemy.RowMapping.__getitem__ -> Any
+    return value if isinstance(value, expected) else None
+
+
+def _col_req(row: RowMapping, key: str, expected: type[_ColT]) -> _ColT:
+    """Like :func:`_col` but raises when the column is missing/NULL."""
+    value = _col(row, key, expected)
+    if value is None:
+        raise TypeError(f"column {key!r}: expected {expected!r}, got NULL/mismatch")
+    return value
+
+
+def _scalar_int(result: _AnyResult, *, default: int = 0) -> int:
+    """Read a one-row/one-column numeric result (``COUNT(*)`` etc.)."""
+    value = result.scalar_one()  # pyright: ignore[reportAny] -- untyped text() result
+    return value if isinstance(value, int) else default
+
+
+def _scalar_str_list(result: _AnyResult) -> list[str]:
+    """Flatten a one-column ``SELECT`` result (ids/shas) to a list of str."""
+    return [str(r[0]) for r in result]  # pyright: ignore[reportAny] -- untyped text() result
+
+
+def _col_safety(row: RowMapping, key: str = "safety") -> Safety | None:
+    value = _col(row, key, str)
+    return value if value in ("sfw", "nsfw", "explicit") else None
+
+
+def _col_task_type(row: RowMapping, key: str = "type") -> TaskType:
+    value = _col_req(row, key, str)
+    if value in ("index", "label"):
+        return value
+    raise TypeError(f"column {key!r}: unexpected task type {value!r}")
+
+
+def _col_task_status(row: RowMapping, key: str = "status") -> TaskStatus:
+    value = _col_req(row, key, str)
+    if value in ("queued", "running", "done", "failed", "dlq"):
+        return value
+    raise TypeError(f"column {key!r}: unexpected task status {value!r}")
+
+
+def _col_id(row: RowMapping, key: str = "id") -> str:
+    """Stringify a UUID surrogate-key column (psycopg may hand back a
+    ``uuid.UUID`` or a plain ``str`` depending on the column/driver path)."""
+    value = row[key]  # pyright: ignore[reportAny] -- sqlalchemy.RowMapping.__getitem__ -> Any
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    raise TypeError(f"column {key!r}: expected uuid.UUID/str")
+
+
+# The type of a single SQLAlchemy ``text()`` bind parameter value used across
+# this module's queries.
+SqlParam = str | int | float | bool | list[str] | None
+SqlParams = dict[str, SqlParam]
+
 
 # ---------------------------------------------------------------------------
 # transaction helpers
@@ -199,8 +287,8 @@ def _image_uuid(conn: Connection, sha256: str) -> str | None:
     row = conn.execute(
         text("SELECT id FROM images WHERE sha256_hash = :sha"),
         {"sha": sha256},
-    ).first()
-    return str(row[0]) if row else None
+    ).mappings().first()
+    return _col_id(row) if row is not None else None
 
 
 # The FULL image-row column list, used by the single-image detail fetch
@@ -238,8 +326,27 @@ _DETAIL_LIGHT_COLUMNS = """
 """
 
 
+def _col_json_object(row: RowMapping, key: str) -> dict[str, JsonValue] | None:
+    """Read a JSONB column decoded to a Python object, narrowed to a JSON
+    object. ``key in row`` (not a bare ``[...]``) so this also handles a LIGHT
+    row that omitted the column entirely (see _DETAIL_LIGHT_COLUMNS)."""
+    value = row[key] if key in row else None  # pyright: ignore[reportAny] -- RowMapping -> Any
+    if isinstance(value, dict):
+        # SQLAlchemy/psycopg decode JSONB to `Any`; narrowed to `dict` above,
+        # cast fills in the JSON-object value type (a genuine library gap).
+        return cast(dict[str, JsonValue], value)
+    return None
+
+
+def _col_int_dict(row: RowMapping, key: str) -> dict[str, int]:
+    """Read a JSONB column decoded to an ``{str: int}`` histogram (e.g.
+    ``jobs.stage_counts``), dropping any entry that isn't an int count."""
+    obj = _col_json_object(row, key) or {}
+    return {k: v for k, v in obj.items() if isinstance(v, int)}
+
+
 def _row_to_image(
-    row: Any,
+    row: RowMapping,
     *,
     tags: list[str],
     params: Params | None,
@@ -249,59 +356,62 @@ def _row_to_image(
     """Assemble an :class:`Image` from a raw image row + its already-loaded
     children. The single place the row→model mapping lives, so the per-image
     (:func:`get_image`) and batched (:func:`_hydrate_images`) paths agree."""
-    # `.get()` (not `[...]`) so this also assembles a LIGHT row that omitted the
-    # two heavy JSONB columns — there they read as None (see _DETAIL_LIGHT_COLUMNS).
-    metadata = row.get("metadata_json") or {}
+    metadata = _col_json_object(row, "metadata_json") or {}
+    raw_api_prompt_json = metadata.get("api_prompt_json")
     api_prompt_json = (
-        metadata.get("api_prompt_json") if isinstance(metadata, dict) else None
+        raw_api_prompt_json if isinstance(raw_api_prompt_json, dict) else None
     )
+    created_at = _col(row, "created_at", datetime)
+    imported_at = _col(row, "imported_at", datetime)
     return Image(
-        sha256=row["sha256_hash"],
-        filepath=row["file_path"],
-        phash=row["perceptual_hash"],
-        width=row["width"],
-        height=row["height"],
-        sourceTool=row["source_tool"],
-        prompt=row["prompt"],
-        negative=row["negative_prompt"],
+        sha256=_col_req(row, "sha256_hash", str),
+        filepath=_col(row, "file_path", str),
+        phash=_col(row, "perceptual_hash", str),
+        width=_col(row, "width", int),
+        height=_col(row, "height", int),
+        sourceTool=_col(row, "source_tool", str),
+        prompt=_col(row, "prompt", str),
+        negative=_col(row, "negative_prompt", str),
         tags=tags,
         params=params,
         references=references,
-        workflow_json=row.get("workflow_json"),
+        workflow_json=_col_json_object(row, "workflow_json"),
         api_prompt_json=api_prompt_json,
-        rating=row["rating"],
-        favorite=row["favorite"],
-        safety=row["safety"],
+        rating=_col(row, "rating", int),
+        favorite=_col_req(row, "favorite", bool),
+        safety=_col_safety(row),
         description=description,
         # created_at = captured file mtime; fall back to the import time for
         # rows ingested before mtime capture existed (keeps it non-null).
-        created_at=row["created_at"] or row["imported_at"],
-        imported_at=row["imported_at"],
+        created_at=created_at or imported_at,
+        imported_at=imported_at,
     )
 
 
 def _row_to_summary(
-    row: Any, *, tags: list[str], references: list[AssetRef]
+    row: RowMapping, *, tags: list[str], references: list[AssetRef]
 ) -> ImageSummary:
     """Assemble the lightweight browse :class:`ImageSummary` from a ``_LIST_COLUMNS``
     row + its (small) tag/reference children. No workflow/api-prompt/params/
     description — those ride only the full :class:`Image` from :func:`get_image`."""
+    created_at = _col(row, "created_at", datetime)
+    imported_at = _col(row, "imported_at", datetime)
     return ImageSummary(
-        sha256=row["sha256_hash"],
-        filepath=row["file_path"],
-        directory=row["directory"],
-        phash=row["perceptual_hash"],
-        width=row["width"],
-        height=row["height"],
-        sourceTool=row["source_tool"],
-        prompt=row["prompt"],
+        sha256=_col_req(row, "sha256_hash", str),
+        filepath=_col(row, "file_path", str),
+        directory=_col(row, "directory", str),
+        phash=_col(row, "perceptual_hash", str),
+        width=_col(row, "width", int),
+        height=_col(row, "height", int),
+        sourceTool=_col(row, "source_tool", str),
+        prompt=_col(row, "prompt", str),
         tags=tags,
         references=references,
-        rating=row["rating"],
-        favorite=row["favorite"],
-        safety=row["safety"],
-        created_at=row["created_at"] or row["imported_at"],
-        imported_at=row["imported_at"],
+        rating=_col(row, "rating", int),
+        favorite=_col_req(row, "favorite", bool),
+        safety=_col_safety(row),
+        created_at=created_at or imported_at,
+        imported_at=imported_at,
     )
 
 
@@ -323,7 +433,7 @@ def get_image(sha256: str, *, light: bool = False) -> Image | None:
         ).mappings().first()
         if row is None:
             return None
-        image_id = str(row["id"])
+        image_id = _col_id(row)
         return _row_to_image(
             row,
             tags=_get_tags(conn, image_id),
@@ -333,7 +443,7 @@ def get_image(sha256: str, *, light: bool = False) -> Image | None:
         )
 
 
-def _hydrate_summaries(conn: Connection, rows: list[Any]) -> list[ImageSummary]:
+def _hydrate_summaries(conn: Connection, rows: list[RowMapping]) -> list[ImageSummary]:
     """Load the SUMMARY children (tags + references) for a PAGE of browse rows in
     two set-based queries instead of the per-image N+1.
 
@@ -346,8 +456,8 @@ def _hydrate_summaries(conn: Connection, rows: list[Any]) -> list[ImageSummary]:
     """
     if not rows:
         return []
-    ids = [str(r["id"]) for r in rows]
-    shas = [r["sha256_hash"] for r in rows]
+    ids = [_col_id(r) for r in rows]
+    shas = [_col_req(r, "sha256_hash", str) for r in rows]
 
     tag_rows = conn.execute(
         text(
@@ -359,10 +469,12 @@ def _hydrate_summaries(conn: Connection, rows: list[Any]) -> list[ImageSummary]:
             """
         ).bindparams(bindparam("ids", expanding=True)),
         {"ids": ids},
-    ).all()
+    ).mappings().all()
     tags_by_id: dict[str, list[str]] = {}
-    for iid, name in tag_rows:
-        tags_by_id.setdefault(str(iid), []).append(name)
+    for tag_row in tag_rows:
+        tags_by_id.setdefault(_col_id(tag_row, "iid"), []).append(
+            _col_req(tag_row, "name", str)
+        )
 
     ref_rows = conn.execute(
         text(
@@ -373,15 +485,19 @@ def _hydrate_summaries(conn: Connection, rows: list[Any]) -> list[ImageSummary]:
     ).mappings().all()
     refs_by_sha: dict[str, list[AssetRef]] = {}
     for r in ref_rows:
-        refs_by_sha.setdefault(r["sha256"], []).append(
-            AssetRef(kind=r["kind"], name=r["name"], hash=r["hash"])
+        refs_by_sha.setdefault(_col_req(r, "sha256", str), []).append(
+            AssetRef(
+                kind=_col_req(r, "kind", str),
+                name=_col_req(r, "name", str),
+                hash=_col(r, "hash", str),
+            )
         )
 
     return [
         _row_to_summary(
             r,
-            tags=tags_by_id.get(str(r["id"]), []),
-            references=refs_by_sha.get(r["sha256_hash"], []),
+            tags=tags_by_id.get(_col_id(r), []),
+            references=refs_by_sha.get(_col_req(r, "sha256_hash", str), []),
         )
         for r in rows
     ]
@@ -414,6 +530,19 @@ _ORDER_BY: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ImageFilters:
+    """The AND-combined browse filters shared by ``list_images`` and
+    ``count_images`` (and their GET /images, GET /images/count routes)."""
+
+    tags: list[str] | None = None
+    exclude_tags: list[str] | None = None
+    favorite: bool | None = None
+    rating_gte: int | None = None
+    safety: list[str] | None = None
+    path: str | None = None
+
+
 def _image_filters(
     *,
     tags: list[str] | None,
@@ -422,7 +551,7 @@ def _image_filters(
     rating_gte: int | None,
     safety: list[str] | None,
     path: str | None = None,
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, SqlParams]:
     """Build the shared WHERE clause + bind params for the browse filters.
 
     Used by both ``list_images`` (paged rows) and ``count_images`` (the matching
@@ -431,7 +560,7 @@ def _image_filters(
     JOIN/DISTINCT) and a count is an honest one-row-per-image tally.
     """
     clauses = ["i.deleted = false"]
-    params: dict[str, Any] = {}
+    params: SqlParams = {}
 
     # Include tags — image must carry EVERY requested tag (AND semantics).
     for idx, tag in enumerate(tags or []):
@@ -481,16 +610,11 @@ def _image_filters(
 
 
 def list_images(
+    filters: ImageFilters,
     *,
-    tags: list[str] | None = None,
-    exclude_tags: list[str] | None = None,
-    favorite: bool | None = None,
-    rating_gte: int | None = None,
     limit: int,
     offset: int,
-    safety: list[str] | None = None,
     sort: str = "newest",
-    path: str | None = None,
 ) -> list[ImageSummary]:
     """Browse the catalog with AND-combined filters and a whitelisted sort.
 
@@ -508,12 +632,12 @@ def list_images(
     """
     eng = get_engine()
     where, params = _image_filters(
-        tags=tags,
-        exclude_tags=exclude_tags,
-        favorite=favorite,
-        rating_gte=rating_gte,
-        safety=safety,
-        path=path,
+        tags=filters.tags,
+        exclude_tags=filters.exclude_tags,
+        favorite=filters.favorite,
+        rating_gte=filters.rating_gte,
+        safety=filters.safety,
+        path=filters.path,
     )
     params.update({"limit": limit, "offset": offset})
     order_by = _ORDER_BY.get(sort, _ORDER_BY["newest"])
@@ -537,15 +661,7 @@ def list_images(
         return _hydrate_summaries(conn, list(rows))
 
 
-def count_images(
-    *,
-    tags: list[str] | None = None,
-    exclude_tags: list[str] | None = None,
-    favorite: bool | None = None,
-    rating_gte: int | None = None,
-    safety: list[str] | None = None,
-    path: str | None = None,
-) -> int:
+def count_images(filters: ImageFilters) -> int:
     """Total images matching the same filters as ``list_images``.
 
     Lets a report/export tool size the work set (how many pages of GET /images to
@@ -553,19 +669,18 @@ def count_images(
     list so the count can never disagree with what listing returns.
     """
     where, params = _image_filters(
-        tags=tags,
-        exclude_tags=exclude_tags,
-        favorite=favorite,
-        rating_gte=rating_gte,
-        safety=safety,
-        path=path,
+        tags=filters.tags,
+        exclude_tags=filters.exclude_tags,
+        favorite=filters.favorite,
+        rating_gte=filters.rating_gte,
+        safety=filters.safety,
+        path=filters.path,
     )
     eng = get_engine()
     with eng.connect() as conn:
-        row = conn.execute(
-            text(f"SELECT count(*) AS n FROM images i WHERE {where}"), params
-        ).first()
-    return int(row[0]) if row else 0
+        return _scalar_int(
+            conn.execute(text(f"SELECT count(*) AS n FROM images i WHERE {where}"), params)
+        )
 
 
 def list_directories(*, limit: int = 2000) -> list[DirectoryCount]:
@@ -596,7 +711,10 @@ def list_directories(*, limit: int = 2000) -> list[DirectoryCount]:
             {"limit": limit},
         ).mappings().all()
     return [
-        DirectoryCount(directory=r["directory"], image_count=int(r["image_count"]))
+        DirectoryCount(
+            directory=_col_req(r, "directory", str),
+            image_count=_col_req(r, "image_count", int),
+        )
         for r in rows
     ]
 
@@ -612,7 +730,7 @@ def suggest_tags(*, prefix: str, limit: int) -> list[str]:
     """
     eng = get_engine()
     norm = _normalize_tag(prefix)
-    params: dict[str, Any] = {"limit": limit}
+    params: SqlParams = {"limit": limit}
     where = ""
     if norm:
         escaped = norm.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -632,8 +750,8 @@ def suggest_tags(*, prefix: str, limit: int) -> list[str]:
                 """
             ),
             params,
-        ).all()
-    return [r[0] for r in rows]
+        ).mappings().all()
+    return [_col_req(r, "name", str) for r in rows]
 
 
 def tag_report(*, prefix: str = "", limit: int, offset: int) -> TagReport:
@@ -648,15 +766,13 @@ def tag_report(*, prefix: str = "", limit: int, offset: int) -> TagReport:
     eng = get_engine()
     norm = _normalize_tag(prefix)
     where = ""
-    bind: dict[str, Any] = {}
+    bind: SqlParams = {}
     if norm:
         escaped = norm.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         where = "WHERE t.normalized_name LIKE :pfx ESCAPE '\\'"
         bind["pfx"] = f"{escaped}%"
     with eng.connect() as conn:
-        total = conn.execute(
-            text(f"SELECT count(*) FROM tags t {where}"), bind
-        ).scalar_one()
+        total = _scalar_int(conn.execute(text(f"SELECT count(*) FROM tags t {where}"), bind))
         rows = conn.execute(
             text(
                 f"""
@@ -677,36 +793,41 @@ def tag_report(*, prefix: str = "", limit: int, offset: int) -> TagReport:
         ).mappings().all()
     items = [
         TagCount(
-            name=r["name"],
-            normalized_name=r["normalized_name"],
-            image_count=int(r["image_count"] or 0),
+            name=_col_req(r, "name", str),
+            normalized_name=_col_req(r, "normalized_name", str),
+            image_count=_col(r, "image_count", int) or 0,
         )
         for r in rows
     ]
-    return TagReport(total=int(total), items=items)
+    return TagReport(total=total, items=items)
+
+
+def _image_patch_sets(sha256: str, patch: ImagePatch) -> tuple[list[str], SqlParams]:
+    sets: list[str] = []
+    params: SqlParams = {"sha": sha256}
+    if patch.rating is not None:
+        sets.append("rating = :rating")
+        params["rating"] = patch.rating
+    if patch.favorite is not None:
+        sets.append("favorite = :favorite")
+        params["favorite"] = patch.favorite
+    if patch.safety is not None:
+        sets.append("safety = :safety")
+        params["safety"] = patch.safety
+    if patch.prompt is not None:
+        sets.append("prompt = :prompt")
+        params["prompt"] = patch.prompt
+    if patch.negative is not None:
+        sets.append("negative_prompt = :negative")
+        params["negative"] = patch.negative
+    return sets, params
 
 
 def patch_image(sha256: str, patch: ImagePatch) -> Image | None:
     def _tx(conn: Connection) -> bool:
         if _image_uuid(conn, sha256) is None:
             return False
-        sets = []
-        params: dict[str, Any] = {"sha": sha256}
-        if patch.rating is not None:
-            sets.append("rating = :rating")
-            params["rating"] = patch.rating
-        if patch.favorite is not None:
-            sets.append("favorite = :favorite")
-            params["favorite"] = patch.favorite
-        if patch.safety is not None:
-            sets.append("safety = :safety")
-            params["safety"] = patch.safety
-        if patch.prompt is not None:
-            sets.append("prompt = :prompt")
-            params["prompt"] = patch.prompt
-        if patch.negative is not None:
-            sets.append("negative_prompt = :negative")
-            params["negative"] = patch.negative
+        sets, params = _image_patch_sets(sha256, patch)
         if sets:
             conn.execute(
                 text(
@@ -978,15 +1099,15 @@ def _get_params(conn: Connection, image_id: str) -> Params | None:
     if row is None:
         return None
     return Params(
-        seed=row["seed"],
-        steps=row["steps"],
-        cfg=row["cfg_scale"],
-        sampler=row["sampler"],
-        scheduler=row["scheduler"],
-        denoise=row["denoise"],
-        clipskip=row["clip_skip"],
-        width=row["width"],
-        height=row["height"],
+        seed=_col(row, "seed", int),
+        steps=_col(row, "steps", int),
+        cfg=_col(row, "cfg_scale", float),
+        sampler=_col(row, "sampler", str),
+        scheduler=_col(row, "scheduler", str),
+        denoise=_col(row, "denoise", float),
+        clipskip=_col(row, "clip_skip", int),
+        width=_col(row, "width", int),
+        height=_col(row, "height", int),
     )
 
 
@@ -1028,7 +1149,14 @@ def _get_references(conn: Connection, sha256: str) -> list[AssetRef]:
         ),
         {"sha": sha256},
     ).mappings().all()
-    return [AssetRef(kind=r["kind"], name=r["name"], hash=r["hash"]) for r in rows]
+    return [
+        AssetRef(
+            kind=_col_req(r, "kind", str),
+            name=_col_req(r, "name", str),
+            hash=_col(r, "hash", str),
+        )
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1082,8 +1210,8 @@ def _get_description(conn: Connection, image_id: str) -> str | None:
             "WHERE image_id = :iid ORDER BY created_at DESC LIMIT 1"
         ),
         {"iid": image_id},
-    ).first()
-    return row[0] if row else None
+    ).mappings().first()
+    return _col(row, "description", str) if row is not None else None
 
 
 # ---------------------------------------------------------------------------
@@ -1109,7 +1237,8 @@ def create_note(payload: NoteUpsert) -> Note:
                 "blocks": json.dumps(payload.blocks),
             },
         ).mappings().first()
-        note_id = str(row["id"])
+        assert row is not None
+        note_id = _col_id(row)
         _set_note_refs(conn, note_id, payload.imageRefs)
     note = get_note(note_id)
     assert note is not None
@@ -1169,24 +1298,23 @@ def get_note(note_id: str) -> Note | None:
         ).mappings().first()
         if row is None:
             return None
-        refs = [
-            r[0]
-            for r in conn.execute(
+        refs = _scalar_str_list(
+            conn.execute(
                 text(
                     "SELECT sha256 FROM note_image_refs WHERE note_id = :nid "
                     "ORDER BY position"
                 ),
                 {"nid": note_id},
-            ).all()
-        ]
+            )
+        )
         return Note(
-            id=str(row["id"]),
-            title=row["title"],
-            positive=row["positive"],
-            negative=row["negative"],
-            blocks=row["blocks"],
+            id=_col_id(row),
+            title=_col(row, "title", str),
+            positive=_col(row, "positive", str),
+            negative=_col(row, "negative", str),
+            blocks=_col_json_object(row, "blocks") or {},  # NOT NULL column
             imageRefs=refs,
-            created_at=row["created_at"],
+            created_at=_col(row, "created_at", datetime),
         )
 
 
@@ -1198,15 +1326,14 @@ def export_note(note_id: str) -> Note | None:
 def notes_by_image(sha256: str) -> list[Note]:
     eng = get_engine()
     with eng.connect() as conn:
-        ids = [
-            str(r[0])
-            for r in conn.execute(
+        ids = _scalar_str_list(
+            conn.execute(
                 text(
                     "SELECT DISTINCT note_id FROM note_image_refs WHERE sha256 = :sha"
                 ),
                 {"sha": sha256},
-            ).all()
-        ]
+            )
+        )
     return [n for nid in ids if (n := get_note(nid)) is not None]
 
 
@@ -1221,8 +1348,9 @@ def create_collection(name: str, images: list[str]) -> Collection:
         row = conn.execute(
             text("INSERT INTO collections (name) VALUES (:name) RETURNING id"),
             {"name": name},
-        ).first()
-        cid = str(row[0])
+        ).mappings().first()
+        assert row is not None
+        cid = _col_id(row)
         _set_collection_images(conn, cid, images)
     col = get_collection(cid)
     assert col is not None
@@ -1232,12 +1360,9 @@ def create_collection(name: str, images: list[str]) -> Collection:
 def list_collections() -> list[Collection]:
     eng = get_engine()
     with eng.connect() as conn:
-        ids = [
-            str(r[0])
-            for r in conn.execute(
-                text("SELECT id FROM collections ORDER BY created_at DESC")
-            ).all()
-        ]
+        ids = _scalar_str_list(
+            conn.execute(text("SELECT id FROM collections ORDER BY created_at DESC"))
+        )
     return [c for cid in ids if (c := get_collection(cid)) is not None]
 
 
@@ -1250,17 +1375,16 @@ def get_collection(cid: str) -> Collection | None:
         ).mappings().first()
         if row is None:
             return None
-        images = [
-            r[0]
-            for r in conn.execute(
+        images = _scalar_str_list(
+            conn.execute(
                 text(
                     "SELECT sha256 FROM collection_images WHERE collection_id = :cid "
                     "ORDER BY position"
                 ),
                 {"cid": cid},
-            ).all()
-        ]
-        return Collection(id=str(row["id"]), name=row["name"], images=images)
+            )
+        )
+        return Collection(id=_col_id(row), name=_col_req(row, "name", str), images=images)
 
 
 def rename_collection(cid: str, name: str) -> Collection | None:
@@ -1290,16 +1414,15 @@ def delete_collection(cid: str) -> bool:
 def collections_by_image(sha256: str) -> list[Collection]:
     eng = get_engine()
     with eng.connect() as conn:
-        ids = [
-            str(r[0])
-            for r in conn.execute(
+        ids = _scalar_str_list(
+            conn.execute(
                 text(
                     "SELECT DISTINCT collection_id FROM collection_images "
                     "WHERE sha256 = :sha"
                 ),
                 {"sha": sha256},
-            ).all()
-        ]
+            )
+        )
     return [c for cid in ids if (c := get_collection(cid)) is not None]
 
 
@@ -1370,24 +1493,25 @@ def _folder_counts(conn: Connection, path: str) -> tuple[int, int]:
     ).mappings().first()
     if row is None:
         return 0, 0
-    return int(row["image_count"] or 0), int(row["labeled_count"] or 0)
+    return _col(row, "image_count", int) or 0, _col(row, "labeled_count", int) or 0
 
 
-def _folder_from_row(conn: Connection, row: Any) -> SourceFolder:
-    image_count, labeled_count = _folder_counts(conn, row["path"])
+def _folder_from_row(conn: Connection, row: RowMapping) -> SourceFolder:
+    path = _col_req(row, "path", str)
+    image_count, labeled_count = _folder_counts(conn, path)
     return SourceFolder(
-        id=str(row["id"]),
-        path=row["path"],
-        label=row["label"],
-        enabled=row["enabled"],
-        recursive=row["recursive"],
-        scan_interval_seconds=row["scan_interval_seconds"],
-        last_scan_at=row["last_scan_at"],
-        last_scan_status=row["last_scan_status"],
-        last_scan_job_id=row["last_scan_job_id"],
-        last_error=row["last_error"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=_col_id(row),
+        path=path,
+        label=_col(row, "label", str),
+        enabled=_col_req(row, "enabled", bool),
+        recursive=_col_req(row, "recursive", bool),
+        scan_interval_seconds=_col_req(row, "scan_interval_seconds", int),
+        last_scan_at=_col(row, "last_scan_at", datetime),
+        last_scan_status=_col(row, "last_scan_status", str),
+        last_scan_job_id=_col(row, "last_scan_job_id", str),
+        last_error=_col(row, "last_error", str),
+        created_at=_col(row, "created_at", datetime),
+        updated_at=_col(row, "updated_at", datetime),
         image_count=image_count,
         labeled_count=labeled_count,
         unlabeled_count=max(image_count - labeled_count, 0),
@@ -1429,6 +1553,7 @@ def create_folder(payload: SourceFolderUpsert) -> SourceFolder:
                 "interval": payload.scan_interval_seconds,
             },
         ).mappings().first()
+        assert row is not None
         return _folder_from_row(conn, row)
 
 
@@ -1483,17 +1608,17 @@ def patch_folder(folder_id: str, patch: SourceFolderPatch) -> SourceFolder | Non
     to record when a scan started/finished)."""
     eng = get_engine()
     sets: list[str] = []
-    params: dict[str, Any] = {"id": folder_id}
-    for field in (
-        "label",
-        "enabled",
-        "recursive",
-        "scan_interval_seconds",
-        "last_scan_status",
-        "last_scan_job_id",
-        "last_error",
-    ):
-        value = getattr(patch, field)
+    params: SqlParams = {"id": folder_id}
+    patch_fields: list[tuple[str, str | bool | int | None]] = [
+        ("label", patch.label),
+        ("enabled", patch.enabled),
+        ("recursive", patch.recursive),
+        ("scan_interval_seconds", patch.scan_interval_seconds),
+        ("last_scan_status", patch.last_scan_status),
+        ("last_scan_job_id", patch.last_scan_job_id),
+        ("last_error", patch.last_error),
+    ]
+    for field, value in patch_fields:
         if value is not None:
             sets.append(f"{field} = :{field}")
             params[field] = value
@@ -1540,16 +1665,18 @@ def library_stats() -> StatsReport:
     """
     eng = get_engine()
     with eng.connect() as conn:
-        images = conn.execute(
-            text("SELECT count(*) FROM images WHERE deleted = false")
-        ).scalar_one()
-        favorites = conn.execute(
-            text("SELECT count(*) FROM images WHERE deleted = false AND favorite = true")
-        ).scalar_one()
-        tags = conn.execute(text("SELECT count(*) FROM tags")).scalar_one()
-        collections = conn.execute(text("SELECT count(*) FROM collections")).scalar_one()
-        notes = conn.execute(text("SELECT count(*) FROM notes")).scalar_one()
-        folders = conn.execute(text("SELECT count(*) FROM source_folders")).scalar_one()
+        images = _scalar_int(
+            conn.execute(text("SELECT count(*) FROM images WHERE deleted = false"))
+        )
+        favorites = _scalar_int(
+            conn.execute(
+                text("SELECT count(*) FROM images WHERE deleted = false AND favorite = true")
+            )
+        )
+        tags = _scalar_int(conn.execute(text("SELECT count(*) FROM tags")))
+        collections = _scalar_int(conn.execute(text("SELECT count(*) FROM collections")))
+        notes = _scalar_int(conn.execute(text("SELECT count(*) FROM notes")))
+        folders = _scalar_int(conn.execute(text("SELECT count(*) FROM source_folders")))
 
         # Content-safety histogram over live images; NULL -> unclassified.
         safety_rows = conn.execute(
@@ -1561,7 +1688,9 @@ def library_stats() -> StatsReport:
                 """
             )
         ).mappings().all()
-        counts = {r["klass"]: int(r["n"]) for r in safety_rows}
+        counts = {
+            _col_req(r, "klass", str): _col_req(r, "n", int) for r in safety_rows
+        }
         safety = SafetyBreakdown(
             sfw=counts.get("sfw", 0),
             nsfw=counts.get("nsfw", 0),
@@ -1572,30 +1701,32 @@ def library_stats() -> StatsReport:
         # Labeled = has a labelagent description AND a safety class. Mirrors the
         # backfill work set (list_unlabeled_sha256 = missing EITHER), so the
         # labeled/unlabeled split here stays consistent with what the sweep targets.
-        labeled = conn.execute(
-            text(
-                """
-                SELECT count(*) FROM images i
-                WHERE i.deleted = false
-                  AND i.safety IS NOT NULL
-                  AND EXISTS (
-                    SELECT 1 FROM image_descriptions d
-                    WHERE d.image_id = i.id AND d.provider = :provider
-                  )
-                """
-            ),
-            {"provider": _DESCRIPTION_PROVIDER},
-        ).scalar_one()
+        labeled = _scalar_int(
+            conn.execute(
+                text(
+                    """
+                    SELECT count(*) FROM images i
+                    WHERE i.deleted = false
+                      AND i.safety IS NOT NULL
+                      AND EXISTS (
+                        SELECT 1 FROM image_descriptions d
+                        WHERE d.image_id = i.id AND d.provider = :provider
+                      )
+                    """
+                ),
+                {"provider": _DESCRIPTION_PROVIDER},
+            )
+        )
 
     return StatsReport(
-        images=int(images),
-        tags=int(tags),
-        collections=int(collections),
-        notes=int(notes),
-        folders=int(folders),
-        favorites=int(favorites),
-        labeled=int(labeled),
-        unlabeled=max(int(images) - int(labeled), 0),
+        images=images,
+        tags=tags,
+        collections=collections,
+        notes=notes,
+        folders=folders,
+        favorites=favorites,
+        labeled=labeled,
+        unlabeled=max(images - labeled, 0),
         safety=safety,
     )
 
@@ -1612,17 +1743,17 @@ _TASK_COLUMNS = (
 )
 
 
-def _task_from_row(row: Any) -> Task:
+def _task_from_row(row: RowMapping) -> Task:
     return Task(
-        id=str(row["id"]),
-        sha256=row["sha256"],
-        type=row["type"],
-        status=row["status"],
-        attempts=int(row["attempts"] or 0),
-        error=row["error"],
-        parent_op_id=row["parent_op_id"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=_col_id(row),
+        sha256=_col_req(row, "sha256", str),
+        type=_col_task_type(row),
+        status=_col_task_status(row),
+        attempts=_col(row, "attempts", int) or 0,
+        error=_col(row, "error", str),
+        parent_op_id=_col(row, "parent_op_id", str),
+        created_at=_col(row, "created_at", datetime),
+        updated_at=_col(row, "updated_at", datetime),
     )
 
 
@@ -1659,6 +1790,7 @@ def upsert_task(payload: TaskUpsert) -> Task:
                 "parent_op_id": payload.parent_op_id,
             },
         ).mappings().first()
+        assert row is not None
         return _task_from_row(row)
 
 
@@ -1672,7 +1804,7 @@ def list_tasks(
 ) -> list[Task]:
     """List tasks (newest-updated first), filtered by sha256/type/status."""
     clauses: list[str] = []
-    params: dict[str, Any] = {"limit": limit, "offset": offset}
+    params: SqlParams = {"limit": limit, "offset": offset}
     if sha256:
         clauses.append("sha256 = :sha256")
         params["sha256"] = sha256
@@ -1740,8 +1872,8 @@ def list_unlabeled_sha256(limit: int, offset: int) -> list[str]:
                 """
             ),
             {"provider": _DESCRIPTION_PROVIDER, "limit": limit, "offset": offset},
-        ).all()
-        return [r[0] for r in rows]
+        )
+        return _scalar_str_list(rows)
 
 
 # ---------------------------------------------------------------------------
@@ -1758,26 +1890,26 @@ _JOB_COLUMNS = (
 )
 
 
-def _job_from_row(row: Any) -> Job:
+def _job_from_row(row: RowMapping) -> Job:
     return Job(
-        id=str(row["id"]),
-        type=row["type"],
-        status=row["status"],
-        folder_path=row["folder_path"],
-        source_folder_id=row["source_folder_id"],
-        total=int(row["total"] or 0),
-        done=int(row["done"] or 0),
-        skipped=int(row["skipped"] or 0),
-        failed=int(row["failed"] or 0),
-        error=row["error"],
-        current_stage=row["current_stage"],
+        id=_col_id(row),
+        type=_col_req(row, "type", str),
+        status=_col_req(row, "status", str),
+        folder_path=_col(row, "folder_path", str),
+        source_folder_id=_col(row, "source_folder_id", str),
+        total=_col(row, "total", int) or 0,
+        done=_col(row, "done", int) or 0,
+        skipped=_col(row, "skipped", int) or 0,
+        failed=_col(row, "failed", int) or 0,
+        error=_col(row, "error", str),
+        current_stage=_col(row, "current_stage", str),
         # JSONB round-trips as a dict already; coerce defensively.
-        stage_counts=row["stage_counts"] or {},
-        report=row["report"],
-        created_at=row["created_at"],
-        started_at=row["started_at"],
-        finished_at=row["finished_at"],
-        updated_at=row["updated_at"],
+        stage_counts=_col_int_dict(row, "stage_counts"),
+        report=_col_json_object(row, "report"),
+        created_at=_col(row, "created_at", datetime),
+        started_at=_col(row, "started_at", datetime),
+        finished_at=_col(row, "finished_at", datetime),
+        updated_at=_col(row, "updated_at", datetime),
     )
 
 
@@ -1841,6 +1973,7 @@ def upsert_job(payload: JobUpsert) -> Job:
                 "finished_at": payload.finished_at,
             },
         ).mappings().first()
+        assert row is not None
         return _job_from_row(row)
 
 
@@ -1888,8 +2021,8 @@ def interrupt_stale_jobs() -> list[str]:
                 RETURNING id
                 """
             )
-        ).all()
-        return [str(r[0]) for r in rows]
+        )
+        return _scalar_str_list(rows)
 
 
 # ---------------------------------------------------------------------------
@@ -1904,10 +2037,14 @@ def get_setting(key: str) -> Setting | None:
         ).mappings().first()
     if row is None:
         return None
-    return Setting(key=row["key"], value=row["value"] or {}, updated_at=row["updated_at"])
+    return Setting(
+        key=_col_req(row, "key", str),
+        value=_col_json_object(row, "value") or {},
+        updated_at=_col(row, "updated_at", datetime),
+    )
 
 
-def put_setting(key: str, value: dict[str, Any]) -> Setting:
+def put_setting(key: str, value: dict[str, JsonValue]) -> Setting:
     eng = get_engine()
     with eng.begin() as conn:
         row = conn.execute(
@@ -1923,4 +2060,9 @@ def put_setting(key: str, value: dict[str, Any]) -> Setting:
             ),
             {"key": key, "value": json.dumps(value or {})},
         ).mappings().first()
-        return Setting(key=row["key"], value=row["value"] or {}, updated_at=row["updated_at"])
+        assert row is not None
+        return Setting(
+            key=_col_req(row, "key", str),
+            value=_col_json_object(row, "value") or {},
+            updated_at=_col(row, "updated_at", datetime),
+        )

@@ -10,10 +10,15 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import psycopg
 import pytest
 from psycopg import sql
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 ADMIN_URL = os.environ.get(
     "CATALOG_ADMIN_DATABASE_URL",
@@ -26,7 +31,7 @@ def _admin_conn() -> psycopg.Connection:
 
 
 @pytest.fixture()
-def migrated_db() -> str:
+def migrated_db() -> Iterator[str]:
     """Create + migrate a fresh database, yield its SQLAlchemy URL, drop it."""
     db_name = f"catalog_test_{uuid.uuid4().hex[:12]}"
     with _admin_conn() as conn, conn.cursor() as cur:
@@ -50,7 +55,7 @@ def migrated_db() -> str:
 
 
 @pytest.fixture()
-def client(migrated_db: str):
+def client(migrated_db: str) -> Iterator[TestClient]:
     from fastapi.testclient import TestClient
 
     prev_db = os.environ.get("DATABASE_URL")

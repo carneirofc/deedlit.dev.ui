@@ -26,9 +26,13 @@ if config.config_file_name is not None:
 
 
 def _database_url() -> str:
-    return os.environ.get("CATALOG_DATABASE_URL") or config.get_main_option(
-        "sqlalchemy.url"
-    )
+    url = os.environ.get("CATALOG_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    if not url:
+        raise RuntimeError(
+            "no database URL: set CATALOG_DATABASE_URL or the alembic.ini "
+            "sqlalchemy.url option"
+        )
+    return url
 
 
 def run_migrations_offline() -> None:

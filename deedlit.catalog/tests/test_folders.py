@@ -9,7 +9,7 @@ from __future__ import annotations
 
 
 def _mk_image(client, sha: str, filepath: str, *, description: str | None = None) -> None:
-    body: dict = {"sha256": sha, "filepath": filepath}
+    body: dict[str, str] = {"sha256": sha, "filepath": filepath}
     if description is not None:
         body["description"] = description
     r = client.post("/images", json=body)

@@ -22,6 +22,8 @@ size/provider-dims in its keys; the catalog blob endpoint exposes the simpler
 """
 from __future__ import annotations
 
+from typing import Protocol, cast
+
 import boto3
 from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
@@ -39,7 +41,30 @@ _KIND_SPEC: dict[str, tuple[str, str, str]] = {
 # the image-delete cleanup loop, so adding a kind above is enough.
 BLOB_KINDS: frozenset[str] = frozenset(_KIND_SPEC)
 
-_client = None
+
+class _S3Body(Protocol):
+    def read(self) -> bytes: ...
+
+
+class _GetObjectResult(Protocol):
+    def __getitem__(self, key: str) -> _S3Body: ...
+
+
+class S3Client(Protocol):
+    """The subset of the boto3 S3 client this module calls (boto3 ships no
+    type stubs, so the boundary is wrapped in a narrow Protocol instead of
+    trusting the untyped client)."""
+
+    def head_bucket(self, *, Bucket: str) -> object: ...
+    def create_bucket(self, *, Bucket: str) -> object: ...
+    def put_object(
+        self, *, Bucket: str, Key: str, Body: bytes, ContentType: str
+    ) -> object: ...
+    def get_object(self, *, Bucket: str, Key: str) -> _GetObjectResult: ...
+    def delete_object(self, *, Bucket: str, Key: str) -> object: ...
+
+
+_client: S3Client | None = None
 _client_endpoint: str | None = None
 _bucket_ready: set[str] = set()
 
@@ -61,19 +86,22 @@ def content_type_for(kind: str) -> str:
     return _spec(kind)[2]
 
 
-def get_client():
+def get_client() -> S3Client:
     global _client, _client_endpoint
     cfg = get_config().object_store
     if _client is None or _client_endpoint != cfg.endpoint:
-        _client = boto3.client(
-            "s3",
-            endpoint_url=cfg.endpoint,
-            region_name=cfg.region,
-            aws_access_key_id=cfg.access_key,
-            aws_secret_access_key=cfg.secret_key,
-            config=BotoConfig(
-                s3={"addressing_style": "path" if cfg.force_path_style else "auto"},
-                signature_version="s3v4",
+        _client = cast(
+            S3Client,
+            boto3.client(  # pyright: ignore[reportUnknownMemberType] -- boto3 ships no stubs
+                "s3",
+                endpoint_url=cfg.endpoint,
+                region_name=cfg.region,
+                aws_access_key_id=cfg.access_key,
+                aws_secret_access_key=cfg.secret_key,
+                config=BotoConfig(
+                    s3={"addressing_style": "path" if cfg.force_path_style else "auto"},
+                    signature_version="s3v4",
+                ),
             ),
         )
         _client_endpoint = cfg.endpoint

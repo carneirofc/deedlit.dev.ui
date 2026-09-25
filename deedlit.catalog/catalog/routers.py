@@ -1,11 +1,16 @@
 """FastAPI routers for the catalog service (per contracts/catalog.openapi.yaml)."""
 from __future__ import annotations
 
+from typing import Annotated, cast
+
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
 
 from catalog import object_store, repository
+from catalog.repository import ImageFilters
 from catalog.schemas import (
     BatchDeleteRequest,
+    BatchDeleteResult,
+    BlobPutResult,
     Collection,
     CollectionImages,
     CollectionRename,
@@ -15,9 +20,12 @@ from catalog.schemas import (
     FavoriteBody,
     FolderReport,
     Image,
+    ImageListQuery,
     ImagePatch,
+    ImageQueryFilters,
     ImageSummary,
     ImageUpsert,
+    InterruptStaleResult,
     Job,
     JobUpsert,
     Note,
@@ -29,12 +37,17 @@ from catalog.schemas import (
     SourceFolderPatch,
     SourceFolderUpsert,
     StatsReport,
+    StatusResult,
     TagReport,
     Task,
     TaskUpsert,
+    UnlabeledResult,
 )
 
-SHA256 = Path(pattern=r"^[a-f0-9]{64}$")
+# fastapi.Path()'s standalone (non-parameter-default) overload returns Any; the
+# runtime value is always the str the path segment resolves to, so this is a
+# concrete cast at a genuine library typing gap, not an escape to Any.
+SHA256 = cast(str, Path(pattern=r"^[a-f0-9]{64}$"))
 
 router = APIRouter()
 
@@ -47,31 +60,24 @@ def create_image(payload: ImageUpsert) -> Image:
     return repository.upsert_image(payload)
 
 
+def _to_image_filters(filters: ImageQueryFilters) -> ImageFilters:
+    return ImageFilters(
+        tags=filters.tag,
+        exclude_tags=filters.exclude_tag,
+        favorite=filters.favorite,
+        rating_gte=filters.rating_gte,
+        safety=filters.safety,
+        path=filters.path,
+    )
+
+
 @router.get("/images", response_model=list[ImageSummary])
-def list_images(
-    tag: list[str] | None = Query(default=None),
-    exclude_tag: list[str] | None = Query(default=None),
-    favorite: bool | None = Query(default=None),
-    rating_gte: int | None = Query(default=None, ge=0, le=5),
-    safety: list[str] | None = Query(default=None),
-    path: str | None = Query(default=None),
-    sort: str = Query(default="newest"),
-    limit: int = Query(default=50),
-    offset: int = Query(default=0),
-) -> list[ImageSummary]:
+def list_images(query: Annotated[ImageListQuery, Query()]) -> list[ImageSummary]:
     # `tag`/`exclude_tag` are repeatable (?tag=a&tag=b). A single ?tag=a still
     # arrives as a one-element list, so legacy single-tag callers keep working.
     # `path` is a separator-insensitive substring match on the on-disk file path.
     return repository.list_images(
-        tags=tag,
-        exclude_tags=exclude_tag,
-        favorite=favorite,
-        rating_gte=rating_gte,
-        safety=safety,
-        path=path,
-        sort=sort,
-        limit=limit,
-        offset=offset,
+        _to_image_filters(query), sort=query.sort, limit=query.limit, offset=query.offset
     )
 
 
@@ -108,37 +114,22 @@ def tags_report(
 # Registered BEFORE /images/{sha256}: a literal segment ("count"/"unlabeled") is
 # not a 64-hex sha, so the parameterized route would 422 it. The literal wins.
 @router.get("/images/count", response_model=CountResult)
-def count_images(
-    tag: list[str] | None = Query(default=None),
-    exclude_tag: list[str] | None = Query(default=None),
-    favorite: bool | None = Query(default=None),
-    rating_gte: int | None = Query(default=None, ge=0, le=5),
-    safety: list[str] | None = Query(default=None),
-    path: str | None = Query(default=None),
-) -> CountResult:
+def count_images(filters: Annotated[ImageQueryFilters, Query()]) -> CountResult:
     """Total images matching the same filters as GET /images (no sort/paging).
 
     Lets a report/export tool size the work set before paging through /images.
     """
-    return CountResult(
-        count=repository.count_images(
-            tags=tag,
-            exclude_tags=exclude_tag,
-            favorite=favorite,
-            rating_gte=rating_gte,
-            safety=safety,
-            path=path,
-        )
-    )
+    return CountResult(count=repository.count_images(_to_image_filters(filters)))
 
 
-@router.get("/images/unlabeled")
+@router.get("/images/unlabeled", response_model=UnlabeledResult)
 def list_unlabeled(
-    limit: int = Query(default=500), offset: int = Query(default=0)
-) -> dict:
+    limit: Annotated[int, Query()] = 500,
+    offset: Annotated[int, Query()] = 0,
+) -> UnlabeledResult:
     """sha256 of images missing a labelagent description — the label-backfill
     work set for deedlit.ingest. Returns ``{sha256: [...]}``."""
-    return {"sha256": repository.list_unlabeled_sha256(limit=limit, offset=offset)}
+    return UnlabeledResult(sha256=repository.list_unlabeled_sha256(limit=limit, offset=offset))
 
 
 # Registered BEFORE /images/{sha256}: "directories" is a literal segment, not a
@@ -180,8 +171,8 @@ def patch_image(payload: ImagePatch, sha256: str = SHA256) -> Image:
 
 # Registered BEFORE /images/{sha256}: "batch-delete" is a literal segment, not a
 # 64-hex sha, so the parameterized route would reject it. The literal wins.
-@router.post("/images/batch-delete")
-def batch_delete_images(body: BatchDeleteRequest) -> dict:
+@router.post("/images/batch-delete", response_model=BatchDeleteResult)
+def batch_delete_images(body: BatchDeleteRequest) -> BatchDeleteResult:
     """Hard-delete MANY images' catalog records + blobs in ONE call.
 
     Two set-based SQL deletes (vs two per image) then per-blob object-store cleanup
@@ -195,11 +186,11 @@ def batch_delete_images(body: BatchDeleteRequest) -> dict:
             object_store.delete_blob(sha, kind)
     gone = set(deleted)
     missing = [s for s in requested if s not in gone]
-    return {"status": "ok", "deleted": deleted, "missing": missing}
+    return BatchDeleteResult(deleted=deleted, missing=missing)
 
 
-@router.delete("/images/{sha256}")
-def delete_image(sha256: str = SHA256) -> dict:
+@router.delete("/images/{sha256}", response_model=StatusResult)
+def delete_image(sha256: str = SHA256) -> StatusResult:
     """Hard-delete an image's catalog record (NOT the source file on disk).
 
     Removes the Postgres row (FK children cascade) plus the per-image asset
@@ -211,21 +202,21 @@ def delete_image(sha256: str = SHA256) -> dict:
         raise HTTPException(status_code=404, detail="image not found")
     for kind in object_store.BLOB_KINDS:
         object_store.delete_blob(sha256, kind)
-    return {"status": "ok"}
+    return StatusResult()
 
 
-@router.put("/images/{sha256}/rating")
-def set_rating(payload: RatingBody, sha256: str = SHA256) -> dict:
+@router.put("/images/{sha256}/rating", response_model=StatusResult)
+def set_rating(payload: RatingBody, sha256: str = SHA256) -> StatusResult:
     if not repository.set_rating(sha256, payload.rating):
         raise HTTPException(status_code=404, detail="image not found")
-    return {"status": "ok"}
+    return StatusResult()
 
 
-@router.put("/images/{sha256}/favorite")
-def set_favorite(payload: FavoriteBody, sha256: str = SHA256) -> dict:
+@router.put("/images/{sha256}/favorite", response_model=StatusResult)
+def set_favorite(payload: FavoriteBody, sha256: str = SHA256) -> StatusResult:
     if not repository.set_favorite(sha256, payload.favorite):
         raise HTTPException(status_code=404, detail="image not found")
-    return {"status": "ok"}
+    return StatusResult()
 
 
 # --- blobs -----------------------------------------------------------------
@@ -258,15 +249,15 @@ def get_blob(
     )
 
 
-@router.put("/blobs/{sha256}/{kind}")
+@router.put("/blobs/{sha256}/{kind}", response_model=BlobPutResult)
 async def put_blob(
     request: Request, sha256: str = SHA256, kind: str = Path(...)
-) -> dict:
+) -> BlobPutResult:
     if kind not in object_store.BLOB_KINDS:
         raise HTTPException(status_code=422, detail="invalid blob kind")
     body = await request.body()
     uri = object_store.put_blob(sha256, kind, body)
-    return {"status": "ok", "uri": uri}
+    return BlobPutResult(uri=uri)
 
 
 # --- notes -----------------------------------------------------------------
@@ -340,18 +331,18 @@ def rename_collection(payload: CollectionRename, id: str = Path(...)) -> Collect
     return col
 
 
-@router.delete("/collections/{id}")
-def delete_collection(id: str = Path(...)) -> dict:
+@router.delete("/collections/{id}", response_model=StatusResult)
+def delete_collection(id: str = Path(...)) -> StatusResult:
     if not repository.delete_collection(id):
         raise HTTPException(status_code=404, detail="collection not found")
-    return {"status": "ok"}
+    return StatusResult()
 
 
-@router.put("/collections/{id}/images")
-def set_collection_images(payload: CollectionImages, id: str = Path(...)) -> dict:
+@router.put("/collections/{id}/images", response_model=StatusResult)
+def set_collection_images(payload: CollectionImages, id: str = Path(...)) -> StatusResult:
     if not repository.set_collection_images(id, payload.images):
         raise HTTPException(status_code=404, detail="collection not found")
-    return {"status": "ok"}
+    return StatusResult()
 
 
 # --- source folders --------------------------------------------------------
@@ -383,11 +374,11 @@ def patch_folder(payload: SourceFolderPatch, id: str = Path(...)) -> SourceFolde
     return folder
 
 
-@router.delete("/folders/{id}")
-def delete_folder(id: str = Path(...)) -> dict:
+@router.delete("/folders/{id}", response_model=StatusResult)
+def delete_folder(id: str = Path(...)) -> StatusResult:
     if not repository.delete_folder(id):
         raise HTTPException(status_code=404, detail="folder not found")
-    return {"status": "ok"}
+    return StatusResult()
 
 
 # --- tasks ledger (ADR 0001) -----------------------------------------------
@@ -421,13 +412,13 @@ def read_task(id: str = Path(...)) -> Task:
 # --- jobs (durable projection of the ingest JobStore) ----------------------
 # Registered BEFORE /jobs/{id}: the literal "interrupt-stale" segment must win
 # over the parameterized route.
-@router.post("/jobs/interrupt-stale")
-def interrupt_stale_jobs() -> dict:
+@router.post("/jobs/interrupt-stale", response_model=InterruptStaleResult)
+def interrupt_stale_jobs() -> InterruptStaleResult:
     """Mark every job still queued/running as interrupted (ingest startup).
 
     A job in those states belongs to a process whose in-memory worker is gone,
     so it can never settle itself. Returns the ids flipped."""
-    return {"interrupted": repository.interrupt_stale_jobs()}
+    return InterruptStaleResult(interrupted=repository.interrupt_stale_jobs())
 
 
 @router.post("/jobs", response_model=Job)

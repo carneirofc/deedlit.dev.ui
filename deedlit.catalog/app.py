@@ -6,20 +6,22 @@ the Alembic migrations and NEVER calls search (Qdrant) or graph (Neo4j).
 
 See contracts/catalog.openapi.yaml.
 """
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import logging
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from activity import install_activity
 from catalog import object_store
 from catalog.db import db_ready
 from catalog.routers import router
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 
 # Health probes are polled on a tight interval (Docker HEALTHCHECK + the status
@@ -42,12 +44,18 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 install_activity(app)
 
 
+class HealthStatus(BaseModel):
+    status: str
+    db_ready: bool
+    blob_ready: bool
+
+
 @app.get("/health")
-def health() -> dict:
+def health() -> HealthStatus:
     db = db_ready()
     blob = object_store.blob_ready()
     status = "ok" if (db and blob) else "degraded"
-    return {"status": status, "db_ready": db, "blob_ready": blob}
+    return HealthStatus(status=status, db_ready=db, blob_ready=blob)
 
 
 app.include_router(router)

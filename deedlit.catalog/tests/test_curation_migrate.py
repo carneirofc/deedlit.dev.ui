@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Iterator
 
 import psycopg
 import pytest
 from psycopg import sql
+from pydantic import JsonValue
 
 ADMIN_URL = os.environ.get(
     "CATALOG_ADMIN_DATABASE_URL",
@@ -93,7 +95,7 @@ CREATE TABLE tags (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT);
 
 
 @pytest.fixture()
-def source_db() -> str:
+def source_db() -> Iterator[str]:
     """Create + seed a throwaway old-schema source DB; yield its URL; drop it."""
     db_name = f"curation_src_{uuid.uuid4().hex[:12]}"
     with _admin_conn() as conn, conn.cursor() as cur:
@@ -157,7 +159,7 @@ def source_db() -> str:
 
 
 @pytest.fixture()
-def dest_db() -> str:
+def dest_db() -> Iterator[str]:
     """Create + migrate a throwaway catalog destination DB; yield URL; drop it."""
     db_name = f"curation_dst_{uuid.uuid4().hex[:12]}"
     with _admin_conn() as conn, conn.cursor() as cur:
@@ -179,9 +181,15 @@ def dest_db() -> str:
 
 
 def _count(url: str, table: str, where: str = "") -> int:
+    query = f"SELECT count(*) FROM {table} {where}"
     with psycopg.connect(url) as conn, conn.cursor() as cur:
-        cur.execute(f"SELECT count(*) FROM {table} {where}")
-        return cur.fetchone()[0]
+        # psycopg's typed execute() overloads want a `LiteralString` query;
+        # this helper composes one from trusted, test-only table/where
+        # fragments (never user input), so the dynamic str is safe here.
+        cur.execute(query)  # pyright: ignore[reportCallIssue, reportArgumentType] -- psycopg Query type requires LiteralString, not a runtime str
+        row = cur.fetchone()
+        assert row is not None
+        return row[0]
 
 
 def test_migration_copies_curation(source_db: str, dest_db: str) -> None:
@@ -200,7 +208,9 @@ def test_migration_copies_curation(source_db: str, dest_db: str) -> None:
     # note fields copied
     with psycopg.connect(dest_db) as conn, conn.cursor() as cur:
         cur.execute("SELECT title, positive, negative FROM notes")
-        title, positive, negative = cur.fetchone()
+        row = cur.fetchone()
+        assert row is not None
+        title, positive, negative = row
     assert title == "My Note"
     assert positive == "masterpiece"
     assert negative == "blurry"
@@ -264,6 +274,11 @@ def test_migration_is_idempotent(source_db: str, dest_db: str) -> None:
     assert counts_1 == counts_2, f"re-run changed counts: {counts_1} -> {counts_2}"
 
 
+def _as_dict(value: JsonValue) -> dict[str, JsonValue]:
+    assert isinstance(value, dict)
+    return value
+
+
 def test_reconcile_reports_matching_counts(source_db: str, dest_db: str) -> None:
     from migration.curation_migrate import migrate, reconcile
 
@@ -273,9 +288,10 @@ def test_reconcile_reports_matching_counts(source_db: str, dest_db: str) -> None
     assert report["notes"] == {"source": 1, "dest": 1, "ok": True}
     assert report["collections"] == {"source": 1, "dest": 1, "ok": True}
     # note_images: source has 2 rows but 1 is unresolvable -> dest 1, resolvable 1
-    assert report["note_image_refs"]["dest"] == 1
-    assert report["note_image_refs"]["source_resolvable"] == 1
-    assert report["note_image_refs"]["ok"] is True
+    note_refs = _as_dict(report["note_image_refs"])
+    assert note_refs["dest"] == 1
+    assert note_refs["source_resolvable"] == 1
+    assert note_refs["ok"] is True
     assert report["collection_images"] == {
         "source": 2,
         "source_resolvable": 2,
