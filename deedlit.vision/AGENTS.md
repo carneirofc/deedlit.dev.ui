@@ -13,6 +13,7 @@
 - Consumers must match dims: comfyhelper's placeholder 512-dim collection must be rebuilt at 1024/1280-dim to use this as the real provider (see `README.md`).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - `pyproject.toml` pins `torch`/`torchvision` to the `pytorch-cu128` index and `onnxruntime-gpu` to a CUDA-12 feed — do not loosen these pins without verifying the GPU/CUDA build still loads.
 
 ## Verification

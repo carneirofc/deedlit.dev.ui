@@ -17,6 +17,7 @@
 - OpenTelemetry auto-instrumentation gates on `OTEL_TRACES_EXPORTER`.
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Keep this a thin aggregation/proxy layer — no DB, no canonical state. Route new downstream calls through `clients.py`.
 
 ## Verification

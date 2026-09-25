@@ -15,6 +15,7 @@
 - Design of record: [`../docs/adr/0001-async-queues-for-labelling-and-indexing.md`](../docs/adr/0001-async-queues-for-labelling-and-indexing.md) and [`0002-per-stage-ingest-dag.md`](../docs/adr/0002-per-stage-ingest-dag.md). RabbitMQ is a hard dependency (no inline fast path).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Catalog write is the durability boundary and the rendezvous latch; stages persist to catalog then publish successors (choreography, no orchestrator). `index.search` upserts only once both dense + sparse blobs are present in catalog.
 
 ## Verification

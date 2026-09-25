@@ -14,6 +14,7 @@
 - Storybook is published to GitHub Pages at `https://carneirofc.github.io/deedlit.dev/ui/storybook/` via [`../.github/workflows/storybook-pages.yml`](../.github/workflows/storybook-pages.yml).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Promote reusable pieces here; keep app-specific behavior out. When a change touches shared UI and an app, build the UI first, then adjust the consumer.
 
 ## Verification

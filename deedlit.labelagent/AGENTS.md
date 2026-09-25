@@ -12,6 +12,7 @@
 - External dependency: a vision-capable GGUF served by a local OpenAI-compatible `llama-server` at `LABELAGENT_LLM_BASE_URL` (default `http://127.0.0.1:8888/v1`). Single-threaded — ingest consumes the `label` queue serially.
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Keep the llama-server contract behind `run_label`; downscale/re-encode images (pillow) before sending to the VLM.
 
 ## Verification

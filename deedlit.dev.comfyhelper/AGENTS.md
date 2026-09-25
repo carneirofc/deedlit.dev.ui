@@ -15,6 +15,7 @@
 - Cross-service id helper: `lib/library/id-scheme.ts` (see [`../id-scheme/`](../id-scheme/AGENTS.md)).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Keep the app a gateway client — no datastore logic. New backend behavior belongs in the owning FastAPI service, exposed via `deedlit.api`.
 
 ## Verification

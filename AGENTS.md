@@ -21,6 +21,13 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - Treat package-level docs and source layout as more trustworthy than old summary docs when they disagree.
 - When a task spans packages, keep ownership clear: shared primitive in `deedlit.dev.ui`, integration in the consuming app.
 
+## Code Quality Rules
+- TypeScript: every type (data, config, props) is `z.infer<typeof XSchema>` from a zod schema — never hand-written `interface`/`type {…}` or inline object types.
+- Python: data shapes are pydantic models (I/O) or dataclasses (internal) — never `TypedDict`, `NamedTuple`, or `dict[str, Any]` records.
+- Never use `any` / `Any`; use `unknown` + zod parse, `JsonValue`, a `Protocol`, or a union.
+- Keep functions small (~40 lines, components ~60) with one responsibility.
+- Details, examples, and lint enforcement: [`docs/agents/code-style.md`](docs/agents/code-style.md).
+
 ## Package Entry Points
 - `deedlit.dev.comfyhelper/`: start from `app/`, `lib/`, `prisma/`, and `.github/instructions/`.
 - `deedlit.dev.ui/`: start from `src/`, `styles/`, and the package exports in `package.json`.
@@ -97,6 +104,7 @@ Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail 
 
 ### Agent operating docs (`docs/agents/`)
 - [`docs/agents/toolchain.md`](docs/agents/toolchain.md) — fnm/uv toolchain locations & activation (Windows/PowerShell).
+- [`docs/agents/code-style.md`](docs/agents/code-style.md) — zod/pydantic typing, no `any`, small functions, and their lint enforcement.
 - [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — GitHub-issue workflow via `gh`.
 - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — canonical triage vocabulary.
 - [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.

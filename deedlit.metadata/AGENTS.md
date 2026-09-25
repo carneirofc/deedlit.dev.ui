@@ -13,6 +13,7 @@
 - The `References` schema must carry all of `checkpoints, loras, embeddings, vae, controlnets, upscalers` (enforced by [`../contracts/validate.py`](../contracts/validate.py)).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Keep it pure and offline — no datastore, no service calls.
 
 ## Verification

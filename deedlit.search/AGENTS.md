@@ -14,6 +14,7 @@
 - No migrations — the collection is created idempotently in `store.ensure_collection()` via FastAPI `lifespan`.
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Treat the index as reconstructible: correctness lives in catalog, so a rebuild must fully reproduce state.
 
 ## Verification

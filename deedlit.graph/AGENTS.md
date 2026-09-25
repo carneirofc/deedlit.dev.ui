@@ -14,6 +14,7 @@
 - No SQL migrations — schema is Neo4j indexes ensured at startup via `repository.ensure_schema()`.
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Treat the graph as reconstructible from catalog; keep name-normalization rules in `repository.py` authoritative.
 
 ## Verification

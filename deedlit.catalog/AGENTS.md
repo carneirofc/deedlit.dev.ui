@@ -15,6 +15,7 @@
 - Cross-service id = SHA-256 hex of image bytes (primary key) — see [`../id-scheme/`](../id-scheme/AGENTS.md).
 
 ## Work Guidance
+- Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
 - Schema changes go through a new Alembic revision under `alembic/versions/`; apply with `npm run dev:migrate` from repo root.
 - This service is the durability boundary — persist here before projections (`search`/`graph`) converge.
 
