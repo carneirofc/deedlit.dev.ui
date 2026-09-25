@@ -1,9 +1,8 @@
 """Tests for GET /fs/browse — the admin directory picker's listing endpoint."""
 import os
 
-from fastapi.testclient import TestClient
-
 from app import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

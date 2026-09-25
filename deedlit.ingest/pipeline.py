@@ -31,17 +31,55 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TypeVar, cast, overload
 
 import httpx
 import imagehash
-from PIL import Image
-
 from id_scheme import point_id_for_sha256
+from models import (
+    AssetRef,
+    CatalogImageRecord,
+    CatalogImageRow,
+    DescribeResult,
+    ExtractResult,
+    GraphEdges,
+    MissingFileEntry,
+    MissingFilesReport,
+    ReferencesBlock,
+    RefItem,
+    SearchPoint,
+    SearchPointPayload,
+    SourceFolder,
+    SparseVector,
+)
+from PIL import Image
+from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 log = logging.getLogger("deedlit.ingest.pipeline")
+
+T = TypeVar("T")
+
+# Boundary adapters: httpx/`resp.json()` returns ``Any`` (an untyped library
+# seam), so every parsed response is routed through one of these to land on a
+# concrete type instead — never through a bare ``.json()`` result.
+_JSON_ADAPTER: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
+_JSON_OBJECT_ADAPTER: TypeAdapter[dict[str, JsonValue]] = TypeAdapter(dict[str, JsonValue])
+_JSON_ARRAY_ADAPTER: TypeAdapter[list[JsonValue]] = TypeAdapter(list[JsonValue])
+_FLOAT_LIST_ADAPTER: TypeAdapter[list[float]] = TypeAdapter(list[float])
+
+
+def _dump_json(model: BaseModel, *, exclude_none: bool = False) -> dict[str, JsonValue]:
+    """``model.model_dump(mode="json")`` re-typed as ``dict[str, JsonValue]``.
+
+    Pydantic's own stub types ``model_dump`` as returning ``dict[str, Any]``
+    even though the payload is JSON-safe by construction — a genuine library
+    typing gap, so a narrowly-scoped cast (never to ``Any``) is used instead of
+    re-validating the just-built dict.
+    """
+    return cast(dict[str, JsonValue], model.model_dump(mode="json", exclude_none=exclude_none))
 
 # ---------------------------------------------------------------------------
 # Configuration (all overridable via env)
@@ -147,7 +185,7 @@ def _mime_for_extension(ext: str) -> str:
 # the API vs worker loops) so a client is never reused across loops.
 # ---------------------------------------------------------------------------
 _client: httpx.AsyncClient | None = None
-_client_loop: Any = None
+_client_loop: asyncio.AbstractEventLoop | None = None
 
 
 def get_client() -> httpx.AsyncClient:
@@ -175,7 +213,11 @@ async def aclose() -> None:
     _client_loop = None
 
 
-async def maybe_await(value: Any) -> Any:
+@overload
+async def maybe_await(value: Awaitable[T]) -> T: ...
+@overload
+async def maybe_await(value: T) -> T: ...
+async def maybe_await(value: Awaitable[T] | T) -> T:
     """Await ``value`` if it is awaitable, else return it unchanged.
 
     The outbound boundary functions are async, but tests monkeypatch them with
@@ -184,7 +226,7 @@ async def maybe_await(value: Any) -> Any:
     """
     if inspect.isawaitable(value):
         return await value
-    return value
+    return cast(T, value)
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +277,7 @@ def _thumbnail_image(im: Image.Image, min_edge: int = THUMBNAIL_MIN_EDGE) -> byt
         short = min(width, height)
         if short > min_edge:  # downscale only; keep smaller sources untouched
             scale = min_edge / short
-            rgb = rgb.resize((round(width * scale), round(height * scale)), Image.LANCZOS)
+            rgb = rgb.resize((round(width * scale), round(height * scale)), Image.Resampling.LANCZOS)
         out = io.BytesIO()
         rgb.save(
             out,
@@ -297,7 +339,7 @@ def _pixel_work(data: bytes) -> tuple[str, str | None, int | None, int | None, b
 # ---------------------------------------------------------------------------
 # Outbound clients (async, pooled; monkeypatched in tests)
 # ---------------------------------------------------------------------------
-async def extract_metadata(data: bytes, filename: str, mime: str) -> dict[str, Any]:
+async def extract_metadata(data: bytes, filename: str, mime: str) -> ExtractResult:
     """POST image bytes to deedlit.metadata /extract; return the ExtractResult.
 
     A 422 (no recognized metadata) degrades to an empty-ish result rather than
@@ -306,18 +348,9 @@ async def extract_metadata(data: bytes, filename: str, mime: str) -> dict[str, A
     files = {"file": (filename, data, mime)}
     resp = await get_client().post(f"{METADATA_URL}/extract", files=files)
     if resp.status_code == 422:
-        return {
-            "sourceTool": "unknown",
-            "prompt": None,
-            "negative": None,
-            "tags": [],
-            "params": {},
-            "references": {},
-            "workflow_json": None,
-            "api_prompt_json": None,
-        }
+        return ExtractResult(sourceTool="unknown")
     resp.raise_for_status()
-    return resp.json()
+    return ExtractResult.model_validate(_JSON_OBJECT_ADAPTER.validate_python(resp.json()))
 
 
 async def embed_image(data: bytes, filename: str, mime: str) -> list[float]:
@@ -331,9 +364,9 @@ async def embed_image(data: bytes, filename: str, mime: str) -> list[float]:
     started = time.perf_counter()
     resp = await get_client().post(f"{VISION_URL}/embed/image", files=files)
     resp.raise_for_status()
-    body = resp.json()
+    body = _JSON_OBJECT_ADAPTER.validate_python(resp.json())
     # The contract names the field `vector`; the live service returns `embedding`.
-    vector = body.get("vector") or body.get("embedding") or []
+    vector = _FLOAT_LIST_ADAPTER.validate_python(body.get("vector") or body.get("embedding") or [])
     log.info(
         "vision /embed/image %s -> dim=%d in %.0f ms",
         filename, len(vector), (time.perf_counter() - started) * 1000,
@@ -341,7 +374,7 @@ async def embed_image(data: bytes, filename: str, mime: str) -> list[float]:
     return vector
 
 
-async def embed_sparse_text(text: str) -> dict[str, list]:
+async def embed_sparse_text(text: str) -> SparseVector:
     """POST text to deedlit.vision /embed/sparse; return {indices, values}.
 
     The sparse-vector vision client. Named ``_text`` to distinguish it from the
@@ -350,8 +383,7 @@ async def embed_sparse_text(text: str) -> dict[str, list]:
     """
     resp = await get_client().post(f"{VISION_URL}/embed/sparse", json={"text": text})
     resp.raise_for_status()
-    body = resp.json()
-    return {"indices": body.get("indices", []), "values": body.get("values", [])}
+    return SparseVector.model_validate(_JSON_OBJECT_ADAPTER.validate_python(resp.json()))
 
 
 async def embed_text(text: str) -> list[float]:
@@ -365,8 +397,8 @@ async def embed_text(text: str) -> list[float]:
     started = time.perf_counter()
     resp = await get_client().post(f"{VISION_URL}/embed/text", json={"text": text})
     resp.raise_for_status()
-    body = resp.json()
-    vector = body.get("vector") or body.get("embedding") or []
+    body = _JSON_OBJECT_ADAPTER.validate_python(resp.json())
+    vector = _FLOAT_LIST_ADAPTER.validate_python(body.get("vector") or body.get("embedding") or [])
     log.info(
         "vision /embed/text -> dim=%d in %.0f ms",
         len(vector), (time.perf_counter() - started) * 1000,
@@ -376,24 +408,24 @@ async def embed_text(text: str) -> list[float]:
 
 async def describe_image(
     data: bytes, filename: str, mime: str, prompt_hint: str | None = None
-) -> dict[str, Any]:
+) -> DescribeResult | None:
     """POST the image to deedlit.labelagent /describe; return ``{label,
     description, tags, safety}``.
 
     Now called ONLY by the async ``label`` task (ADR 0001), so the failure mode is
     deliberately STRICT: when ``LABELAGENT_URL`` is unset the call is skipped and
-    ``{}`` is returned (a clean no-op the task treats as "nothing to patch"), but
+    None is returned (a clean no-op the task treats as "nothing to patch"), but
     any transport/HTTP error PROPAGATES so the broker can retry with backoff and
     eventually dead-letter (``label.dlq``). ``prompt_hint`` (the extracted SD
     prompt) grounds the model.
     """
     if not LABELAGENT_URL:
-        return {}
+        return None
     files = {"file": (filename, data, mime)}
     form = {"prompt_hint": prompt_hint} if prompt_hint else None
     resp = await get_client().post(f"{LABELAGENT_URL}/describe", files=files, data=form)
     resp.raise_for_status()
-    return resp.json()
+    return DescribeResult.model_validate(_JSON_OBJECT_ADAPTER.validate_python(resp.json()))
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +462,7 @@ async def _read_path_bytes(path: str) -> tuple[bytes, str]:
     return data, _mime_for_extension(p.suffix)
 
 
-async def fetch_image_record(sha256: str) -> dict[str, Any] | None:
+async def fetch_image_record(sha256: str) -> CatalogImageRow | None:
     """GET the catalog record (the source of truth) for ``sha256``, or None.
 
     Used by the index task (to project from catalog truth — description/safety/
@@ -445,8 +477,8 @@ async def fetch_image_record(sha256: str) -> dict[str, Any] | None:
             f"{CATALOG_URL}/images/{sha256}", params={"fields": "light"}
         )
         resp.raise_for_status()
-        body = resp.json()
-        return body if isinstance(body, dict) else None
+        body = _JSON_ADAPTER.validate_python(resp.json())
+        return CatalogImageRow.model_validate(body) if isinstance(body, dict) else None
     except (httpx.HTTPError, ValueError):
         return None
 
@@ -460,10 +492,10 @@ async def fetch_image_filepath(sha256: str) -> str | None:
     that identifies the image. Best-effort: any read failure degrades to None.
     """
     record = await maybe_await(fetch_image_record(sha256))
-    return record.get("filepath") if record else None
+    return record.filepath if record else None
 
 
-def rebuild_thumbnails() -> dict[str, Any]:
+def rebuild_thumbnails() -> dict[str, JsonValue]:
     """Regenerate thumbnails from catalog originals (catalog-owned rebuild, #17).
 
     Thumbnails are catalog RustFS blobs, so the rebuild is owned by catalog. The
@@ -474,8 +506,8 @@ def rebuild_thumbnails() -> dict[str, Any]:
     resp = httpx.post(f"{CATALOG_URL}/rebuild", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
     try:
-        return resp.json()
-    except Exception:
+        return _JSON_OBJECT_ADAPTER.validate_python(resp.json())
+    except ValueError:
         return {}
 
 
@@ -505,10 +537,10 @@ def list_catalog_sha256() -> list[str]:
             timeout=HTTP_TIMEOUT,
         )
         resp.raise_for_status()
-        rows = resp.json() or []
+        rows = _JSON_ARRAY_ADAPTER.validate_python(resp.json() or [])
         for row in rows:
             sha = row.get("sha256") if isinstance(row, dict) else None
-            if sha:
+            if isinstance(sha, str) and sha:
                 out.append(sha)
         if len(rows) < CATALOG_PAGE_SIZE:
             break
@@ -536,10 +568,10 @@ def list_catalog_filepaths_under(folder: str) -> set[str]:
             timeout=HTTP_TIMEOUT,
         )
         resp.raise_for_status()
-        rows = resp.json() or []
+        rows = _JSON_ARRAY_ADAPTER.validate_python(resp.json() or [])
         for row in rows:
             fp = row.get("filepath") if isinstance(row, dict) else None
-            if fp:
+            if isinstance(fp, str) and fp:
                 out.add(fp.replace("\\", "/"))
         if len(rows) < CATALOG_PAGE_SIZE:
             break
@@ -547,7 +579,49 @@ def list_catalog_filepaths_under(folder: str) -> set[str]:
     return out
 
 
-def scan_missing_files(limit: int = 0) -> dict[str, Any]:
+@dataclass(frozen=True, slots=True)
+class _MissingFilesScanState:
+    """Running counters for :func:`scan_missing_files` (one page at a time)."""
+
+    missing: list[MissingFileEntry] = field(default_factory=list)
+    missing_total: int = 0
+    checked: int = 0
+    truncated: bool = False
+
+
+def _scan_missing_files_row(
+    row: JsonValue, state: _MissingFilesScanState, limit: int
+) -> _MissingFilesScanState:
+    """Probe one catalog row for its on-disk file, folding it into ``state``."""
+    if not isinstance(row, dict):
+        return state
+    fp = row.get("filepath")
+    sha = row.get("sha256")
+    if not (isinstance(fp, str) and fp) or not (isinstance(sha, str) and sha):
+        return state
+    # Blob-only fallback paths (no captured source) were never on disk.
+    if fp.startswith("s3://") or fp.startswith("blob:"):
+        return state
+    checked = state.checked + 1
+    if os.path.exists(fp):
+        return replace(state, checked=checked)
+    missing_total = state.missing_total + 1
+    if limit and len(state.missing) >= limit:
+        return replace(state, checked=checked, missing_total=missing_total, truncated=True)
+    filename = row.get("filename")
+    directory = row.get("directory")
+    entry = MissingFileEntry(
+        sha256=sha,
+        filepath=fp,
+        filename=filename if isinstance(filename, str) else None,
+        directory=directory if isinstance(directory, str) else None,
+    )
+    return replace(
+        state, missing=[*state.missing, entry], missing_total=missing_total, checked=checked
+    )
+
+
+def scan_missing_files(limit: int = 0) -> MissingFilesReport:
     """Find cataloged images whose on-disk source file has vanished.
 
     Pages catalog ``GET /images`` (the source of truth) and, for each record with
@@ -562,10 +636,7 @@ def scan_missing_files(limit: int = 0) -> dict[str, Any]:
     ``missing_count`` is the exact total and ``truncated`` flags that more matched
     than were returned.
     """
-    missing: list[dict[str, Any]] = []
-    missing_total = 0
-    checked = 0
-    truncated = False
+    state = _MissingFilesScanState()
     offset = 0
     while True:
         resp = httpx.get(
@@ -574,40 +645,18 @@ def scan_missing_files(limit: int = 0) -> dict[str, Any]:
             timeout=HTTP_TIMEOUT,
         )
         resp.raise_for_status()
-        rows = resp.json() or []
+        rows = _JSON_ARRAY_ADAPTER.validate_python(resp.json() or [])
         for row in rows:
-            if not isinstance(row, dict):
-                continue
-            fp = row.get("filepath")
-            sha = row.get("sha256")
-            if not fp or not sha:
-                continue
-            # Blob-only fallback paths (no captured source) were never on disk.
-            if fp.startswith("s3://") or fp.startswith("blob:"):
-                continue
-            checked += 1
-            if not os.path.exists(fp):
-                missing_total += 1
-                if not limit or len(missing) < limit:
-                    missing.append(
-                        {
-                            "sha256": sha,
-                            "filepath": fp,
-                            "filename": row.get("filename"),
-                            "directory": row.get("directory"),
-                        }
-                    )
-                else:
-                    truncated = True
+            state = _scan_missing_files_row(row, state, limit)
         if len(rows) < CATALOG_PAGE_SIZE:
             break
         offset += CATALOG_PAGE_SIZE
-    return {
-        "checked": checked,
-        "missing": missing,
-        "missing_count": missing_total,
-        "truncated": truncated,
-    }
+    return MissingFilesReport(
+        checked=state.checked,
+        missing=state.missing,
+        missing_count=state.missing_total,
+        truncated=state.truncated,
+    )
 
 
 async def search_has(sha256: str) -> bool:
@@ -644,27 +693,27 @@ async def graph_has(sha256: str) -> bool:
     return resp.status_code == 200
 
 
-def rebuild_search() -> dict[str, Any]:
+def rebuild_search() -> dict[str, JsonValue]:
     """Rebuild the search projection from catalog (search ``POST /rebuild``)."""
     resp = httpx.post(f"{SEARCH_URL}/rebuild", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
     try:
-        return resp.json()
-    except Exception:
+        return _JSON_OBJECT_ADAPTER.validate_python(resp.json())
+    except ValueError:
         return {}
 
 
-def rebuild_graph() -> dict[str, Any]:
+def rebuild_graph() -> dict[str, JsonValue]:
     """Rebuild the graph projection from catalog (graph ``POST /rebuild``)."""
     resp = httpx.post(f"{GRAPH_URL}/rebuild", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
     try:
-        return resp.json()
-    except Exception:
+        return _JSON_OBJECT_ADAPTER.validate_python(resp.json())
+    except ValueError:
         return {}
 
 
-def prune_graph_orphans() -> dict[str, Any]:
+def prune_graph_orphans() -> dict[str, JsonValue]:
     """Prune structurally-orphaned graph nodes (graph ``POST /prune``).
 
     Sweeps the orphan :Asset/:Tag nodes that image deletes leave behind (an
@@ -674,8 +723,8 @@ def prune_graph_orphans() -> dict[str, Any]:
     resp = httpx.post(f"{GRAPH_URL}/prune", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
     try:
-        return resp.json()
-    except Exception:
+        return _JSON_OBJECT_ADAPTER.validate_python(resp.json())
+    except ValueError:
         return {}
 
 
@@ -686,12 +735,12 @@ def prune_graph_orphans() -> dict[str, Any]:
 # filesystem + the pipeline; catalog just persists the registry. Thin wrappers
 # so tests monkeypatch them and stay offline.
 # ---------------------------------------------------------------------------
-def list_source_folders() -> list[dict[str, Any]]:
+def list_source_folders() -> list[SourceFolder]:
     """GET the configured source folders from catalog (the registry owner)."""
     resp = httpx.get(f"{CATALOG_URL}/folders", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
-    body = resp.json()
-    return body if isinstance(body, list) else []
+    body = _JSON_ADAPTER.validate_python(resp.json())
+    return [SourceFolder.model_validate(row) for row in body] if isinstance(body, list) else []
 
 
 def record_folder_scan(
@@ -707,7 +756,7 @@ def record_folder_scan(
     Best-effort: a registry write failure must not fail the scan it describes,
     so transport/HTTP errors are logged and swallowed.
     """
-    payload: dict[str, Any] = {}
+    payload: dict[str, JsonValue] = {}
     if status is not None:
         payload["last_scan_status"] = status
     if job_id is not None:
@@ -743,7 +792,9 @@ def list_unlabeled_sha256() -> list[str]:
             timeout=HTTP_TIMEOUT,
         )
         resp.raise_for_status()
-        shas = (resp.json() or {}).get("sha256", []) or []
+        body = _JSON_OBJECT_ADAPTER.validate_python(resp.json() or {})
+        raw_shas = body.get("sha256")
+        shas = [s for s in raw_shas if isinstance(s, str)] if isinstance(raw_shas, list) else []
         out.extend(shas)
         if len(shas) < CATALOG_PAGE_SIZE:
             break
@@ -767,30 +818,27 @@ async def label_image(sha256: str) -> bool:
     """
     data, mime = await maybe_await(fetch_image_bytes(sha256))
     filename = f"{sha256}{_reconcile_ext_for_mime(mime)}"
-    record = await maybe_await(fetch_image_record(sha256)) or {}
+    record = await maybe_await(fetch_image_record(sha256)) or CatalogImageRow()
     extract = await maybe_await(extract_metadata(data, filename, mime))
     describe = await maybe_await(
-        describe_image(data, filename, mime, prompt_hint=extract.get("prompt"))
+        describe_image(data, filename, mime, prompt_hint=extract.prompt)
     )
-    if not describe:
+    if describe is None or (not describe.description and not describe.safety and not describe.tags):
         return False  # labelagent disabled (or empty result) -> nothing to patch
     # Merge the AI tags into the existing catalog tags (AI appended, de-duped,
     # order-stable), falling back to the freshly extracted tags.
-    base_tags = record.get("tags") or extract.get("tags") or []
-    merged = list(dict.fromkeys([*base_tags, *(describe.get("tags") or [])]))
+    base_tags = record.tags or extract.tags or []
+    merged: list[str] = list(dict.fromkeys([*base_tags, *(describe.tags or [])]))
     phash, width, height = await asyncio.to_thread(_phash_dims, data)
     patched = build_catalog_record(
-        sha256=sha256,
-        phash=phash,
-        width=width,
-        height=height,
+        pixel=ImagePixelInfo(sha256=sha256, phash=phash, width=width, height=height),
         extract=extract,
-        source_path=record.get("filepath"),
-        tags=merged,
-        description=describe.get("description"),
-        safety=describe.get("safety"),
+        source_path=record.filepath,
+        overlay=CatalogLabelOverlay(
+            tags=merged, description=describe.description, safety=describe.safety
+        ),
     )
-    await maybe_await(_post_with_retry(f"{CATALOG_URL}/images", patched))
+    await maybe_await(_post_with_retry(f"{CATALOG_URL}/images", _dump_json(patched)))
     return True
 
 
@@ -826,11 +874,11 @@ async def store_dense_blob(sha256: str, dense: list[float]) -> None:
     ))
 
 
-async def store_sparse_blob(sha256: str, sparse: dict[str, list]) -> None:
+async def store_sparse_blob(sha256: str, sparse: SparseVector) -> None:
     """Persist the sparse vector to the catalog ``sparse`` blob (JSON)."""
     await maybe_await(_put_blob_with_retry(
         f"{CATALOG_URL}/blobs/{sha256}/sparse",
-        json.dumps(sparse).encode("utf-8"),
+        json.dumps(_dump_json(sparse)).encode("utf-8"),
         "application/json",
     ))
 
@@ -844,7 +892,7 @@ async def store_description_blob(sha256: str, dense: list[float]) -> None:
     ))
 
 
-async def _load_json_blob(sha256: str, kind: str) -> Any | None:
+async def _load_json_blob(sha256: str, kind: str) -> JsonValue | None:
     """GET a catalog blob and parse it as JSON, or None if absent/unreadable.
 
     A missing blob (404) is the normal "stage hasn't run yet" signal for the
@@ -855,19 +903,33 @@ async def _load_json_blob(sha256: str, kind: str) -> Any | None:
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
-        return resp.json()
+        return _JSON_ADAPTER.validate_python(resp.json())
     except (httpx.HTTPError, ValueError):
         return None
 
 
 async def load_dense_blob(sha256: str) -> list[float] | None:
     """Read the persisted dense vector from catalog, or None if not embedded yet."""
-    return await maybe_await(_load_json_blob(sha256, CATALOG_DENSE_BLOB_KIND))
+    body = await maybe_await(_load_json_blob(sha256, CATALOG_DENSE_BLOB_KIND))
+    if body is None:
+        return None
+    try:
+        return _FLOAT_LIST_ADAPTER.validate_python(body)
+    except (ValidationError, ValueError):
+        log.warning("load_dense_blob %s: malformed blob", sha256[:12])
+        return None
 
 
-async def load_sparse_blob(sha256: str) -> dict[str, list] | None:
+async def load_sparse_blob(sha256: str) -> SparseVector | None:
     """Read the persisted sparse vector from catalog, or None if not embedded yet."""
-    return await maybe_await(_load_json_blob(sha256, "sparse"))
+    body = await maybe_await(_load_json_blob(sha256, "sparse"))
+    if body is None:
+        return None
+    try:
+        return SparseVector.model_validate(body)
+    except (ValidationError, ValueError):
+        log.warning("load_sparse_blob %s: malformed blob", sha256[:12])
+        return None
 
 
 async def load_description_blob(sha256: str) -> list[float] | None:
@@ -876,7 +938,14 @@ async def load_description_blob(sha256: str) -> list[float] | None:
     Absent is the NORMAL case for an image with no AI description, so index.search
     treats it as optional (unlike dense/sparse, which gate the fan-in).
     """
-    return await maybe_await(_load_json_blob(sha256, CATALOG_DESCRIPTION_BLOB_KIND))
+    body = await maybe_await(_load_json_blob(sha256, CATALOG_DESCRIPTION_BLOB_KIND))
+    if body is None:
+        return None
+    try:
+        return _FLOAT_LIST_ADAPTER.validate_python(body)
+    except (ValidationError, ValueError):
+        log.warning("load_description_blob %s: malformed blob", sha256[:12])
+        return None
 
 
 async def embed_dense(sha256: str, path: str | None = None) -> None:
@@ -915,24 +984,24 @@ async def embed_sparse(sha256: str) -> None:
     with no AI description carries no description vector, and index.search treats
     it as optional. The worker then publishes ``index.search``.
     """
-    record = await maybe_await(fetch_image_record(sha256)) or {}
-    tags = record.get("tags") or []
+    record = await maybe_await(fetch_image_record(sha256)) or CatalogImageRow()
+    tags = record.tags or []
     sparse_text = " ".join(
         s.strip()
-        for s in (record.get("prompt"), record.get("description"), " ".join(tags))
+        for s in (record.prompt, record.description, " ".join(tags))
         if s and s.strip()
     )
     sparse = (
         await maybe_await(embed_sparse_text(sparse_text))
         if sparse_text.strip()
-        else {"indices": [], "values": []}
+        else SparseVector()
     )
     await maybe_await(store_sparse_blob(sha256, sparse))
 
     # Second dense vector: CLIP-text embedding of the AI description, on the GPU.
     # Embed the description alone (not prompt/tags) so the vector captures the
     # description's meaning; skip the empty string so the vector stays meaningful.
-    description = (record.get("description") or "").strip()
+    description = (record.description or "").strip()
     if description:
         description_vec = await maybe_await(embed_text(description))
         await maybe_await(store_description_blob(sha256, description_vec))
@@ -941,10 +1010,10 @@ async def embed_sparse(sha256: str) -> None:
 def build_search_point(
     sha256: str,
     dense: list[float],
-    sparse: dict[str, list],
-    record: dict[str, Any],
+    sparse: SparseVector,
+    record: CatalogImageRow,
     description: list[float] | None = None,
-) -> dict[str, Any]:
+) -> SearchPoint:
     """Assemble the search UpsertPoint from the vectors + catalog truth.
 
     Sources the payload fields (tags/filepath/description/safety) from the catalog
@@ -953,27 +1022,20 @@ def build_search_point(
     ``description`` is the optional CLIP-text vector; it is added to the point only
     when present so an image without an AI description indexes on dense + sparse.
     """
-    filepath = record.get("filepath")
+    filepath = record.filepath
     ext = os.path.splitext(filepath)[1].lower() if filepath else ""
     image_url, thumbnail_url = _proxy_urls(sha256, ext)
-    tags = record.get("tags") or []
-    payload: dict[str, Any] = {
-        "sha256": sha256,
-        "point_id": point_id_for_sha256(sha256),
-        "tags": tags,
-        "image_url": image_url,
-        "thumbnail_url": thumbnail_url,
-    }
-    if filepath:
-        payload["filepath"] = filepath
-    if record.get("description"):
-        payload["description"] = record["description"]
-    if record.get("safety"):
-        payload["safety"] = record["safety"]
-    point: dict[str, Any] = {"sha256": sha256, "dense": dense, "sparse": sparse, "payload": payload}
-    if description:
-        point["description"] = description
-    return point
+    payload = SearchPointPayload(
+        sha256=sha256,
+        point_id=point_id_for_sha256(sha256),
+        tags=record.tags or [],
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
+        filepath=filepath or None,
+        description=record.description or None,
+        safety=record.safety or None,
+    )
+    return SearchPoint(sha256=sha256, dense=dense, sparse=sparse, payload=payload, description=description or None)
 
 
 async def index_search(sha256: str) -> bool:
@@ -1011,12 +1073,12 @@ async def index_search(sha256: str) -> bool:
         maybe_await(load_description_blob(sha256)),
         maybe_await(fetch_image_record(sha256)),
     )
-    record = record or {}
+    record = record or CatalogImageRow()
     point = build_search_point(sha256, dense, sparse, record, description=description)
-    await maybe_await(_post_with_retry(f"{SEARCH_URL}/points", point))
+    await maybe_await(_post_with_retry(f"{SEARCH_URL}/points", _dump_json(point, exclude_none=True)))
     log.info(
         "index.search %s: upserted point (dense dim=%d, sparse terms=%d, description=%s)",
-        sha256[:12], len(dense), len(sparse.get("indices", [])), description is not None,
+        sha256[:12], len(dense), len(sparse.indices), description is not None,
     )
     return True
 
@@ -1028,20 +1090,15 @@ async def index_graph(sha256: str) -> None:
     are already the flat AssetRef list), so this stage needs neither bytes nor
     embeddings and runs in parallel with the embed stages.
     """
-    record = await maybe_await(fetch_image_record(sha256)) or {}
-    edges = {
-        "sha256": sha256,
-        "references": record.get("references") or [],
-        "tags": record.get("tags") or [],
-        "lineage": [],
-    }
-    await maybe_await(_post_with_retry(f"{GRAPH_URL}/edges", edges))
+    record = await maybe_await(fetch_image_record(sha256)) or CatalogImageRow()
+    edges = GraphEdges(sha256=sha256, references=record.references or [], tags=record.tags or [])
+    await maybe_await(_post_with_retry(f"{GRAPH_URL}/edges", _dump_json(edges)))
 
 
 # ---------------------------------------------------------------------------
 # Record assembly
 # ---------------------------------------------------------------------------
-def _references_list(references: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _references_list(references: ReferencesBlock | None) -> list[AssetRef]:
     """Flatten the metadata References object into catalog/graph AssetRef rows.
 
     Metadata returns ``{checkpoints:[...], loras:[...], ...}``; catalog/graph
@@ -1049,18 +1106,18 @@ def _references_list(references: dict[str, Any] | None) -> list[dict[str, Any]]:
     """
     if not references:
         return []
-    kind_for = {
-        "checkpoints": "checkpoint",
-        "loras": "lora",
-        "embeddings": "embedding",
-        "vae": "vae",
-        "controlnets": "controlnet",
-        "upscalers": "upscaler",
-    }
-    out: list[dict[str, Any]] = []
-    for plural, kind in kind_for.items():
-        for ref in references.get(plural, []) or []:
-            out.append({"kind": kind, "name": ref.get("name"), "hash": ref.get("hash")})
+    buckets: list[tuple[str, list[RefItem]]] = [
+        ("checkpoint", references.checkpoints),
+        ("lora", references.loras),
+        ("embedding", references.embeddings),
+        ("vae", references.vae),
+        ("controlnet", references.controlnets),
+        ("upscaler", references.upscalers),
+    ]
+    out: list[AssetRef] = []
+    for kind, refs in buckets:
+        for ref in refs:
+            out.append(AssetRef(kind=kind, name=ref.name, hash=ref.hash))
     return out
 
 
@@ -1093,62 +1150,79 @@ def file_created_at_iso(source_path: str | None) -> str | None:
         mtime = os.stat(source_path).st_mtime
     except OSError:
         return None
-    return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(mtime, tz=UTC).isoformat()
+
+
+@dataclass(frozen=True, slots=True)
+class ImagePixelInfo:
+    """The per-image values derived from decoding pixels (``_pixel_work`` /
+    ``_phash_dims``), bundled so :func:`build_catalog_record` stays under the
+    max-args limit."""
+
+    sha256: str
+    phash: str | None
+    width: int | None
+    height: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogLabelOverlay:
+    """The optional AI-labelagent fields a ``label`` stage patch overlays onto a
+    catalog record. None for ``description``/``safety`` is safe: catalog
+    COALESCEs them so a later write never wipes an AI value an earlier label
+    stored."""
+
+    tags: list[str] | None = None
+    description: str | None = None
+    safety: str | None = None
 
 
 def build_catalog_record(
     *,
-    sha256: str,
-    phash: str | None,
-    width: int | None,
-    height: int | None,
-    extract: dict[str, Any],
+    pixel: ImagePixelInfo,
+    extract: ExtractResult,
     source_path: str | None = None,
     created_at: str | None = None,
-    tags: list[str] | None = None,
-    description: str | None = None,
-    safety: str | None = None,
-) -> dict[str, Any]:
+    overlay: CatalogLabelOverlay | None = None,
+) -> CatalogImageRecord:
     """Build the catalog ImageUpsert record (the source-of-truth row).
 
     Used by the ``ingest`` stage (:func:`ingest_fast`, catalog record only) and the
     ``label`` stage (:func:`label_image`, a full record patch carrying the AI
-    description/safety/tags). None for ``description``/``safety`` is safe: catalog
-    COALESCEs them so a later write never wipes an AI value an earlier label stored.
+    description/safety/tags via ``overlay``).
     """
-    return {
-        "sha256": sha256,
+    overlay = overlay or CatalogLabelOverlay()
+    return CatalogImageRecord(
+        sha256=pixel.sha256,
         # Original on-disk path of the source file (folder-walk ingests). The
         # cross-service id is the opaque sha256, so carrying the source path lets
         # a human tell which file a record came from when inspecting the system.
         # None for paths-unknown ingests (e.g. reindex from stored bytes, where
         # the caller backfills it from the catalog record).
-        "filepath": source_path,
+        filepath=source_path,
         # Source-file creation time (captured on first ingest). None on the
         # reproject/reindex path — catalog keeps the value from first ingest.
-        "createdAt": created_at,
-        "phash": phash,
-        "width": width,
-        "height": height,
-        "sourceTool": (
-            None if extract.get("sourceTool") in (None, "unknown") else extract.get("sourceTool")
-        ),
-        "prompt": extract.get("prompt"),
-        "negative": extract.get("negative"),
-        "tags": tags if tags is not None else (extract.get("tags") or []),
-        "params": extract.get("params") or {},
-        "references": _references_list(extract.get("references")),
-        "workflow_json": extract.get("workflow_json"),
-        "api_prompt_json": extract.get("api_prompt_json"),
+        createdAt=created_at,
+        phash=pixel.phash,
+        width=pixel.width,
+        height=pixel.height,
+        sourceTool=(None if extract.sourceTool in (None, "unknown") else extract.sourceTool),
+        prompt=extract.prompt,
+        negative=extract.negative,
+        tags=overlay.tags if overlay.tags is not None else (extract.tags or []),
+        params=extract.params or {},
+        references=_references_list(extract.references),
+        workflow_json=extract.workflow_json,
+        api_prompt_json=extract.api_prompt_json,
         # AI content-safety class (deedlit.labelagent); None when the labelagent
         # is disabled — catalog COALESCEs None so a reindex never wipes it.
-        "safety": safety,
+        safety=overlay.safety,
         # AI description (deedlit.labelagent). An expensive vision-LLM result, so
         # it is persisted in the catalog (image_descriptions) — not just the
         # search payload — to stay retrievable/viewable. None when the labelagent
         # is disabled; catalog keeps the existing one so a reindex never wipes it.
-        "description": description,
-    }
+        description=overlay.description,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1175,7 +1249,7 @@ async def ingest_fast(
     ``on_stage`` is the optional progress hook, called as the stage enters each
     step (``hash`` / ``metadata`` / ``catalog``).
     """
-    stage = on_stage if on_stage is not None else lambda _name: None
+    stage: Callable[[str], None] = on_stage if on_stage is not None else lambda _name: None
 
     ext = os.path.splitext(filename)[1].lower()
     mime = _mime_for_extension(ext)
@@ -1189,17 +1263,14 @@ async def ingest_fast(
     # Catalog truth only — extracted tags, no AI fields (the label task fills
     # description/safety/AI-tags later, and catalog COALESCEs the None values).
     record = build_catalog_record(
-        sha256=sha256,
-        phash=phash,
-        width=width,
-        height=height,
+        pixel=ImagePixelInfo(sha256=sha256, phash=phash, width=width, height=height),
         extract=extract,
         source_path=source_path,
         created_at=file_created_at_iso(source_path),
     )
 
     stage("catalog")
-    await maybe_await(_post_with_retry(f"{CATALOG_URL}/images", record))
+    await maybe_await(_post_with_retry(f"{CATALOG_URL}/images", _dump_json(record)))
     if thumbnail is not None:
         await maybe_await(_put_blob_with_retry(
             f"{CATALOG_URL}/blobs/{sha256}/thumbnail", thumbnail, "image/webp"
@@ -1224,7 +1295,7 @@ async def ingest_path(path: str) -> str:
 # Fan-out (catalog-first, per-store retry)
 # ---------------------------------------------------------------------------
 async def _request_with_retry(
-    send: Callable[[], Awaitable[Any]],
+    send: Callable[[], Awaitable[httpx.Response]],
     label: str,
     retries: int = FANOUT_RETRIES,
 ) -> None:
@@ -1252,7 +1323,7 @@ async def _request_with_retry(
     raise last_exc
 
 
-async def _post_with_retry(url: str, json_body: dict[str, Any], retries: int = FANOUT_RETRIES) -> None:
+async def _post_with_retry(url: str, json_body: dict[str, JsonValue], retries: int = FANOUT_RETRIES) -> None:
     """POST JSON with per-store retry on transient failure (5xx / network)."""
     client = get_client()
     await _request_with_retry(lambda: client.post(url, json=json_body), url, retries)

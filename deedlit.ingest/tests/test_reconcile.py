@@ -22,14 +22,12 @@ from __future__ import annotations
 
 import time
 
-import pytest
-from fastapi.testclient import TestClient
-
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
-
+import pytest
+from fastapi.testclient import TestClient
 
 SHA_A = "a" * 64
 SHA_B = "b" * 64
@@ -43,7 +41,7 @@ def fresh_store(monkeypatch):
     return store
 
 
-def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0) -> dict:
+def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0):
     deadline = time.time() + timeout
     last = None
     while time.time() < deadline:
@@ -51,6 +49,7 @@ def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: floa
         if last["status"] in statuses:
             return last
         time.sleep(0.02)
+    assert last is not None
     return last
 
 
@@ -66,12 +65,15 @@ def mock_projections(monkeypatch):
     index.search={B} (B has both vectors but no point; C's vectors are missing so
     its embed stages fan in instead), index.graph={C}.
     """
-    state: dict = {
+    pub_calls: dict[str, list[str]] = {
+        "embed.dense": [], "embed.sparse": [], "index.search": [], "index.graph": [],
+    }
+    state: dict[str, object] = {
         "dense_ids": {SHA_A, SHA_B},
         "sparse_ids": {SHA_A, SHA_B},
         "search_ids": {SHA_A},
         "graph_ids": {SHA_A, SHA_B},
-        "pub": {"embed.dense": [], "embed.sparse": [], "index.search": [], "index.graph": []},
+        "pub": pub_calls,
     }
 
     monkeypatch.setattr(pipeline, "list_catalog_sha256", lambda: [SHA_A, SHA_B, SHA_C])
@@ -82,7 +84,7 @@ def mock_projections(monkeypatch):
 
     def _record(key):
         async def pub(sha256, parent_op_id=None):
-            state["pub"][key].append(sha256)
+            pub_calls[key].append(sha256)
         return pub
 
     monkeypatch.setattr(broker_module, "publish_embed_dense_task", _record("embed.dense"))

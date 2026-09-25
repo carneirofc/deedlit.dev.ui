@@ -8,11 +8,10 @@ and inspect the recorded calls.
 """
 from __future__ import annotations
 
-import pytest
-
 import config
 import job_ledger
 import ledger
+import pytest
 import settings_client
 
 
@@ -25,7 +24,7 @@ def stub_job_persistence(monkeypatch):
     blocks on a missing catalog. The returned list records job snapshots for
     tests that want to assert what would have been persisted.
     """
-    recorded: list[dict] = []
+    recorded: list[dict[str, object]] = []
 
     async def _record_job(snapshot):
         recorded.append(snapshot)
@@ -67,7 +66,7 @@ def stub_ledger(monkeypatch):
     Each recorded call is a dict: {sha256, type, status, attempts, error,
     parent_op_id}. Autouse so the ledger never reaches out over HTTP in tests.
     """
-    calls: list[dict] = []
+    calls: list[dict[str, object]] = []
 
     def _record(sha256, task_type, status, attempts=None, error=None, parent_op_id=None):
         calls.append(

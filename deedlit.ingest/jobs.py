@@ -12,27 +12,29 @@ import logging
 import os
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 import broker
 import config
 import job_ledger
 import ledger
 import pipeline
+from models import ReconcileImageStatus, ReconcileReport
+from pydantic import JsonValue
 
 log = logging.getLogger("deedlit.ingest.jobs")
 
 
 async def _publish_stage_best_effort(
-    publisher: Callable[..., Any],
+    publisher: Callable[..., Awaitable[None]],
     queue: str,
     sha256: str,
     parent_op_id: str | None = None,
-    **pub_kwargs: Any,
+    **pub_kwargs: str | None,
 ) -> bool:
     """Publish one per-image stage task, swallowing broker errors (ADR 0001/0002).
 
@@ -86,13 +88,13 @@ async def _publish_index_graph_best_effort(sha256: str, parent_op_id: str | None
     )
 
 
-async def _publish_label_best_effort(sha256: str, parent_op_id: str | None = None) -> bool:
+async def publish_label_best_effort(sha256: str, parent_op_id: str | None = None) -> bool:
     return await _publish_stage_best_effort(
         broker.publish_label_task, broker.LABEL_QUEUE, sha256, parent_op_id
     )
 
 
-async def _publish_reproject_best_effort(sha256: str, parent_op_id: str | None = None) -> bool:
+async def publish_reproject_best_effort(sha256: str, parent_op_id: str | None = None) -> bool:
     """Re-publish the projection stages (no re-label) for one image (ADR 0002).
 
     Drives embed.dense + embed.sparse (which fan into index.search) + index.graph
@@ -110,7 +112,7 @@ async def _publish_reproject_best_effort(sha256: str, parent_op_id: str | None =
 
 def _now_iso() -> str:
     """UTC timestamp in ISO-8601 — the wire format the UI job rows expect."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 # Job lifecycle states (mirrors contracts/ingest.openapi.yaml).
 QUEUED = "queued"
@@ -136,7 +138,7 @@ def ingest_concurrency() -> int:
     producer's in-flight publishes via an asyncio.Semaphore so a huge folder
     enqueues at a steady rate instead of an unbounded burst.
     """
-    return config.runtime()["ingest_concurrency"]
+    return config.runtime().ingest_concurrency
 
 
 def llm_enabled() -> bool:
@@ -147,7 +149,7 @@ def llm_enabled() -> bool:
     producer skips publishing ``label`` tasks and the label-backfill sweep no-ops
     — images are cataloged + projected without an AI description/safety/tags.
     """
-    return config.runtime()["llm_enabled"]
+    return config.runtime().llm_enabled
 
 # Maintenance job types (mirrors MaintenanceRequest.type in the contract).
 REINDEX_ONE_IMAGE = "reindex-one-image"
@@ -191,12 +193,31 @@ REBUILD_FUNCS = {
 }
 
 
+def _rebuild_callables() -> dict[str, Callable[[], dict[str, JsonValue]]]:
+    """Name -> the current pipeline callable (looked up fresh each call, so
+    tests can monkeypatch ``pipeline.rebuild_*``), avoiding a
+    reportAny-triggering ``getattr(pipeline, name)`` at the call site."""
+    return {
+        "rebuild_search": pipeline.rebuild_search,
+        "rebuild_graph": pipeline.rebuild_graph,
+        "rebuild_thumbnails": pipeline.rebuild_thumbnails,
+    }
+
+
 @dataclass
 class Progress:
     total: int = 0
     done: int = 0
     skipped: int = 0
     failed: int = 0
+
+
+@dataclass(slots=True)
+class _StageTimer:
+    """Per-file timing state for :meth:`Job.stage_callback`."""
+
+    prev: str | None = None
+    since: float | None = None
 
 
 @dataclass
@@ -217,7 +238,7 @@ class Job:
     # shows each folder's last-scan status/time. None for ad-hoc ingests.
     source_folder_id: str | None = None
     # Reconcile output: per-image projection status + repair summary (#21).
-    report: dict[str, Any] | None = None
+    report: dict[str, JsonValue] | None = None
     # Live observability: which pipeline stage the worker is in right now
     # (hash/metadata/label/vision:dense/vision:sparse/catalog/search/graph) and a
     # per-stage count of files that have REACHED that stage — drives the UI's
@@ -230,8 +251,8 @@ class Job:
     started_at: str | None = None
     finished_at: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
+    def to_dict(self) -> dict[str, JsonValue]:
+        out: dict[str, JsonValue] = {
             "id": self.id,
             "type": self.type,
             "status": self.status,
@@ -250,7 +271,7 @@ class Job:
             # Live stage + lifecycle timestamps (snake_case; the UI normalizes
             # both camelCase and snake_case — see lib/store/activity-jobs.ts).
             "current_stage": self.current_stage,
-            "stage_counts": self.stage_counts,
+            "stage_counts": cast(dict[str, JsonValue], self.stage_counts),
             "created_at": self.created_at,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
@@ -259,7 +280,7 @@ class Job:
             out["report"] = self.report
         return out
 
-    def to_persist(self) -> dict[str, Any]:
+    def to_persist(self) -> dict[str, JsonValue]:
         """Snake_case snapshot for the catalog ``jobs`` table (job_ledger).
 
         Coarse, not per-file: written on the lifecycle edges (queued → terminal).
@@ -276,7 +297,7 @@ class Job:
             "failed": self.progress.failed,
             "error": self.error,
             "current_stage": self.current_stage,
-            "stage_counts": self.stage_counts,
+            "stage_counts": cast(dict[str, JsonValue], self.stage_counts),
             "report": self.report,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
@@ -293,17 +314,17 @@ class Job:
         # the next one begins, so a slow service (e.g. the labelagent LLM at the
         # `label` stage, or `vision:dense` waiting on the GPU) is obvious in the
         # log. The closure is per-file (one callback is created per _process_one).
-        state: dict[str, Any] = {"prev": None, "since": None}
+        timer = _StageTimer()
 
         def cb(stage: str) -> None:
             now = time.perf_counter()
-            if state["prev"] is not None:
+            if timer.prev is not None and timer.since is not None:
                 log.info(
-                    "job %s | %-13s %7.0f ms", self.id[:8], state["prev"],
-                    (now - state["since"]) * 1000,
+                    "job %s | %-13s %7.0f ms", self.id[:8], timer.prev,
+                    (now - timer.since) * 1000,
                 )
-            state["prev"] = stage
-            state["since"] = now
+            timer.prev = stage
+            timer.since = now
             self.current_stage = stage
             self.stage_counts[stage] = self.stage_counts.get(stage, 0) + 1
 
@@ -314,30 +335,53 @@ class Job:
 # a dead process, so it is loaded as ``interrupted``.
 _TERMINAL_STATES = frozenset({COMPLETED, FAILED, CANCELLED, INTERRUPTED})
 
+# The four per-image projection stages a reconcile sweep probes + repairs.
+_RECONCILE_STAGES = (
+    broker.EMBED_DENSE_QUEUE,
+    broker.EMBED_SPARSE_QUEUE,
+    broker.INDEX_SEARCH_QUEUE,
+    broker.INDEX_GRAPH_QUEUE,
+)
 
-def _as_str(value: Any) -> str | None:
+
+def _as_str(value: JsonValue) -> str | None:
     """ISO datetime / id fields ride as strings; pass through, coercing None."""
     return str(value) if value is not None else None
 
 
-def _job_from_snapshot(snap: dict[str, Any]) -> Job:
+def _as_int(value: JsonValue) -> int:
+    """Narrow a persisted JSON value to a progress counter, defaulting to 0."""
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
+def _as_dict(value: JsonValue) -> dict[str, JsonValue] | None:
+    """Narrow a persisted JSON value to an object, or None."""
+    return value if isinstance(value, dict) else None
+
+
+def _as_int_counts(value: JsonValue) -> dict[str, int]:
+    """Narrow a persisted JSON value to the ``{stage: count}`` shape."""
+    return {k: v for k, v in (_as_dict(value) or {}).items() if isinstance(v, int)}
+
+
+def _job_from_snapshot(snap: dict[str, JsonValue]) -> Job:
     """Rebuild an in-memory Job from a persisted catalog snapshot (hydrate)."""
     status = str(snap.get("status") or QUEUED)
     if status not in _TERMINAL_STATES:
         status = INTERRUPTED
     job = Job(id=str(snap["id"]), type=str(snap.get("type") or "ingest"), status=status)
-    job.folder_path = snap.get("folder_path")
-    job.source_folder_id = snap.get("source_folder_id")
+    job.folder_path = _as_str(snap.get("folder_path"))
+    job.source_folder_id = _as_str(snap.get("source_folder_id"))
     job.progress = Progress(
-        total=int(snap.get("total") or 0),
-        done=int(snap.get("done") or 0),
-        skipped=int(snap.get("skipped") or 0),
-        failed=int(snap.get("failed") or 0),
+        total=_as_int(snap.get("total")),
+        done=_as_int(snap.get("done")),
+        skipped=_as_int(snap.get("skipped")),
+        failed=_as_int(snap.get("failed")),
     )
-    job.error = snap.get("error")
-    job.current_stage = snap.get("current_stage")
-    job.stage_counts = dict(snap.get("stage_counts") or {})
-    job.report = snap.get("report")
+    job.error = _as_str(snap.get("error"))
+    job.current_stage = _as_str(snap.get("current_stage"))
+    job.stage_counts = _as_int_counts(snap.get("stage_counts"))
+    job.report = _as_dict(snap.get("report"))
     job.created_at = _as_str(snap.get("created_at")) or _now_iso()
     job.started_at = _as_str(snap.get("started_at"))
     # A job interrupted mid-run has no persisted finish; stamp one so the UI
@@ -354,7 +398,7 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
-        self._worker: asyncio.Task | None = None
+        self._worker: asyncio.Task[None] | None = None
         # The event loop the worker runs on, captured so a job snapshot can be
         # scheduled onto it (best-effort, fire-and-forget) even from a sync
         # endpoint thread. Set by start_worker / the async lifespan.
@@ -385,7 +429,7 @@ class JobStore:
         """All jobs, newest first — backs the gateway/dashboard GET /jobs list."""
         return list(reversed(self._jobs.values()))
 
-    def hydrate(self, snapshots: list[dict[str, Any]]) -> int:
+    def hydrate(self, snapshots: list[dict[str, JsonValue]]) -> int:
         """Seed the registry from persisted catalog snapshots on startup.
 
         Loads history so ``GET /jobs`` (and the dashboard) shows past jobs right
@@ -397,7 +441,7 @@ class JobStore:
         """
         loaded = 0
         for snap in reversed(snapshots):
-            jid = snap.get("id")
+            jid = _as_str(snap.get("id"))
             if not jid or jid in self._jobs:
                 continue
             self._jobs[jid] = _job_from_snapshot(snap)
@@ -500,6 +544,45 @@ class JobStore:
             finally:
                 self._queue.task_done()
 
+    async def _dispatch_job(self, job: Job) -> None:
+        """Route a running job to its type-specific runner."""
+        if job.type == REINDEX_ONE_IMAGE:
+            await self._run_reindex_one(job)
+        elif job.type == RECONCILE:
+            await self._run_reconcile(job)
+        elif job.type == LABEL_BACKFILL:
+            await self._run_label_backfill(job)
+        elif job.type == PRUNE_GRAPH_ORPHANS:
+            await self._run_prune_orphans(job)
+        elif job.type in REBUILD_FUNCS:
+            await self._run_rebuild(job)
+        else:
+            # "ingest" and "rescan-files" both walk a folder and run the
+            # per-file pipeline — rescan-files reuses the #9 folder pipeline.
+            await self._run_folder(job)
+
+    async def _finalize_job(self, job: Job) -> None:
+        """Settle a finished job: registry scan-state + the durable snapshot."""
+        # Settled on every path (completed / failed / cancelled mid-run).
+        job.finished_at = _now_iso()
+        # If this was a scheduled scan of a configured folder, write its
+        # outcome back to the registry so the UI shows last-scan status/time.
+        # Best-effort: a registry write must never fail the scan it describes.
+        if job.source_folder_id:
+            await asyncio.to_thread(
+                pipeline.record_folder_scan,
+                job.source_folder_id,
+                status=job.status,
+                job_id=job.id,
+                # "" (not None) so a successful re-scan CLEARS a prior error;
+                # record_folder_scan only writes non-None fields.
+                error=job.error or "",
+                touch_last_scan_at=True,
+            )
+        # Persist the terminal snapshot (status + final counts + finished_at)
+        # so the job survives a restart in the catalog history.
+        self._schedule_persist(job)
+
     async def _run_job(self, job: Job) -> None:
         if job.cancel_requested:
             job.status = CANCELLED
@@ -509,71 +592,34 @@ class JobStore:
         job.started_at = _now_iso()
         log.info("job %s (%s) started folder=%s sha256=%s", job.id, job.type, job.folder_path, job.sha256)
         try:
-            if job.type == REINDEX_ONE_IMAGE:
-                await self._run_reindex_one(job)
-            elif job.type == RECONCILE:
-                await self._run_reconcile(job)
-            elif job.type == LABEL_BACKFILL:
-                await self._run_label_backfill(job)
-            elif job.type == PRUNE_GRAPH_ORPHANS:
-                await self._run_prune_orphans(job)
-            elif job.type in REBUILD_FUNCS:
-                await self._run_rebuild(job)
-            else:
-                # "ingest" and "rescan-files" both walk a folder and run the
-                # per-file pipeline — rescan-files reuses the #9 folder pipeline.
-                await self._run_folder(job)
+            await self._dispatch_job(job)
         except Exception as exc:  # folder missing, image not found, etc.
-            if job.status not in (CANCELLED,):
+            # basedpyright narrows job.status to Literal["running"] from the
+            # assignment above and doesn't see the awaited helpers (which can
+            # set it to CANCELLED) as invalidating that — a false positive.
+            if job.status not in (CANCELLED,):  # pyright: ignore[reportUnnecessaryContains]
                 job.status = FAILED
                 job.error = str(exc)
             log.exception("job %s (%s) FAILED: %s", job.id, job.type, exc)
         finally:
-            # Settled on every path (completed / failed / cancelled mid-run).
-            job.finished_at = _now_iso()
-            # If this was a scheduled scan of a configured folder, write its
-            # outcome back to the registry so the UI shows last-scan status/time.
-            # Best-effort: a registry write must never fail the scan it describes.
-            if job.source_folder_id:
-                await asyncio.to_thread(
-                    pipeline.record_folder_scan,
-                    job.source_folder_id,
-                    status=job.status,
-                    job_id=job.id,
-                    # "" (not None) so a successful re-scan CLEARS a prior error;
-                    # record_folder_scan only writes non-None fields.
-                    error=job.error or "",
-                    touch_last_scan_at=True,
-                )
-            # Persist the terminal snapshot (status + final counts + finished_at)
-            # so the job survives a restart in the catalog history.
-            self._schedule_persist(job)
+            await self._finalize_job(job)
         log.info(
             "job %s (%s) -> %s (total=%d done=%d skipped=%d failed=%d)",
             job.id, job.type, job.status,
             job.progress.total, job.progress.done, job.progress.skipped, job.progress.failed,
         )
 
-    async def _run_folder(self, job: Job) -> None:
-        """Walk the folder and PUBLISH one ``ingest`` task per NEW file (ADR 0002).
+    async def _dedupe_against_catalog(self, job: Job, files: list[Path]) -> list[Path]:
+        """Drop files already cataloged (by on-disk path), bumping ``skipped``.
 
-        The producer does no processing — it only enqueues. The ingest-worker pool
-        reads the bytes, catalogs each file, and fans out the per-stage DAG, all in
-        parallel across processes. Up to ``INGEST_CONCURRENCY`` publishes are kept
-        in flight via a semaphore so a huge folder enqueues steadily; cancellation
-        is honoured between launches (already-launched publishes finish, then the
-        job settles cancelled). ``progress.done`` counts files ENQUEUED.
-
-        INCREMENTAL: files already cataloged (by on-disk path) are SKIPPED so a
-        scheduled re-walk / manual re-ingest of an unchanged library doesn't
-        re-enqueue the whole projection DAG (which would re-embed + re-label every
-        image every scan, never draining the queues). A file edited in place keeps
-        its path — re-project it explicitly via reindex.
+        INCREMENTAL: a scheduled re-walk / manual re-ingest of an unchanged
+        library doesn't re-enqueue the whole projection DAG (which would
+        re-embed + re-label every image every scan, never draining the queues).
+        A file edited in place keeps its path — re-project it explicitly via
+        reindex. A catalog lookup failure degrades to enqueuing everything
+        rather than skipping new files.
         """
-        files = _list_supported_files(job.folder_path or "")
-        job.progress.total = len(files)
-        # Dedup against catalog truth (one paged read). A lookup failure degrades
-        # to enqueuing everything rather than skipping new files.
+        cataloged: set[str]
         try:
             cataloged = await asyncio.to_thread(
                 pipeline.list_catalog_filepaths_under, job.folder_path or ""
@@ -590,14 +636,21 @@ class JobStore:
                 job.progress.skipped += 1
             else:
                 new_files.append(path)
-        files = new_files
-        if files:
+        if new_files:
             log.info(
                 "folder scan %s: %d new, %d already cataloged (skipped)",
-                job.id, len(files), job.progress.skipped,
+                job.id, len(new_files), job.progress.skipped,
             )
+        return new_files
+
+    async def _publish_new_files(self, job: Job, files: list[Path]) -> None:
+        """Publish one ``ingest`` task per file, bounded by ``INGEST_CONCURRENCY``.
+
+        Cancellation is honoured between launches (already-launched publishes
+        finish, then the job settles cancelled).
+        """
         sem = asyncio.Semaphore(ingest_concurrency())
-        tasks: list[asyncio.Task] = []
+        tasks: list[asyncio.Task[None]] = []
 
         async def _run_one(path: Path) -> None:
             try:
@@ -614,6 +667,19 @@ class JobStore:
                 break
             tasks.append(asyncio.create_task(_run_one(path)))
         await asyncio.gather(*tasks)
+
+    async def _run_folder(self, job: Job) -> None:
+        """Walk the folder and PUBLISH one ``ingest`` task per NEW file (ADR 0002).
+
+        The producer does no processing — it only enqueues. The ingest-worker pool
+        reads the bytes, catalogs each file, and fans out the per-stage DAG, all in
+        parallel across processes. ``progress.done`` counts files ENQUEUED.
+        """
+        files = _list_supported_files(job.folder_path or "")
+        job.progress.total = len(files)
+        # Dedup against catalog truth (one paged read).
+        files = await self._dedupe_against_catalog(job, files)
+        await self._publish_new_files(job, files)
         job.status = CANCELLED if job.cancel_requested else COMPLETED
 
     async def _run_reindex_one(self, job: Job) -> None:
@@ -630,7 +696,7 @@ class JobStore:
             job.status = CANCELLED
             return
         sha256 = job.sha256 or ""
-        if await _publish_reproject_best_effort(sha256, parent_op_id=job.id):
+        if await publish_reproject_best_effort(sha256, parent_op_id=job.id):
             job.progress.done += 1
         else:
             job.progress.failed += 1
@@ -654,7 +720,7 @@ class JobStore:
         if job.cancel_requested:
             job.status = CANCELLED
             return
-        rebuild = getattr(pipeline, job.rebuild_func or "")
+        rebuild = _rebuild_callables()[job.rebuild_func or ""]
         await asyncio.to_thread(rebuild)
         job.progress.done += 1
         job.status = COMPLETED
@@ -675,7 +741,7 @@ class JobStore:
             async with sem:
                 if job.cancel_requested:
                     return
-                if await _publish_reproject_best_effort(sha, parent_op_id=job.id):
+                if await publish_reproject_best_effort(sha, parent_op_id=job.id):
                     job.progress.done += 1
                 else:
                     job.progress.failed += 1
@@ -683,43 +749,14 @@ class JobStore:
         await asyncio.gather(*(_one(sha) for sha in shas))
         job.status = CANCELLED if job.cancel_requested else COMPLETED
 
-    async def _run_reconcile(self, job: Job) -> None:
-        """Reconcile sweep: catalog truth vs the per-stage DAG outputs (#21,
-        ADR 0002 — coarse op as task producer).
+    async def _reconcile_probe_all(
+        self, job: Job, catalog: list[str]
+    ) -> dict[str, dict[str, bool]]:
+        """Probe the four stage outputs for every cataloged image, CONCURRENT.
 
-        For each cataloged image, probe the four stage outputs that hang off
-        catalog truth — the persisted dense vector (``embedding`` blob), the
-        sparse vector (``sparse`` blob), the search point, and the graph node —
-        and re-publish exactly the stage(s) that are missing:
-
-          - no dense blob   -> embed.dense   (which fans into index.search)
-          - no sparse blob  -> embed.sparse  (which fans into index.search)
-          - both vectors present but no search point -> index.search directly
-          - no graph node   -> index.graph
-
-        This is the safety net for the best-effort publish model: anything dropped
-        during a broker outage shows up as drift here and is re-enqueued at the
-        right stage. Progress counts catalog images probed; cancellation is
-        checked between probes and between publishes.
-        """
-        STAGES = (
-            broker.EMBED_DENSE_QUEUE,
-            broker.EMBED_SPARSE_QUEUE,
-            broker.INDEX_SEARCH_QUEUE,
-            broker.INDEX_GRAPH_QUEUE,
-        )
-        catalog = await asyncio.to_thread(pipeline.list_catalog_sha256)
-        job.progress.total = len(catalog)
-
-        images: dict[str, dict[str, Any]] = {}
-        drift: dict[str, list[str]] = {s: [] for s in STAGES}
-
-        # -- per-stage coverage probe (per catalog image), CONCURRENT --
-        # The four probes for one image are independent reads, and images are
-        # independent of each other, so they all run concurrently (bounded by the
-        # producer concurrency knob). Results are collected into a dict and the
-        # drift lists are then assembled in CATALOG order so the report stays
-        # deterministic regardless of probe completion order.
+        The four probes for one image are independent reads, and images are
+        independent of each other, so they all run concurrently (bounded by the
+        producer concurrency knob)."""
         sem = asyncio.Semaphore(ingest_concurrency())
         probed: dict[str, dict[str, bool]] = {}
 
@@ -740,11 +777,15 @@ class JobStore:
                 job.progress.done += 1
 
         await asyncio.gather(*(_probe(sha) for sha in catalog))
+        return probed
 
-        if job.cancel_requested:
-            job.status = CANCELLED
-            return
-
+    def _reconcile_build_drift(
+        self, catalog: list[str], probed: dict[str, dict[str, bool]]
+    ) -> tuple[dict[str, ReconcileImageStatus], dict[str, list[str]]]:
+        """Assemble per-image status + the per-stage drift lists (CATALOG order,
+        so the report stays deterministic regardless of probe completion order)."""
+        images: dict[str, ReconcileImageStatus] = {}
+        drift: dict[str, list[str]] = {s: [] for s in _RECONCILE_STAGES}
         for sha in catalog:
             r = probed.get(sha)
             if r is None:
@@ -761,34 +802,79 @@ class JobStore:
             if not r["in_graph"]:
                 need.append(broker.INDEX_GRAPH_QUEUE)
 
-            images[sha] = {**r, "enqueued": []}
+            images[sha] = ReconcileImageStatus(
+                dense=r["dense"], sparse=r["sparse"],
+                in_search=r["in_search"], in_graph=r["in_graph"],
+            )
             for stage in need:
                 drift[stage].append(sha)
+        return images, drift
 
-        # -- re-enqueue exactly the drifted stage(s) per image --
+    async def _reconcile_publish_drift(
+        self,
+        job: Job,
+        drift: dict[str, list[str]],
+        images: dict[str, ReconcileImageStatus],
+    ) -> dict[str, list[str]] | None:
+        """Re-publish exactly the drifted stage(s) per image. Returns None (and
+        leaves ``job.status`` set to CANCELLED) if cancelled mid-sweep."""
         publishers = {
             broker.EMBED_DENSE_QUEUE: _publish_embed_dense_best_effort,
             broker.EMBED_SPARSE_QUEUE: _publish_embed_sparse_best_effort,
             broker.INDEX_SEARCH_QUEUE: _publish_index_search_best_effort,
             broker.INDEX_GRAPH_QUEUE: _publish_index_graph_best_effort,
         }
-        enqueued: dict[str, list[str]] = {s: [] for s in STAGES}
-        for stage in STAGES:
+        enqueued: dict[str, list[str]] = {s: [] for s in _RECONCILE_STAGES}
+        for stage in _RECONCILE_STAGES:
             for sha in drift[stage]:
                 if job.cancel_requested:
                     job.status = CANCELLED
-                    return
+                    return None
                 if await publishers[stage](sha, parent_op_id=job.id):
-                    images[sha]["enqueued"].append(stage)
+                    images[sha].enqueued.append(stage)
                     enqueued[stage].append(sha)
+        return enqueued
 
-        job.report = {
-            "catalog_count": len(catalog),
-            "drift": drift,
-            "enqueued": enqueued,
-            "repair_strategy": "enqueue-per-stage",
-            "images": images,
-        }
+    async def _run_reconcile(self, job: Job) -> None:
+        """Reconcile sweep: catalog truth vs the per-stage DAG outputs (#21,
+        ADR 0002 — coarse op as task producer).
+
+        For each cataloged image, probe the four stage outputs that hang off
+        catalog truth — the persisted dense vector (``embedding`` blob), the
+        sparse vector (``sparse`` blob), the search point, and the graph node —
+        and re-publish exactly the stage(s) that are missing:
+
+          - no dense blob   -> embed.dense   (which fans into index.search)
+          - no sparse blob  -> embed.sparse  (which fans into index.search)
+          - both vectors present but no search point -> index.search directly
+          - no graph node   -> index.graph
+
+        This is the safety net for the best-effort publish model: anything dropped
+        during a broker outage shows up as drift here and is re-enqueued at the
+        right stage. Progress counts catalog images probed; cancellation is
+        checked between probes and between publishes.
+        """
+        catalog = await asyncio.to_thread(pipeline.list_catalog_sha256)
+        job.progress.total = len(catalog)
+
+        probed = await self._reconcile_probe_all(job, catalog)
+        if job.cancel_requested:
+            job.status = CANCELLED
+            return
+
+        images, drift = self._reconcile_build_drift(catalog, probed)
+        enqueued = await self._reconcile_publish_drift(job, drift, images)
+        if enqueued is None:
+            return
+
+        report = ReconcileReport(
+            catalog_count=len(catalog),
+            drift=drift,
+            enqueued=enqueued,
+            repair_strategy="enqueue-per-stage",
+            images=images,
+        )
+        job.report = cast(dict[str, JsonValue], report.model_dump(mode="json"))
         job.status = COMPLETED
 
     async def _run_label_backfill(self, job: Job) -> None:
@@ -815,7 +901,7 @@ class JobStore:
             if job.cancel_requested:
                 job.status = CANCELLED
                 return
-            if await _publish_label_best_effort(sha, parent_op_id=job.id):
+            if await publish_label_best_effort(sha, parent_op_id=job.id):
                 job.progress.done += 1
             else:
                 job.progress.failed += 1
@@ -834,8 +920,7 @@ class JobStore:
         if job.cancel_requested:
             job.status = CANCELLED
             return
-        result = await asyncio.to_thread(pipeline.prune_graph_orphans)
-        job.report = result if isinstance(result, dict) else None
+        job.report = await asyncio.to_thread(pipeline.prune_graph_orphans)
         job.progress.done += 1
         job.status = COMPLETED
 
@@ -896,13 +981,13 @@ def reconcile_interval_seconds() -> int:
         return 0
 
 
-def run_reconcile_tick(store: "JobStore") -> Job:
+def run_reconcile_tick(store: JobStore) -> Job:
     """Enqueue one reconcile job. The scheduler calls this every interval; tests
     call it directly to assert a job is enqueued without waiting on the clock."""
     return store.create_reconcile_job()
 
 
-async def reconcile_scheduler(store: "JobStore") -> None:
+async def reconcile_scheduler(store: JobStore) -> None:
     """Background loop: enqueue a reconcile sweep every interval (opt-in).
 
     No-op (returns immediately) when RECONCILE_INTERVAL_SECONDS is 0/unset, so
@@ -955,25 +1040,25 @@ def folder_scan_max_ingest_backlog() -> int:
         return 5000
 
 
-def _folder_due(folder: dict[str, Any], now: datetime) -> bool:
+def _folder_due(folder: pipeline.SourceFolder, now: datetime) -> bool:
     """True when an enabled folder is past its per-folder scan interval (or has
     never been scanned)."""
-    if not folder.get("enabled"):
+    if not folder.enabled:
         return False
-    last = folder.get("last_scan_at")
+    last = folder.last_scan_at
     if not last:
         return True
     try:
-        last_dt = datetime.fromisoformat(str(last))
+        last_dt = datetime.fromisoformat(last)
     except ValueError:
         return True
     if last_dt.tzinfo is None:
-        last_dt = last_dt.replace(tzinfo=timezone.utc)
-    interval = int(folder.get("scan_interval_seconds") or 0)
+        last_dt = last_dt.replace(tzinfo=UTC)
+    interval = folder.scan_interval_seconds or 0
     return (now - last_dt).total_seconds() >= interval
 
 
-def run_folder_scan_tick(store: "JobStore") -> list[Job]:
+def run_folder_scan_tick(store: JobStore) -> list[Job]:
     """Enqueue an ingest scan for every enabled, past-due folder.
 
     Returns the jobs enqueued (tests assert on this without waiting on the
@@ -985,7 +1070,7 @@ def run_folder_scan_tick(store: "JobStore") -> list[Job]:
     except Exception as exc:  # catalog down / transport — try again next tick
         log.warning("folder scan tick: could not list folders: %s", exc)
         return []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     active = {
         j.source_folder_id
         for j in store.list()
@@ -993,8 +1078,8 @@ def run_folder_scan_tick(store: "JobStore") -> list[Job]:
     }
     enqueued: list[Job] = []
     for folder in folders:
-        fid = folder.get("id")
-        path = folder.get("path")
+        fid = folder.id
+        path = folder.path
         if not fid or not path or fid in active:
             continue
         if not _folder_due(folder, now):
@@ -1010,7 +1095,7 @@ def run_folder_scan_tick(store: "JobStore") -> list[Job]:
     return enqueued
 
 
-async def folder_scan_scheduler(store: "JobStore") -> None:
+async def folder_scan_scheduler(store: JobStore) -> None:
     """Background loop: evaluate folders for due scans every tick (opt-in).
 
     No-op when FOLDER_SCAN_TICK_SECONDS is 0/unset, so importing the app or
@@ -1061,12 +1146,12 @@ def label_backfill_interval_seconds() -> int:
         return 0
 
 
-def run_label_backfill_tick(store: "JobStore") -> Job:
+def run_label_backfill_tick(store: JobStore) -> Job:
     """Enqueue one label-backfill job (tests call this directly)."""
     return store.create_maintenance_job(LABEL_BACKFILL)
 
 
-async def label_backfill_scheduler(store: "JobStore") -> None:
+async def label_backfill_scheduler(store: JobStore) -> None:
     """Background loop: enqueue a label-backfill sweep every interval (opt-in)."""
     interval = label_backfill_interval_seconds()
     if interval <= 0:
@@ -1100,12 +1185,12 @@ def orphan_prune_interval_seconds() -> int:
         return 0
 
 
-def run_orphan_prune_tick(store: "JobStore") -> Job:
+def run_orphan_prune_tick(store: JobStore) -> Job:
     """Enqueue one prune-graph-orphans job (tests call this directly)."""
     return store.create_maintenance_job(PRUNE_GRAPH_ORPHANS)
 
 
-async def orphan_prune_scheduler(store: "JobStore") -> None:
+async def orphan_prune_scheduler(store: JobStore) -> None:
     """Background loop: enqueue a graph orphan-prune sweep every interval (opt-in).
 
     No-op when ORPHAN_PRUNE_INTERVAL_SECONDS is 0/unset, so importing the app or

@@ -23,21 +23,18 @@ ingest job.
 """
 from __future__ import annotations
 
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import asyncio
 import logging
-import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Literal
-
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, model_validator
 
 import config
 import job_ledger
@@ -45,35 +42,39 @@ import ledger
 import pipeline
 import settings_client
 from activity import install_activity
-from fs_browse import FsBrowseError, browse_directory
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fs_browse import FsBrowseError, FsBrowseResult, browse_directory
 from jobs import (
     REINDEX_ONE_IMAGE,
     JobStore,
-    _publish_label_best_effort,
-    _publish_reproject_best_effort,
     folder_scan_scheduler,
     folder_scan_tick_seconds,
     label_backfill_interval_seconds,
     label_backfill_scheduler,
     orphan_prune_interval_seconds,
     orphan_prune_scheduler,
+    publish_label_best_effort,
+    publish_reproject_best_effort,
     reconcile_interval_seconds,
     reconcile_scheduler,
 )
+from models import ConfigPatch, IngestRuntimeConfig
+from pydantic import BaseModel, JsonValue, model_validator
 
 store = JobStore()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    store.start_worker()
-    # Restore durable state from catalog before serving (best-effort — a cold or
-    # unreachable catalog must never block startup; both helpers swallow their
-    # own errors and degrade to empty):
-    #   1. flip any job left queued/running by the previous process to
-    #      interrupted (its in-memory worker is gone),
-    #   2. hydrate the job registry so GET /jobs shows history immediately, and
-    #   3. seed the live producer config with the persisted UI overrides.
+async def _restore_durable_state() -> None:
+    """Restore durable state from catalog before serving (best-effort — a cold
+    or unreachable catalog must never block startup; both helpers swallow their
+    own errors and degrade to empty):
+      1. flip any job left queued/running by the previous process to
+         interrupted (its in-memory worker is gone),
+      2. hydrate the job registry so GET /jobs shows history immediately, and
+      3. seed the live producer config with the persisted UI overrides.
+    """
     await job_ledger.interrupt_stale()
     loaded = store.hydrate(await job_ledger.list_jobs(limit=200))
     if loaded:
@@ -86,13 +87,17 @@ async def lifespan(app: FastAPI):
         logging.getLogger("deedlit.ingest.app").info(
             "loaded persisted ingest config overrides: %s", overrides
         )
-    # Opt-in background schedulers (all disabled unless their interval env > 0,
-    # so tests never get a surprise scheduler):
-    #   - reconcile sweep (#21)
-    #   - folder scan (per-folder cadence over the configured-folder registry)
-    #   - label backfill (relabel images missing an AI description)
-    #   - graph orphan prune (sweep orphaned Asset/Tag nodes from Neo4j)
-    schedulers: list[asyncio.Task] = []
+
+
+def _start_schedulers() -> list[asyncio.Task[None]]:
+    """Start the opt-in background schedulers (all disabled unless their
+    interval env > 0, so tests never get a surprise scheduler):
+      - reconcile sweep (#21)
+      - folder scan (per-folder cadence over the configured-folder registry)
+      - label backfill (relabel images missing an AI description)
+      - graph orphan prune (sweep orphaned Asset/Tag nodes from Neo4j)
+    """
+    schedulers: list[asyncio.Task[None]] = []
     if reconcile_interval_seconds() > 0:
         schedulers.append(asyncio.create_task(reconcile_scheduler(store)))
     if folder_scan_tick_seconds() > 0:
@@ -101,6 +106,14 @@ async def lifespan(app: FastAPI):
         schedulers.append(asyncio.create_task(label_backfill_scheduler(store)))
     if orphan_prune_interval_seconds() > 0:
         schedulers.append(asyncio.create_task(orphan_prune_scheduler(store)))
+    return schedulers
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    store.start_worker()
+    await _restore_durable_state()
+    schedulers = _start_schedulers()
     try:
         yield
     finally:
@@ -173,7 +186,7 @@ class MaintenanceRequest(BaseModel):
     folderPath: str | None = None
 
     @model_validator(mode="after")
-    def _check_required(self) -> "MaintenanceRequest":
+    def _check_required(self) -> MaintenanceRequest:
         if self.type == REINDEX_ONE_IMAGE:
             if not self.sha256:
                 raise ValueError("sha256 is required for reindex-one-image")
@@ -192,30 +205,18 @@ class ReconcileRequest(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict:
+def health() -> dict[str, JsonValue]:
     return {"status": "ok"}
 
 
-class ConfigPatch(BaseModel):
-    """PUT /config body — partial update of the live producer knobs (ADR 0002).
-
-    Both optional so the settings panel can patch one field; None leaves it
-    unchanged. ``ingest_concurrency`` is clamped to >= 1 by the config layer.
-    """
-
-    ingest_concurrency: int | None = None
-    # Master switch for the vision-LLM (labelagent) enrichment stage.
-    llm_enabled: bool | None = None
-
-
 @app.get("/config")
-def get_config() -> dict:
+def get_config() -> IngestRuntimeConfig:
     """Effective runtime producer config (env defaults + live overrides)."""
     return config.runtime()
 
 
 @app.put("/config")
-async def put_config(patch: ConfigPatch) -> dict:
+async def put_config(patch: ConfigPatch) -> IngestRuntimeConfig:
     """Update the live producer config; returns the new effective config.
 
     Tunes folder-scan parallelism from the settings panel without a restart.
@@ -224,12 +225,12 @@ async def put_config(patch: ConfigPatch) -> dict:
     override still applies this run). Consumer-side parallelism (broker prefetch /
     worker replicas) is deploy-time and not settable here."""
     effective = config.update(patch.model_dump(exclude_none=True))
-    await settings_client.save(effective)
+    await settings_client.save(effective.model_dump())
     return effective
 
 
 @app.get("/fs/browse")
-def fs_browse(path: str | None = Query(default=None)) -> dict:
+def fs_browse(path: str | None = Query(default=None)) -> FsBrowseResult:
     """List a directory on the ingest host for the admin folder picker.
 
     Read-only. Omitting ``path`` returns the synthetic roots view (drives/home/
@@ -252,7 +253,7 @@ def start_ingest(req: IngestRequest) -> JSONResponse:
 
 
 @app.get("/jobs")
-def list_jobs() -> list[dict]:
+def list_jobs() -> list[dict[str, JsonValue]]:
     """List every job (newest first) for the gateway/dashboard.
 
     The gateway proxies ``GET /jobs`` here; without this route it 405s and the
@@ -292,7 +293,7 @@ class SingleTaskRequest(BaseModel):
     sha256: str
 
     @model_validator(mode="after")
-    def _check_sha(self) -> "SingleTaskRequest":
+    def _check_sha(self) -> SingleTaskRequest:
         import re
 
         if not re.fullmatch(r"[a-f0-9]{64}", self.sha256):
@@ -301,22 +302,22 @@ class SingleTaskRequest(BaseModel):
 
 
 @app.post("/tasks/index", status_code=202)
-async def enqueue_index_task(req: SingleTaskRequest) -> dict:
+async def enqueue_index_task(req: SingleTaskRequest) -> dict[str, JsonValue]:
     """Re-project one image from catalog truth: publish the per-stage projection
     set (embed.dense + embed.sparse -> index.search, plus index.graph). No relabel."""
-    ok = await _publish_reproject_best_effort(req.sha256)
+    ok = await publish_reproject_best_effort(req.sha256)
     return {"status": "queued" if ok else "publish_failed", "sha256": req.sha256, "type": "reproject"}
 
 
 @app.post("/tasks/label", status_code=202)
-async def enqueue_label_task(req: SingleTaskRequest) -> dict:
+async def enqueue_label_task(req: SingleTaskRequest) -> dict[str, JsonValue]:
     """Publish a single label task for one image (describe -> patch -> re-index)."""
-    ok = await _publish_label_best_effort(req.sha256)
+    ok = await publish_label_best_effort(req.sha256)
     return {"status": "queued" if ok else "publish_failed", "sha256": req.sha256, "type": "label"}
 
 
 @app.get("/maintenance/missing-files")
-async def missing_files(limit: int = Query(default=500, ge=0, le=5000)) -> dict:
+async def missing_files(limit: int = Query(default=500, ge=0, le=5000)) -> dict[str, JsonValue]:
     """Scan the catalog for images whose on-disk source file has vanished.
 
     Walks catalog truth and probes ``os.path.exists`` for every record with a
@@ -326,11 +327,12 @@ async def missing_files(limit: int = Query(default=500, ge=0, le=5000)) -> dict:
     Read-only — deletes nothing. The blocking catalog paging + stat calls run off
     the event loop.
     """
-    return await asyncio.to_thread(pipeline.scan_missing_files, limit)
+    report = await asyncio.to_thread(pipeline.scan_missing_files, limit)
+    return report.model_dump(mode="json")
 
 
 @app.get("/jobs/{job_id}")
-def get_job(job_id: str) -> dict:
+def get_job(job_id: str) -> dict[str, JsonValue]:
     job = store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
@@ -338,7 +340,7 @@ def get_job(job_id: str) -> dict:
 
 
 @app.post("/jobs/{job_id}/cancel")
-def cancel_job(job_id: str) -> dict:
+def cancel_job(job_id: str) -> dict[str, JsonValue]:
     job = store.request_cancel(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")

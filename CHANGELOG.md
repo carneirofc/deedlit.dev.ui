@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Changed
+- `deedlit.ingest`: queue payloads, catalog records, job snapshots and config as pydantic models (wire formats unchanged), split `_run_reconcile`/`_run_folder`/pipeline hotspots, no `Any`; malformed stored blobs and queue payloads are still tolerated.
 - `deedlit.catalog`: typed row mapping and response models in the repository/routers, `ImageListQuery` query model for `GET /images` (same query params), split `upsert_image`/`library_stats`/migration `reconcile`, `JsonValue` for opaque JSON columns, no `Any`.
 - `deedlit.vision`: typed embedding boundary over torch/open_clip (concrete `list[float]` outputs), split model loading, no `Any`.
 - `@carneirofc/ui`: all component props and data types derived from zod schemas (exported type names unchanged), `DirectoryPicker` parses the fs-browse response, large components (`Gallery`, `DockPanel`, `TagSelect`, `DirectoryPicker`, `Toast`) split into hooks/subcomponents.

@@ -17,6 +17,7 @@ from jobs import (
     JobStore,
     Progress,
 )
+from pydantic import JsonValue
 
 
 def test_to_persist_has_snake_case_columns_and_counts():
@@ -34,7 +35,7 @@ def test_to_persist_has_snake_case_columns_and_counts():
 
 
 def test_job_from_snapshot_marks_nonterminal_interrupted():
-    snap = {
+    snap: dict[str, JsonValue] = {
         "id": "j1",
         "type": "ingest",
         "status": RUNNING,  # non-terminal -> interrupted on hydrate
@@ -71,7 +72,7 @@ def test_hydrate_inserts_oldest_first_and_skips_existing():
 
     # Catalog returns newest-updated first; hydrate inserts oldest-first so the
     # registry's `list` (reversed) still yields newest-first.
-    snapshots = [
+    snapshots: list[dict[str, JsonValue]] = [
         {"id": "newer", "type": "ingest", "status": COMPLETED},
         {"id": "older", "type": "ingest", "status": COMPLETED},
         {"id": "live", "type": "ingest", "status": COMPLETED},  # already present -> skip
@@ -84,7 +85,9 @@ def test_hydrate_inserts_oldest_first_and_skips_existing():
     assert "older" in ids
     # The pre-existing live job is untouched (still queued, not the snapshot's
     # completed).
-    assert store.get("live").status == QUEUED
+    live_job = store.get("live")
+    assert live_job is not None
+    assert live_job.status == QUEUED
 
 
 def test_hydrated_jobs_are_not_queued_for_rerun():

@@ -12,9 +12,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Any
 
 import httpx
+from pydantic import JsonValue, TypeAdapter
 
 log = logging.getLogger("deedlit.ingest.settings_client")
 
@@ -23,7 +23,8 @@ SETTINGS_TIMEOUT = float(os.getenv("LEDGER_HTTP_TIMEOUT", "5.0"))
 INGEST_CONFIG_KEY = "ingest_config"
 
 _client: httpx.AsyncClient | None = None
-_client_loop: Any = None
+_client_loop: asyncio.AbstractEventLoop | None = None
+_JSON_ADAPTER: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
 def _get_client() -> httpx.AsyncClient:
@@ -43,7 +44,7 @@ async def aclose() -> None:
     _client_loop = None
 
 
-async def load() -> dict[str, Any]:
+async def load() -> dict[str, JsonValue]:
     """Return the persisted ingest config overrides, or {} when absent/down.
 
     A 404 (no row yet) and any transport error both degrade to {} so a fresh DB
@@ -53,7 +54,7 @@ async def load() -> dict[str, Any]:
         if resp.status_code == 404:
             return {}
         resp.raise_for_status()
-        body = resp.json()
+        body = _JSON_ADAPTER.validate_json(resp.content)
         value = body.get("value") if isinstance(body, dict) else None
         return value if isinstance(value, dict) else {}
     except Exception as exc:  # noqa: BLE001 — best-effort
@@ -61,7 +62,7 @@ async def load() -> dict[str, Any]:
         return {}
 
 
-async def save(overrides: dict[str, Any]) -> bool:
+async def save(overrides: dict[str, JsonValue]) -> bool:
     """Persist the effective ingest config (best-effort). Returns write success."""
     try:
         resp = await _get_client().put(

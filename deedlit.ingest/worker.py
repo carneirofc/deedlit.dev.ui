@@ -14,20 +14,24 @@ replicas with ``QUEUES=label`` once the label queue exists (#26).
 """
 from __future__ import annotations
 
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import asyncio
 import logging
-import os
+from collections.abc import Callable
 
 import broker
 import config
 import ledger
 import pipeline
 import settings_client
+from models import IngestTaskPayload, ShaTaskPayload
+from pydantic import JsonValue, ValidationError
 
 # Mirror app.py's package-logger setup so the worker's per-task logs are visible
 # (uvicorn isn't running here to configure logging for us).
@@ -41,7 +45,7 @@ if not _pkg.handlers:
 _pkg.setLevel(os.getenv("INGEST_LOG_LEVEL", "INFO").upper())
 
 
-async def label_handler(payload: dict) -> None:
+async def label_handler(payload: dict[str, JsonValue]) -> None:
     """Label one image, patch the catalog, then re-project the cheap stages (#26).
 
     ``label_image`` describes the image and patches catalog description/safety/
@@ -53,23 +57,24 @@ async def label_handler(payload: dict) -> None:
     2x dense embed (ADR 0002). A labelagent failure propagates so the broker
     retries / dead-letters; a disabled labelagent is a no-op. Runs in a thread.
     """
-    sha256 = payload.get("sha256")
+    task = ShaTaskPayload.model_validate(payload)
+    sha256 = task.sha256
     if not sha256:
         raise ValueError("label task missing sha256")
     # Master switch: when LLM enrichment is off, drop any label task already in the
     # queue (or one a producer published before the toggle reached it) as a clean
     # no-op so it isn't described. The producer also skips publishing new ones.
-    if not config.runtime()["llm_enabled"]:
+    if not config.runtime().llm_enabled:
         log.info("label %s skipped: LLM processing is disabled", sha256[:12])
         return
     changed = await pipeline.maybe_await(pipeline.label_image(sha256))
     if changed:
-        parent = payload.get("parent_op_id")
+        parent = task.parent_op_id
         await broker.publish_embed_sparse_task(sha256, parent_op_id=parent)
         await broker.publish_index_graph_task(sha256, parent_op_id=parent)
 
 
-async def ingest_handler(payload: dict) -> None:
+async def ingest_handler(payload: dict[str, JsonValue]) -> None:
     """``ingest`` stage: catalog one source file, then fan out the DAG (ADR 0002).
 
     The first stage of the fully queue-driven pipeline — a folder scan publishes
@@ -79,7 +84,8 @@ async def ingest_handler(payload: dict) -> None:
     plus label when the LLM master switch is on). Downstream-publish errors
     propagate so the broker retries the whole (idempotent) ingest task.
     """
-    path = payload.get("path")
+    task = IngestTaskPayload.model_validate(payload)
+    path = task.path
     if not path:
         raise ValueError("ingest task missing path")
     sha256 = await pipeline.maybe_await(pipeline.ingest_path(path))
@@ -90,54 +96,58 @@ async def ingest_handler(payload: dict) -> None:
     await broker.publish_post_ingest(
         sha256,
         path=path,
-        parent_op_id=payload.get("parent_op_id"),
-        with_label=config.runtime()["llm_enabled"],
+        parent_op_id=task.parent_op_id,
+        with_label=config.runtime().llm_enabled,
     )
 
 
-async def embed_dense_handler(payload: dict) -> None:
+async def embed_dense_handler(payload: dict[str, JsonValue]) -> None:
     """``embed.dense`` stage: GPU dense-embed, persist to catalog, fan to search.
 
     On success publishes ``index.search`` — the fan-in stage reads this vector
     (and the sparse one) back from catalog. A vision/transport error propagates so
     the broker retries / dead-letters. Runs in a thread (httpx is sync).
     """
-    sha256 = payload.get("sha256")
+    task = ShaTaskPayload.model_validate(payload)
+    sha256 = task.sha256
     if not sha256:
         raise ValueError("embed.dense task missing sha256")
     # ``path`` (when the producer supplied it) lets embed_dense read the bytes
     # straight off disk; absent (e.g. a reconcile re-publish) it falls back to the
     # catalog filepath lookup.
-    await pipeline.maybe_await(pipeline.embed_dense(sha256, path=payload.get("path")))
-    await broker.publish_index_search_task(sha256, parent_op_id=payload.get("parent_op_id"))
+    await pipeline.maybe_await(pipeline.embed_dense(sha256, path=task.path))
+    await broker.publish_index_search_task(sha256, parent_op_id=task.parent_op_id)
     log.info("embed.dense %s done -> published index.search", sha256[:12])
 
 
-async def embed_sparse_handler(payload: dict) -> None:
+async def embed_sparse_handler(payload: dict[str, JsonValue]) -> None:
     """``embed.sparse`` stage: sparse-embed catalog text, persist, fan to search."""
-    sha256 = payload.get("sha256")
+    task = ShaTaskPayload.model_validate(payload)
+    sha256 = task.sha256
     if not sha256:
         raise ValueError("embed.sparse task missing sha256")
     await pipeline.maybe_await(pipeline.embed_sparse(sha256))
-    await broker.publish_index_search_task(sha256, parent_op_id=payload.get("parent_op_id"))
+    await broker.publish_index_search_task(sha256, parent_op_id=task.parent_op_id)
 
 
-async def index_search_handler(payload: dict) -> None:
+async def index_search_handler(payload: dict[str, JsonValue]) -> None:
     """``index.search`` stage: FAN-IN dense+sparse -> upsert the search point.
 
     A no-op when one vector is still missing (the sibling embed stage re-publishes
     this task on its own completion); idempotent when both are present. Publishes
     nothing downstream — it is a DAG leaf.
     """
-    sha256 = payload.get("sha256")
+    task = ShaTaskPayload.model_validate(payload)
+    sha256 = task.sha256
     if not sha256:
         raise ValueError("index.search task missing sha256")
     await pipeline.maybe_await(pipeline.index_search(sha256))
 
 
-async def index_graph_handler(payload: dict) -> None:
+async def index_graph_handler(payload: dict[str, JsonValue]) -> None:
     """``index.graph`` stage: upsert graph edges from catalog truth (DAG leaf)."""
-    sha256 = payload.get("sha256")
+    task = ShaTaskPayload.model_validate(payload)
+    sha256 = task.sha256
     if not sha256:
         raise ValueError("index.graph task missing sha256")
     await pipeline.maybe_await(pipeline.index_graph(sha256))
@@ -146,7 +156,7 @@ async def index_graph_handler(payload: dict) -> None:
 # Per-queue handlers — a replica drains the subset named in QUEUES (ADR 0002).
 # The GPU-bound embed.dense is its own queue so a `QUEUES=embed.dense` replica set
 # scales independently of the cheap I/O stages.
-HANDLERS = {
+HANDLERS: dict[str, broker.Handler] = {
     broker.INGEST_QUEUE: ingest_handler,
     broker.EMBED_DENSE_QUEUE: embed_dense_handler,
     broker.EMBED_SPARSE_QUEUE: embed_sparse_handler,
@@ -156,7 +166,9 @@ HANDLERS = {
 }
 
 
-def _ledger_event_factory(queue: str, payload: dict):
+def _ledger_event_factory(
+    queue: str, payload: dict[str, JsonValue]
+) -> Callable[[str, int, str | None], None] | None:
     """Build the per-message ledger hook for one delivery (#27).
 
     Records done/failed/dlq to the catalog tasks ledger, best-effort. The
@@ -165,9 +177,18 @@ def _ledger_event_factory(queue: str, payload: dict):
     is fire-and-forget (see :func:`ledger.record_task_bg`) so a slow/absent catalog
     never adds latency to the consumer's ack path.
     """
-    sha256 = payload.get("sha256")
-    task_type = payload.get("type") or queue
-    parent_op_id = payload.get("parent_op_id")
+    try:
+        task = ShaTaskPayload.model_validate(payload)
+        sha256 = task.sha256
+        task_type = task.type or queue
+        parent_op_id = task.parent_op_id
+    except ValidationError:
+        raw_sha256 = payload.get("sha256")
+        raw_type = payload.get("type")
+        raw_parent_op_id = payload.get("parent_op_id")
+        sha256 = raw_sha256 if isinstance(raw_sha256, str) else None
+        task_type = raw_type if isinstance(raw_type, str) else queue
+        parent_op_id = raw_parent_op_id if isinstance(raw_parent_op_id, str) else None
 
     # The ledger is per-image (keyed by sha256). An ``ingest`` task is keyed by
     # path (the sha isn't known until the bytes are hashed), so it has no ledger

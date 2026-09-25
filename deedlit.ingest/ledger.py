@@ -12,9 +12,9 @@ import asyncio
 import inspect
 import logging
 import os
-from typing import Any
 
 import httpx
+from pydantic import JsonValue
 
 log = logging.getLogger("deedlit.ingest.ledger")
 
@@ -25,7 +25,7 @@ LEDGER_TIMEOUT = float(os.getenv("LEDGER_HTTP_TIMEOUT", "5.0"))
 # created, so best-effort ledger writes reuse keep-alive connections instead of a
 # handshake per transition.
 _client: httpx.AsyncClient | None = None
-_client_loop: Any = None
+_client_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _get_client() -> httpx.AsyncClient:
@@ -63,7 +63,7 @@ async def record_task(
     """
     if not sha256 or not task_type:
         return False
-    body: dict[str, Any] = {"sha256": sha256, "type": task_type, "status": status}
+    body: dict[str, JsonValue] = {"sha256": sha256, "type": task_type, "status": status}
     if attempts is not None:
         body["attempts"] = attempts
     if error is not None:
@@ -81,7 +81,7 @@ async def record_task(
 
 # Strong refs to in-flight fire-and-forget writes so the loop doesn't GC a task
 # mid-flight (asyncio only holds a weak ref to a bare create_task result).
-_bg_tasks: set[asyncio.Task] = set()
+_bg_tasks: set[asyncio.Task[None]] = set()
 
 
 def record_task_bg(

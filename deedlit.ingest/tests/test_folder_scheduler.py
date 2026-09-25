@@ -21,15 +21,14 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
-
-import pytest
-from fastapi.testclient import TestClient
+from datetime import UTC, datetime, timedelta
 
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
+import pytest
+from fastapi.testclient import TestClient
 from jobs import QUEUED, RUNNING, Job, JobStore
 
 SHA_A = "a" * 64
@@ -37,14 +36,19 @@ SHA_B = "b" * 64
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------
 # Fake store for the synchronous tick tests (no worker / event loop needed).
 # ---------------------------------------------------------------------------
-class FakeStore:
+class FakeStore(JobStore):
+    """A JobStore whose registry is just an in-memory list (no worker loop / no
+    catalog write-through), so the sync tick tests stay offline and don't spin
+    up the real async claim/worker machinery."""
+
     def __init__(self, existing: list[Job] | None = None) -> None:
+        super().__init__()
         self.jobs: list[Job] = list(existing or [])
 
     def list(self) -> list[Job]:
@@ -63,7 +67,7 @@ class FakeStore:
 
 @pytest.fixture
 def record_calls(monkeypatch):
-    calls: list[tuple[str, dict]] = []
+    calls: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(
         pipeline,
         "record_folder_scan",
@@ -76,13 +80,13 @@ def record_calls(monkeypatch):
 # (1) due folder enqueues + records queued scan-state
 # ---------------------------------------------------------------------------
 def test_tick_enqueues_due_folder(monkeypatch, record_calls):
-    folder = {
-        "id": "f1",
-        "path": "K:/lib/a",
-        "enabled": True,
-        "scan_interval_seconds": 900,
-        "last_scan_at": None,  # never scanned -> due
-    }
+    folder = pipeline.SourceFolder(
+        id="f1",
+        path="K:/lib/a",
+        enabled=True,
+        scan_interval_seconds=900,
+        last_scan_at=None,  # never scanned -> due
+    )
     monkeypatch.setattr(pipeline, "list_source_folders", lambda: [folder])
     store = FakeStore()
 
@@ -105,26 +109,30 @@ def test_tick_enqueues_due_folder(monkeypatch, record_calls):
 # (2) skip disabled / not-due / already-scanning folders
 # ---------------------------------------------------------------------------
 def test_tick_skips_disabled_folder(monkeypatch, record_calls):
-    folder = {"id": "f1", "path": "K:/a", "enabled": False, "scan_interval_seconds": 0, "last_scan_at": None}
+    folder = pipeline.SourceFolder(
+        id="f1", path="K:/a", enabled=False, scan_interval_seconds=0, last_scan_at=None
+    )
     monkeypatch.setattr(pipeline, "list_source_folders", lambda: [folder])
     assert jobs_module.run_folder_scan_tick(FakeStore()) == []
     assert record_calls == []
 
 
 def test_tick_skips_recently_scanned_folder(monkeypatch, record_calls):
-    folder = {
-        "id": "f1",
-        "path": "K:/a",
-        "enabled": True,
-        "scan_interval_seconds": 900,
-        "last_scan_at": _now_iso(),  # just scanned -> not due
-    }
+    folder = pipeline.SourceFolder(
+        id="f1",
+        path="K:/a",
+        enabled=True,
+        scan_interval_seconds=900,
+        last_scan_at=_now_iso(),  # just scanned -> not due
+    )
     monkeypatch.setattr(pipeline, "list_source_folders", lambda: [folder])
     assert jobs_module.run_folder_scan_tick(FakeStore()) == []
 
 
 def test_tick_skips_folder_with_active_job(monkeypatch, record_calls):
-    folder = {"id": "f1", "path": "K:/a", "enabled": True, "scan_interval_seconds": 900, "last_scan_at": None}
+    folder = pipeline.SourceFolder(
+        id="f1", path="K:/a", enabled=True, scan_interval_seconds=900, last_scan_at=None
+    )
     monkeypatch.setattr(pipeline, "list_source_folders", lambda: [folder])
     active = Job(id="j0", type="ingest", source_folder_id="f1", status=RUNNING)
     assert jobs_module.run_folder_scan_tick(FakeStore([active])) == []
@@ -134,14 +142,19 @@ def test_tick_skips_folder_with_active_job(monkeypatch, record_calls):
 # (3) _folder_due interval math
 # ---------------------------------------------------------------------------
 def test_folder_due_math():
-    now = datetime.now(timezone.utc)
-    base = {"enabled": True, "scan_interval_seconds": 600}
-    assert jobs_module._folder_due({**base, "last_scan_at": None}, now) is True
+    now = datetime.now(UTC)
+
+    def folder(*, enabled: bool = True, last_scan_at: str | None) -> pipeline.SourceFolder:
+        return pipeline.SourceFolder(
+            enabled=enabled, scan_interval_seconds=600, last_scan_at=last_scan_at
+        )
+
+    assert jobs_module._folder_due(folder(last_scan_at=None), now) is True
     long_ago = (now - timedelta(seconds=700)).isoformat()
-    assert jobs_module._folder_due({**base, "last_scan_at": long_ago}, now) is True
+    assert jobs_module._folder_due(folder(last_scan_at=long_ago), now) is True
     recent = (now - timedelta(seconds=100)).isoformat()
-    assert jobs_module._folder_due({**base, "last_scan_at": recent}, now) is False
-    assert jobs_module._folder_due({**base, "enabled": False, "last_scan_at": None}, now) is False
+    assert jobs_module._folder_due(folder(last_scan_at=recent), now) is False
+    assert jobs_module._folder_due(folder(enabled=False, last_scan_at=None), now) is False
 
 
 # ---------------------------------------------------------------------------
@@ -158,14 +171,17 @@ def test_tick_swallows_catalog_outage(monkeypatch):
 # ---------------------------------------------------------------------------
 # Worker-backed tests (real store + async worker via TestClient)
 # ---------------------------------------------------------------------------
-def _wait_for(client, job_id, statuses, timeout=5.0):
+def _wait_for(client, job_id, statuses, timeout=5.0) -> dict[str, object]:
     deadline = time.time() + timeout
-    last = None
+    last: dict[str, object] | None = None
     while time.time() < deadline:
-        last = client.get(f"/jobs/{job_id}").json()
+        body = client.get(f"/jobs/{job_id}").json()
+        assert isinstance(body, dict)
+        last = body
         if last["status"] in statuses:
             return last
         time.sleep(0.02)
+    assert last is not None, f"job {job_id} never reached {statuses}"
     return last
 
 
@@ -178,11 +194,13 @@ def fresh_store(monkeypatch):
 
 # (5) a scheduled scan writes its final status back to the folder on completion.
 def test_scheduled_scan_records_completion(fresh_store, monkeypatch):
-    folder = {"id": "f9", "path": "K:/lib/empty", "enabled": True, "scan_interval_seconds": 900, "last_scan_at": None}
+    folder = pipeline.SourceFolder(
+        id="f9", path="K:/lib/empty", enabled=True, scan_interval_seconds=900, last_scan_at=None
+    )
     monkeypatch.setattr(pipeline, "list_source_folders", lambda: [folder])
     # Empty folder walk -> the scan completes instantly and offline.
     monkeypatch.setattr(jobs_module, "_list_supported_files", lambda path: [])
-    records: list[dict] = []
+    records: list[dict[str, object]] = []
     monkeypatch.setattr(
         pipeline, "record_folder_scan", lambda fid, **kw: records.append({"fid": fid, **kw})
     )
@@ -218,8 +236,10 @@ def test_label_backfill_publishes_label_tasks(fresh_store, monkeypatch):
 
     assert final["status"] == "completed"
     assert published == [SHA_A, SHA_B]
-    assert final["progress"]["total"] == 2
-    assert final["progress"]["done"] == 2
+    progress = final["progress"]
+    assert isinstance(progress, dict)
+    assert progress["total"] == 2
+    assert progress["done"] == 2
 
 
 def test_label_backfill_counts_publish_failures(fresh_store, monkeypatch):
@@ -237,8 +257,10 @@ def test_label_backfill_counts_publish_failures(fresh_store, monkeypatch):
 
     # One publish failing doesn't abort the sweep (best-effort).
     assert final["status"] == "completed"
-    assert final["progress"]["failed"] == 1
-    assert final["progress"]["done"] == 1
+    progress = final["progress"]
+    assert isinstance(progress, dict)
+    assert progress["failed"] == 1
+    assert progress["done"] == 1
 
 
 # (7) the label-backfill scheduler tick enqueues a label-backfill job.
@@ -255,10 +277,10 @@ def test_label_backfill_tick_enqueues_job(fresh_store):
 # cancel on its second call, with run_folder_scan_tick / broker.queue_depth
 # stubbed. A deep queue must NOT call the tick; a shallow one must.
 # ---------------------------------------------------------------------------
-def _drive_one_scheduler_tick(monkeypatch, *, depth: int, ceiling: int) -> list:
+def _drive_one_scheduler_tick(monkeypatch, *, depth: int, ceiling: int) -> list[FakeStore]:
     import asyncio as aio
 
-    ran: list = []
+    ran: list[FakeStore] = []
     monkeypatch.setattr(jobs_module, "folder_scan_tick_seconds", lambda: 1)
     monkeypatch.setattr(jobs_module, "folder_scan_max_ingest_backlog", lambda: ceiling)
     monkeypatch.setattr(jobs_module, "run_folder_scan_tick", lambda store: ran.append(store) or [])
@@ -277,7 +299,7 @@ def _drive_one_scheduler_tick(monkeypatch, *, depth: int, ceiling: int) -> list:
 
     monkeypatch.setattr(jobs_module.asyncio, "sleep", fake_sleep)
     with pytest.raises(aio.CancelledError):
-        aio.run(jobs_module.folder_scan_scheduler(object()))
+        aio.run(jobs_module.folder_scan_scheduler(FakeStore()))
     return ran
 
 

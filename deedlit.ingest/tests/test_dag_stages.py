@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 import broker as broker_module
 import ledger as ledger_module
 import pipeline
+import pytest
 import worker as worker_module
 
 SHA = "a" * 64
@@ -25,11 +24,12 @@ SHA = "a" * 64
 # fire writes off the consumer's ack path
 # ---------------------------------------------------------------------------
 def test_ledger_factory_drops_running_and_fires_async(monkeypatch):
-    recorded: list[tuple] = []
+    recorded: list[tuple[object, ...]] = []
     monkeypatch.setattr(ledger_module, "record_task_bg", lambda *a, **k: recorded.append(a))
     on_event = worker_module._ledger_event_factory(
         "embed.dense", {"sha256": SHA, "type": "embed.dense", "parent_op_id": "op2"}
     )
+    assert on_event is not None
     on_event("running", 0, None)  # dropped — halves consumer-side ledger writes
     on_event("done", 1, None)     # recorded (fire-and-forget)
     assert len(recorded) == 1
@@ -41,7 +41,7 @@ def test_ledger_factory_drops_running_and_fires_async(monkeypatch):
 # ingest stage (opt-in cross-process producer)
 # ---------------------------------------------------------------------------
 def test_ingest_path_reads_file_and_fast_paths(tmp_path, monkeypatch):
-    seen: list[tuple] = []
+    seen: list[tuple[object, ...]] = []
     p = tmp_path / "x.png"
     p.write_bytes(b"rawbytes")
     monkeypatch.setattr(
@@ -55,7 +55,7 @@ def test_ingest_path_reads_file_and_fast_paths(tmp_path, monkeypatch):
 
 def test_ingest_handler_fast_paths_then_publishes_post_ingest(monkeypatch):
     monkeypatch.setattr(pipeline, "ingest_path", lambda path: SHA)
-    published: list[tuple] = []
+    published: list[tuple[object, ...]] = []
 
     async def fake_post(sha256, path=None, parent_op_id=None, with_label=True):
         published.append((sha256, path, parent_op_id, with_label))
@@ -76,7 +76,7 @@ def test_ingest_handler_requires_path():
 # Slice 4: embed.dense
 # ---------------------------------------------------------------------------
 def test_embed_dense_persists_vector_to_catalog(monkeypatch):
-    stored: list[tuple] = []
+    stored: list[tuple[object, ...]] = []
     monkeypatch.setattr(pipeline, "fetch_image_bytes", lambda sha: (b"bytes", "image/png"))
     monkeypatch.setattr(pipeline, "embed_image", lambda d, f, m: [0.1, 0.2, 0.3])
     monkeypatch.setattr(pipeline, "store_dense_blob", lambda sha, v: stored.append((sha, v)))
@@ -86,15 +86,33 @@ def test_embed_dense_persists_vector_to_catalog(monkeypatch):
 
 
 def test_store_dense_blob_writes_embedding_kind_json(monkeypatch):
-    puts: list[tuple] = []
+    puts: list[tuple[object, ...]] = []
     monkeypatch.setattr(
         pipeline, "_put_blob_with_retry",
         lambda url, data, content_type=None, *a, **k: puts.append((url, data, content_type)),
     )
     asyncio.run(pipeline.store_dense_blob(SHA, [1.0, 2.0]))
-    url, data, ctype = puts[0]
+    url, data, _ctype = puts[0]
     assert url == f"{pipeline.CATALOG_URL}/blobs/{SHA}/embedding"
     assert data == b"[1.0, 2.0]"
+
+
+def test_load_dense_blob_tolerates_malformed_body(monkeypatch):
+    """Regression: a blob that parses as JSON but fails float-list validation
+    must degrade to None (like a transport error), not raise ValidationError
+    into index.search's fan-in / jobs.py's reconcile."""
+    monkeypatch.setattr(pipeline, "_load_json_blob", lambda sha, kind: {"not": "a float list"})
+    assert asyncio.run(pipeline.load_dense_blob(SHA)) is None
+
+
+def test_load_sparse_blob_tolerates_malformed_body(monkeypatch):
+    monkeypatch.setattr(pipeline, "_load_json_blob", lambda sha, kind: ["not", "a", "sparse", "vector"])
+    assert asyncio.run(pipeline.load_sparse_blob(SHA)) is None
+
+
+def test_load_description_blob_tolerates_malformed_body(monkeypatch):
+    monkeypatch.setattr(pipeline, "_load_json_blob", lambda sha, kind: {"not": "a float list"})
+    assert asyncio.run(pipeline.load_description_blob(SHA)) is None
 
 
 def test_embed_dense_reads_path_directly_skipping_catalog(monkeypatch):
@@ -115,8 +133,8 @@ def test_embed_dense_reads_path_directly_skipping_catalog(monkeypatch):
 
 
 def test_embed_dense_handler_publishes_index_search_and_forwards_path(monkeypatch):
-    published: list[tuple] = []
-    embedded: list[tuple] = []
+    published: list[tuple[object, ...]] = []
+    embedded: list[tuple[object, ...]] = []
     monkeypatch.setattr(pipeline, "embed_dense", lambda sha, path=None: embedded.append((sha, path)))
 
     async def fake(sha, parent_op_id=None):
@@ -141,16 +159,16 @@ def test_embed_dense_handler_requires_sha():
 # ---------------------------------------------------------------------------
 def test_embed_sparse_builds_text_from_catalog_truth(monkeypatch):
     seen_text: list[str] = []
-    stored: list[tuple] = []
+    stored: list[tuple[object, ...]] = []
     desc_text: list[str] = []
-    desc_stored: list[tuple] = []
+    desc_stored: list[tuple[object, ...]] = []
     monkeypatch.setattr(
         pipeline, "fetch_image_record",
-        lambda sha: {"prompt": "a cat", "description": "fluffy", "tags": ["cute", "pet"]},
+        lambda sha: pipeline.CatalogImageRow(prompt="a cat", description="fluffy", tags=["cute", "pet"]),
     )
     monkeypatch.setattr(
         pipeline, "embed_sparse_text",
-        lambda t: seen_text.append(t) or {"indices": [1], "values": [0.5]},
+        lambda t: seen_text.append(t) or pipeline.SparseVector(indices=[1], values=[0.5]),
     )
     monkeypatch.setattr(pipeline, "store_sparse_blob", lambda sha, v: stored.append((sha, v)))
     monkeypatch.setattr(pipeline, "embed_text", lambda t: desc_text.append(t) or [0.1, 0.2])
@@ -160,7 +178,7 @@ def test_embed_sparse_builds_text_from_catalog_truth(monkeypatch):
 
     asyncio.run(pipeline.embed_sparse(SHA))
     assert seen_text == ["a cat fluffy cute pet"]
-    assert stored == [(SHA, {"indices": [1], "values": [0.5]})]
+    assert stored == [(SHA, pipeline.SparseVector(indices=[1], values=[0.5]))]
     # The description ALSO gets its own CLIP-text dense vector — over the
     # description text alone (not the combined sparse text).
     assert desc_text == ["fluffy"]
@@ -168,8 +186,8 @@ def test_embed_sparse_builds_text_from_catalog_truth(monkeypatch):
 
 
 def test_embed_sparse_empty_text_stores_empty_without_calling_vision(monkeypatch):
-    stored: list[tuple] = []
-    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: {"tags": []})
+    stored: list[tuple[object, ...]] = []
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: pipeline.CatalogImageRow(tags=[]))
 
     def boom(_t):  # pragma: no cover - must not be called for empty text
         raise AssertionError("vision should not be called for empty sparse text")
@@ -184,16 +202,16 @@ def test_embed_sparse_empty_text_stores_empty_without_calling_vision(monkeypatch
     )
 
     asyncio.run(pipeline.embed_sparse(SHA))
-    assert stored == [(SHA, {"indices": [], "values": []})]
+    assert stored == [(SHA, pipeline.SparseVector())]
 
 
 def test_embed_sparse_embeds_description_even_when_no_prompt_tags(monkeypatch):
     """A description with no prompt/tags still yields BOTH the sparse vector (over
     the description) and its own description dense vector."""
-    sparse_stored: list[tuple] = []
+    sparse_stored: list[tuple[object, ...]] = []
     desc_text: list[str] = []
-    desc_stored: list[tuple] = []
-    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: {"description": "a lone wolf"})
+    desc_stored: list[tuple[object, ...]] = []
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: pipeline.CatalogImageRow(description="a lone wolf"))
     monkeypatch.setattr(pipeline, "embed_sparse_text", lambda t: {"indices": [7], "values": [1.0]})
     monkeypatch.setattr(pipeline, "store_sparse_blob", lambda sha, v: sparse_stored.append((sha, v)))
     monkeypatch.setattr(pipeline, "embed_text", lambda t: desc_text.append(t) or [0.9])
@@ -222,16 +240,16 @@ def test_embed_sparse_handler_publishes_index_search(monkeypatch):
 # Slice 6: index.search fan-in
 # ---------------------------------------------------------------------------
 def test_index_search_upserts_when_both_vectors_present(monkeypatch):
-    posts: list[tuple] = []
+    posts: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(pipeline, "load_dense_blob", lambda sha: [0.1, 0.2])
-    monkeypatch.setattr(pipeline, "load_sparse_blob", lambda sha: {"indices": [3], "values": [0.9]})
+    monkeypatch.setattr(pipeline, "load_sparse_blob", lambda sha: pipeline.SparseVector(indices=[3], values=[0.9]))
     monkeypatch.setattr(pipeline, "load_description_blob", lambda sha: [0.3, 0.4])
     monkeypatch.setattr(
         pipeline, "fetch_image_record",
-        lambda sha: {
-            "filepath": "/lib/x.png", "tags": ["t"],
-            "description": "d", "safety": "sfw",
-        },
+        lambda sha: pipeline.CatalogImageRow(
+            filepath="/lib/x.png", tags=["t"],
+            description="d", safety="sfw",
+        ),
     )
     monkeypatch.setattr(pipeline, "_post_with_retry", lambda url, body, *a, **k: posts.append((url, body)))
 
@@ -243,19 +261,36 @@ def test_index_search_upserts_when_both_vectors_present(monkeypatch):
     assert point["sparse"] == {"indices": [3], "values": [0.9]}
     # The description dense vector rides along as its own named vector.
     assert point["description"] == [0.3, 0.4]
-    assert point["payload"]["filepath"] == "/lib/x.png"
-    assert point["payload"]["description"] == "d"
-    assert point["payload"]["safety"] == "sfw"
+    payload = point["payload"]
+    assert isinstance(payload, dict)
+    assert payload["filepath"] == "/lib/x.png"
+    assert payload["description"] == "d"
+    assert payload["safety"] == "sfw"
 
 
 def test_index_search_omits_description_vector_when_absent(monkeypatch):
     """No persisted description vector -> the point indexes on dense+sparse only
     (the missing description vector never blocks the fan-in)."""
-    posts: list[tuple] = []
+    posts: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(pipeline, "load_dense_blob", lambda sha: [0.1, 0.2])
-    monkeypatch.setattr(pipeline, "load_sparse_blob", lambda sha: {"indices": [3], "values": [0.9]})
+    monkeypatch.setattr(pipeline, "load_sparse_blob", lambda sha: pipeline.SparseVector(indices=[3], values=[0.9]))
     monkeypatch.setattr(pipeline, "load_description_blob", lambda sha: None)
-    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: {"filepath": "/lib/x.png"})
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: pipeline.CatalogImageRow(filepath="/lib/x.png"))
+    monkeypatch.setattr(pipeline, "_post_with_retry", lambda url, body, *a, **k: posts.append((url, body)))
+
+    assert asyncio.run(pipeline.index_search(SHA)) is True
+    _, point = posts[0]
+    assert "description" not in point
+
+
+def test_index_search_omits_description_vector_when_empty(monkeypatch):
+    """An empty (not None) persisted description vector is also omitted, not
+    sent as ``"description": []`` (regression: truthiness, not None-ness)."""
+    posts: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(pipeline, "load_dense_blob", lambda sha: [0.1, 0.2])
+    monkeypatch.setattr(pipeline, "load_sparse_blob", lambda sha: pipeline.SparseVector(indices=[3], values=[0.9]))
+    monkeypatch.setattr(pipeline, "load_description_blob", lambda sha: [])
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha: pipeline.CatalogImageRow(filepath="/lib/x.png"))
     monkeypatch.setattr(pipeline, "_post_with_retry", lambda url, body, *a, **k: posts.append((url, body)))
 
     assert asyncio.run(pipeline.index_search(SHA)) is True
@@ -295,13 +330,13 @@ def test_index_search_handler_requires_sha():
 # Slice 7: index.graph
 # ---------------------------------------------------------------------------
 def test_index_graph_posts_edges_from_catalog(monkeypatch):
-    posts: list[tuple] = []
+    posts: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(
         pipeline, "fetch_image_record",
-        lambda sha: {
-            "references": [{"kind": "lora", "name": "x", "hash": None}],
-            "tags": ["a", "b"],
-        },
+        lambda sha: pipeline.CatalogImageRow(
+            references=[pipeline.AssetRef(kind="lora", name="x", hash=None)],
+            tags=["a", "b"],
+        ),
     )
     monkeypatch.setattr(pipeline, "_post_with_retry", lambda url, body, *a, **k: posts.append((url, body)))
 

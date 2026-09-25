@@ -19,7 +19,8 @@ exchange is itself a direct exchange, so no custom exchange is needed):
 ``aio_pika`` is imported lazily inside the functions that actually connect, so the
 test suite can import this module and monkeypatch :func:`publish_task` /
 unit-test :func:`process_delivery` without a live broker or the dependency
-installed.
+installed. Type-only imports of ``aio_pika.abc`` are fine (they run only under
+``TYPE_CHECKING``, never at import time).
 """
 from __future__ import annotations
 
@@ -28,7 +29,13 @@ import json
 import logging
 import os
 from collections.abc import Awaitable, Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
+
+from pydantic import JsonValue, TypeAdapter, ValidationError
+
+if TYPE_CHECKING:
+    from aio_pika.abc import AbstractChannel, AbstractRobustConnection, HeadersType
 
 log = logging.getLogger("deedlit.ingest.broker")
 
@@ -109,7 +116,9 @@ ATTEMPT_HEADER = "x-attempt"
 ERROR_HEADER = "x-error"
 
 # A task handler maps a decoded payload dict to None (sync) or an awaitable.
-Handler = Callable[[dict[str, Any]], "Awaitable[None] | None"]
+Handler = Callable[[dict[str, JsonValue]], "Awaitable[None] | None"]
+
+_PAYLOAD_ADAPTER: TypeAdapter[dict[str, JsonValue]] = TypeAdapter(dict[str, JsonValue])
 
 
 def retry_queue(queue: str) -> str:
@@ -127,7 +136,7 @@ def backoff_ms(attempt: int) -> int:
     """
     if attempt < 1:
         attempt = 1
-    delay = BACKOFF_BASE_MS * (2 ** (attempt - 1))
+    delay = BACKOFF_BASE_MS * (1 << (attempt - 1))
     return min(delay, BACKOFF_CAP_MS)
 
 
@@ -142,11 +151,11 @@ def next_action(attempts: int, max_retries: int = MAX_RETRIES) -> str:
 # ---------------------------------------------------------------------------
 # Connection / channel (lazily created, cached in the running process)
 # ---------------------------------------------------------------------------
-_connection: Any = None
-_channel: Any = None
+_connection: AbstractRobustConnection | None = None
+_channel: AbstractChannel | None = None
 
 
-async def get_connection() -> Any:
+async def get_connection() -> AbstractRobustConnection:
     """Return a cached robust connection, opening it on first use.
 
     ``aio_pika.connect_robust`` self-heals a dropped connection. Shared by the
@@ -161,7 +170,7 @@ async def get_connection() -> Any:
     return _connection
 
 
-async def get_channel() -> Any:
+async def get_channel() -> AbstractChannel:
     """Return a cached robust PUBLISH channel, declaring topology on first use.
 
     Declares the full topology (every task queue + its retry/dlq) so a publisher
@@ -178,7 +187,7 @@ async def get_channel() -> Any:
     return _channel
 
 
-async def declare_topology(channel: Any, queues: "tuple[str, ...] | list[str]") -> None:
+async def declare_topology(channel: AbstractChannel, queues: tuple[str, ...] | list[str]) -> None:
     """Declare the main/retry/dlq queues for each task queue (idempotent)."""
     for q in queues:
         await channel.declare_queue(dlq_queue(q), durable=True)
@@ -207,7 +216,7 @@ async def queue_depth(queue: str) -> int:
     """
     channel = await get_channel()
     q = await channel.declare_queue(queue, durable=True, passive=True)
-    return int(getattr(q.declaration_result, "message_count", 0) or 0)
+    return q.declaration_result.message_count or 0
 
 
 async def close() -> None:
@@ -224,9 +233,9 @@ async def close() -> None:
 # ---------------------------------------------------------------------------
 async def publish_task(
     queue: str,
-    payload: dict[str, Any],
+    payload: dict[str, JsonValue],
     *,
-    headers: dict[str, Any] | None = None,
+    headers: dict[str, int | str] | None = None,
     expiration_ms: int | None = None,
 ) -> None:
     """Publish ``payload`` (JSON) to ``queue`` via the default exchange.
@@ -241,7 +250,11 @@ async def publish_task(
         body=json.dumps(payload).encode("utf-8"),
         delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         content_type="application/json",
-        headers=headers or {},
+        # aio-pika's HeadersType (Dict[str, FieldValue]) is invariant in the value
+        # type; our headers are always plain int/str (see ATTEMPT_HEADER /
+        # ERROR_HEADER), a structurally-compatible subset — genuine library typing
+        # gap, not a real type mismatch.
+        headers=cast("HeadersType", headers or {}),
         expiration=(expiration_ms / 1000.0) if expiration_ms is not None else None,
     )
     await channel.default_exchange.publish(message, routing_key=queue)
@@ -252,7 +265,7 @@ async def _publish_sha_task(
     sha256: str,
     *,
     parent_op_id: str | None = None,
-    extra: dict[str, Any] | None = None,
+    extra: dict[str, JsonValue] | None = None,
 ) -> None:
     """Publish a per-image stage task keyed by ``sha256`` (the common DAG shape).
 
@@ -261,7 +274,7 @@ async def _publish_sha_task(
     thin wrappers below name the queue so callers (and tests) read clearly.
     ``extra`` merges stage-specific fields (e.g. embed.dense's optional ``path``).
     """
-    payload: dict[str, Any] = {"sha256": sha256, "type": queue, "parent_op_id": parent_op_id}
+    payload: dict[str, JsonValue] = {"sha256": sha256, "type": queue, "parent_op_id": parent_op_id}
     if extra:
         payload.update(extra)
     await publish_task(queue, payload)
@@ -300,7 +313,7 @@ async def publish_embed_dense_task(
     lookup; omitted on re-publish paths (reconcile/rebuild), which fall back to the
     catalog lookup.
     """
-    extra = {"path": path} if path else None
+    extra: dict[str, JsonValue] | None = {"path": path} if path else None
     await _publish_sha_task(EMBED_DENSE_QUEUE, sha256, parent_op_id=parent_op_id, extra=extra)
 
 
@@ -357,20 +370,49 @@ async def publish_post_ingest(
 # ---------------------------------------------------------------------------
 # Consume — the testable core of one delivery
 # ---------------------------------------------------------------------------
-async def _maybe_await(value: Any) -> None:
+async def _maybe_await(value: object) -> None:
     if inspect.isawaitable(value):
         await value
 
 
+def _decode_payload(body: bytes | bytearray | dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Decode one delivery's body into a JSON-object payload.
+
+    The common case is raw AMQP bytes; a plain dict is accepted too (defensive —
+    a caller that already holds a decoded mapping shouldn't have to re-encode it).
+    """
+    if isinstance(body, (bytes, bytearray)):
+        try:
+            return _PAYLOAD_ADAPTER.validate_json(bytes(body))
+        except (ValidationError, ValueError):
+            # Valid JSON but not an object (or malformed) — degrade to an empty
+            # payload rather than raising outside process_delivery's try, so the
+            # handler failure (not the decode) drives retry/dlq routing.
+            return {}
+    return dict(body)
+
+
+@dataclass(frozen=True, slots=True)
+class Delivery:
+    """One raw AMQP delivery: which queue, its body, and its headers.
+
+    A plain internal value object (not validated JSON) — bundles the three
+    per-message bits :func:`process_delivery` needs so the function itself stays
+    under the arg-count budget.
+    """
+
+    queue: str
+    body: bytes | bytearray | dict[str, JsonValue]
+    headers: dict[str, int | str] | None
+
+
 async def process_delivery(
-    queue: str,
-    body: bytes,
-    headers: dict[str, Any] | None,
+    delivery: Delivery,
     handler: Handler,
     *,
     publish: Callable[..., Awaitable[None]],
     max_retries: int = MAX_RETRIES,
-    on_event: Callable[..., Any] | None = None,
+    on_event: Callable[..., object] | None = None,
 ) -> str:
     """Run ``handler`` for one delivery and decide retry/dlq on failure.
 
@@ -387,8 +429,9 @@ async def process_delivery(
     its own errors. Pure w.r.t. the broker (``publish``/``on_event`` injected), so
     tests drive it with fakes — no live RabbitMQ needed.
     """
-    payload = json.loads(body) if isinstance(body, (bytes, bytearray)) else dict(body)
-    prior = int((headers or {}).get(ATTEMPT_HEADER, 0))
+    queue = delivery.queue
+    payload = _decode_payload(delivery.body)
+    prior = int((delivery.headers or {}).get(ATTEMPT_HEADER, 0))
     if on_event is not None:
         await _maybe_await(on_event("running", prior, None))
     try:
@@ -400,7 +443,7 @@ async def process_delivery(
         return "ok"
     except Exception as exc:  # handler failed — route to retry or dlq
         attempts = prior + 1
-        new_headers = {ATTEMPT_HEADER: attempts, ERROR_HEADER: str(exc)[:500]}
+        new_headers: dict[str, int | str] = {ATTEMPT_HEADER: attempts, ERROR_HEADER: str(exc)[:500]}
         action = next_action(attempts, max_retries)
         if action == "retry":
             log.warning(
@@ -427,9 +470,10 @@ async def process_delivery(
 # Worker loop (live)
 # ---------------------------------------------------------------------------
 async def run_worker(
-    queues: "list[str] | tuple[str, ...]",
+    queues: list[str] | tuple[str, ...],
     handlers: dict[str, Handler],
-    on_event_factory: "Callable[[str, dict[str, Any]], Callable[..., Any]] | None" = None,
+    on_event_factory: Callable[[str, dict[str, JsonValue]], Callable[..., object] | None]
+    | None = None,
 ) -> None:
     """Consume ``queues`` forever, dispatching each delivery to its handler.
 
@@ -445,34 +489,39 @@ async def run_worker(
     ``on_event_factory(queue, payload)`` (optional) returns the per-message ledger
     hook passed to :func:`process_delivery` (#27).
     """
+    from aio_pika.abc import AbstractIncomingMessage
+
     await get_channel()  # ensure the connection + topology exist (publish channel)
     connection = await get_connection()
-    consumed: list[Any] = []
     for q in queues:
         ch = await connection.channel()
         await ch.set_qos(prefetch_count=prefetch_for(q))
         queue = await ch.get_queue(q)
         handler = handlers[q]
 
-        async def _on_message(message: Any, _q: str = q, _h: Handler = handler) -> None:
+        async def _on_message(
+            message: AbstractIncomingMessage, _q: str = q, _h: Handler = handler
+        ) -> None:
             async with message.process(requeue=False, ignore_processed=True):
                 on_event = None
                 if on_event_factory is not None:
                     try:
-                        preview = json.loads(message.body)
+                        preview = _PAYLOAD_ADAPTER.validate_json(message.body)
                     except Exception:
                         preview = {}
                     on_event = on_event_factory(_q, preview)
+                headers: dict[str, int | str] = {
+                    str(k): v for k, v in (message.headers or {}).items() if isinstance(v, (int, str))
+                }
                 await process_delivery(
-                    _q, message.body, dict(message.headers or {}), _h,
+                    Delivery(_q, message.body, headers), _h,
                     publish=publish_task, on_event=on_event,
                 )
 
         tag = await queue.consume(_on_message, exclusive=exclusive_for(q))
-        consumed.append((queue, tag))
         log.info(
-            "consuming queue %s (prefetch=%d exclusive=%s)",
-            q, prefetch_for(q), exclusive_for(q),
+            "consuming queue %s (prefetch=%d exclusive=%s tag=%s)",
+            q, prefetch_for(q), exclusive_for(q), tag,
         )
 
     # Block forever; the robust connection keeps the consumers alive.

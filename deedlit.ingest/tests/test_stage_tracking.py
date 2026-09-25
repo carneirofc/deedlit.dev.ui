@@ -12,14 +12,13 @@ import asyncio
 import io
 import time
 
-from fastapi.testclient import TestClient
-from PIL import Image
-
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
 from activity import ActivityTracker
+from fastapi.testclient import TestClient
+from PIL import Image
 
 
 def _png_bytes(color: tuple[int, int, int] = (255, 0, 0), size: int = 16) -> bytes:
@@ -67,7 +66,7 @@ def test_activity_endpoint_excludes_probes_and_reports_last_real_op():
 def test_ingest_fast_emits_stages_in_order(monkeypatch):
     # The ``ingest`` stage catalogs only: hash -> metadata -> catalog. Projection
     # (vision/search/graph) is the downstream DAG, not part of this stage.
-    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: {"prompt": "x", "tags": []})
+    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: pipeline.ExtractResult(prompt="x", tags=[]))
     monkeypatch.setattr(pipeline, "_post_with_retry", lambda *a, **k: None)
     monkeypatch.setattr(pipeline, "_put_blob_with_retry", lambda *a, **k: None)
 

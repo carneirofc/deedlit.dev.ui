@@ -13,14 +13,13 @@ import io
 import time
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-from PIL import Image
-
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +55,7 @@ def mock_publish(monkeypatch):
     Returns a dict whose ``pub_ingest`` list holds every published file path so a
     folder-scan test can assert one enqueue per file.
     """
-    calls: dict = {"pub_ingest": []}
+    calls: dict[str, list[str]] = {"pub_ingest": []}
 
     async def fake_publish_ingest(path, source_folder_id=None, parent_op_id=None):
         calls["pub_ingest"].append(path)
@@ -68,16 +67,27 @@ def mock_publish(monkeypatch):
     return calls
 
 
-def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0) -> dict:
+def _wait_for(
+    client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0
+) -> dict[str, object]:
     """Poll GET /jobs/{id} until status is in `statuses` (lets the worker run)."""
     deadline = time.time() + timeout
-    last = None
+    last: dict[str, object] | None = None
     while time.time() < deadline:
-        last = client.get(f"/jobs/{job_id}").json()
+        body = client.get(f"/jobs/{job_id}").json()
+        assert isinstance(body, dict)
+        last = body
         if last["status"] in statuses:
             return last
         time.sleep(0.02)
+    assert last is not None, f"job {job_id} never reached {statuses}"
     return last
+
+
+def _progress(job: dict[str, object]) -> dict[str, object]:
+    p = job["progress"]
+    assert isinstance(p, dict)
+    return p
 
 
 # ---------------------------------------------------------------------------
@@ -95,10 +105,10 @@ def test_ingest_returns_job_and_enqueues_each_file(tmp_path, fresh_store, mock_p
 
         final = _wait_for(client, job_id, {"completed"})
         assert final["status"] == "completed"
-        assert final["progress"]["total"] == 3
-        assert final["progress"]["done"] == 3  # done counts files ENQUEUED
-        assert final["progress"]["skipped"] == 0
-        assert final["progress"]["failed"] == 0
+        assert _progress(final)["total"] == 3
+        assert _progress(final)["done"] == 3  # done counts files ENQUEUED
+        assert _progress(final)["skipped"] == 0
+        assert _progress(final)["failed"] == 0
     # One ingest task per file, each carrying the real on-disk path so the worker
     # can read the bytes off the shared disk.
     assert len(mock_publish["pub_ingest"]) == 3
@@ -127,9 +137,9 @@ def test_already_cataloged_files_are_skipped(tmp_path, fresh_store, monkeypatch)
         job_id = client.post("/ingest", json={"folderPath": str(tmp_path)}).json()["id"]
         final = _wait_for(client, job_id, {"completed"})
         assert final["status"] == "completed"
-        assert final["progress"]["total"] == 3
-        assert final["progress"]["skipped"] == 2  # the two already-cataloged
-        assert final["progress"]["done"] == 1  # only the new file enqueued
+        assert _progress(final)["total"] == 3
+        assert _progress(final)["skipped"] == 2  # the two already-cataloged
+        assert _progress(final)["done"] == 1  # only the new file enqueued
     assert len(published) == 1
     assert published[0].replace("\\", "/") == str(paths[2]).replace("\\", "/")
 
@@ -149,9 +159,9 @@ def test_broker_down_marks_files_failed(tmp_path, fresh_store, monkeypatch):
         final = _wait_for(client, job_id, {"completed"})
         # The job still settles; every file is counted failed (nothing cataloged).
         assert final["status"] == "completed"
-        assert final["progress"]["total"] == 2
-        assert final["progress"]["failed"] == 2
-        assert final["progress"]["done"] == 0
+        assert _progress(final)["total"] == 2
+        assert _progress(final)["failed"] == 2
+        assert _progress(final)["done"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +222,9 @@ def test_cancel_mid_run(tmp_path, fresh_store, monkeypatch):
         final = _wait_for(client, job_id, {"cancelled", "completed"})
         assert final["status"] == "cancelled"
         # Did not enqueue all 10 files.
-        assert final["progress"]["done"] < 10
+        done = _progress(final)["done"]
+        assert isinstance(done, int)
+        assert done < 10
 
 
 # ---------------------------------------------------------------------------
@@ -253,12 +265,13 @@ def test_pixel_work_hashes_dims_thumbnail():
 class _FakeResp:
     def __init__(self, status_code):
         self.status_code = status_code
-        self.request = None
+        self.request = pipeline.httpx.Request("POST", "http://catalog")
         self.response = None
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise pipeline.httpx.HTTPStatusError("err", request=None, response=None)
+            response = pipeline.httpx.Response(self.status_code, request=self.request)
+            raise pipeline.httpx.HTTPStatusError("err", request=self.request, response=response)
 
 
 class _FakeClient:
@@ -268,6 +281,7 @@ class _FakeClient:
         self._post = post
 
     async def post(self, url, json=None, **kw):
+        assert self._post is not None
         return self._post(url, json=json)
 
 

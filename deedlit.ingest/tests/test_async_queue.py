@@ -15,15 +15,14 @@ import asyncio
 import io
 import time
 
-import pytest
-from fastapi.testclient import TestClient
-from PIL import Image
-
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
+import pytest
 import worker as worker_module
+from fastapi.testclient import TestClient
+from PIL import Image
 
 
 def _png_bytes(color: tuple[int, int, int] = (255, 0, 0), size: int = 16) -> bytes:
@@ -32,14 +31,19 @@ def _png_bytes(color: tuple[int, int, int] = (255, 0, 0), size: int = 16) -> byt
     return out.getvalue()
 
 
-def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0) -> dict:
+def _wait_for(
+    client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0
+) -> dict[str, object]:
     deadline = time.time() + timeout
-    last = None
+    last: dict[str, object] | None = None
     while time.time() < deadline:
-        last = client.get(f"/jobs/{job_id}").json()
+        body = client.get(f"/jobs/{job_id}").json()
+        assert isinstance(body, dict)
+        last = body
         if last["status"] in statuses:
             return last
         time.sleep(0.02)
+    assert last is not None, f"job {job_id} never reached {statuses}"
     return last
 
 
@@ -75,7 +79,8 @@ def test_process_delivery_ok_runs_handler_and_does_not_publish():
 
     action = asyncio.run(
         broker_module.process_delivery(
-            "index", b'{"sha256":"abc"}', None, handler, publish=fake_publish
+            broker_module.Delivery("index", b'{"sha256":"abc"}', None),
+            handler, publish=fake_publish,
         )
     )
     assert action == "ok"
@@ -93,14 +98,15 @@ def test_process_delivery_awaits_async_handler():
 
     action = asyncio.run(
         broker_module.process_delivery(
-            "index", b'{"sha256":"z"}', None, handler, publish=fake_publish
+            broker_module.Delivery("index", b'{"sha256":"z"}', None),
+            handler, publish=fake_publish,
         )
     )
     assert action == "ok" and seen == ["z"]
 
 
 def test_process_delivery_failure_retries_with_backoff():
-    published: list[tuple] = []
+    published: list[tuple[str, dict[str, object], dict[str, object] | None, int | None]] = []
 
     async def fake_publish(queue, payload, *, headers=None, expiration_ms=None):
         published.append((queue, payload, headers, expiration_ms))
@@ -110,19 +116,21 @@ def test_process_delivery_failure_retries_with_backoff():
 
     action = asyncio.run(
         broker_module.process_delivery(
-            "index", b'{"sha256":"x"}', {}, boom, publish=fake_publish, max_retries=3
+            broker_module.Delivery("index", b'{"sha256":"x"}', {}),
+            boom, publish=fake_publish, max_retries=3,
         )
     )
     assert action == "retry"
     queue, payload, headers, expiration = published[0]
     assert queue == "index.retry"
     assert payload == {"sha256": "x"}
+    assert headers is not None
     assert headers[broker_module.ATTEMPT_HEADER] == 1
     assert expiration == broker_module.backoff_ms(1)
 
 
 def test_process_delivery_dead_letters_after_max_retries():
-    published: list[tuple] = []
+    published: list[tuple[str, dict[str, object], dict[str, object] | None, int | None]] = []
 
     async def fake_publish(queue, payload, *, headers=None, expiration_ms=None):
         published.append((queue, payload, headers, expiration_ms))
@@ -133,14 +141,14 @@ def test_process_delivery_dead_letters_after_max_retries():
     # Header says 2 prior failures; this is the 3rd == max_retries -> DLQ.
     action = asyncio.run(
         broker_module.process_delivery(
-            "index", b'{"sha256":"x"}',
-            {broker_module.ATTEMPT_HEADER: 2}, boom,
-            publish=fake_publish, max_retries=3,
+            broker_module.Delivery("index", b'{"sha256":"x"}', {broker_module.ATTEMPT_HEADER: 2}),
+            boom, publish=fake_publish, max_retries=3,
         )
     )
     assert action == "dlq"
     queue, _payload, headers, expiration = published[0]
     assert queue == "index.dlq"
+    assert headers is not None
     assert headers[broker_module.ATTEMPT_HEADER] == 3
     assert expiration is None  # dead-letter is terminal, no TTL
 
@@ -149,12 +157,12 @@ def test_process_delivery_dead_letters_after_max_retries():
 # (3) fast path: catalog-only write + record shape
 # ---------------------------------------------------------------------------
 def test_ingest_fast_writes_catalog_record_and_thumbnail(monkeypatch):
-    posts: list[tuple] = []
-    puts: list[tuple] = []
+    posts: list[tuple[str, dict[str, object]]] = []
+    puts: list[tuple[str, str | None]] = []
 
     monkeypatch.setattr(
         pipeline, "extract_metadata",
-        lambda d, f, m: {"prompt": "p", "tags": ["t"], "params": {}, "references": {}},
+        lambda d, f, m: pipeline.ExtractResult(prompt="p", tags=["t"], params={}),
     )
     monkeypatch.setattr(
         pipeline, "_post_with_retry",
@@ -216,7 +224,7 @@ def test_publish_embed_dense_best_effort_swallows_broker_errors(monkeypatch):
 
 
 def test_publish_embed_dense_best_effort_happy_path(monkeypatch):
-    seen: list[tuple] = []
+    seen: list[tuple[str, str | None]] = []
 
     async def fake(sha256, parent_op_id=None):
         seen.append((sha256, parent_op_id))
@@ -245,8 +253,10 @@ def test_folder_ingest_marks_files_failed_when_broker_is_down(tmp_path, monkeypa
         final = _wait_for(client, job_id, {"completed", "failed"})
 
     assert final["status"] == "completed"
-    assert final["progress"]["done"] == 0
-    assert final["progress"]["failed"] == 1
+    progress = final["progress"]
+    assert isinstance(progress, dict)
+    assert progress["done"] == 0
+    assert progress["failed"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -254,10 +264,11 @@ def test_folder_ingest_marks_files_failed_when_broker_is_down(tmp_path, monkeypa
 # ---------------------------------------------------------------------------
 class _Err:
     status_code = 500
-    request = None
+    request = pipeline.httpx.Request("POST", "http://labelagent")
 
     def raise_for_status(self):
-        raise pipeline.httpx.HTTPStatusError("boom", request=None, response=None)
+        response = pipeline.httpx.Response(500, request=self.request)
+        raise pipeline.httpx.HTTPStatusError("boom", request=self.request, response=response)
 
     def json(self):  # pragma: no cover
         return {}
@@ -270,18 +281,21 @@ class _FakeClient:
         self._post, self._put, self._get = post, put, get
 
     async def post(self, url, **kw):
+        assert self._post is not None
         return self._post(url, **kw)
 
     async def put(self, url, **kw):
+        assert self._put is not None
         return self._put(url, **kw)
 
     async def get(self, url, **kw):
+        assert self._get is not None
         return self._get(url, **kw)
 
 
 def test_describe_image_disabled_returns_empty(monkeypatch):
     monkeypatch.setattr(pipeline, "LABELAGENT_URL", "")
-    assert asyncio.run(pipeline.describe_image(b"x", "x.png", "image/png")) == {}
+    assert asyncio.run(pipeline.describe_image(b"x", "x.png", "image/png")) is None
 
 
 def test_describe_image_raises_on_http_error(monkeypatch):
@@ -295,21 +309,21 @@ def test_describe_image_raises_on_http_error(monkeypatch):
 
 def test_label_image_patches_catalog_and_merges_tags(monkeypatch):
     data = _png_bytes((5, 5, 5))
-    posts: list[tuple] = []
+    posts: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(pipeline, "fetch_image_bytes", lambda sha256: (data, "image/png"))
     monkeypatch.setattr(
         pipeline, "fetch_image_record",
-        lambda sha256: {"filepath": "/lib/x.png", "tags": ["red"]},
+        lambda sha256: pipeline.CatalogImageRow(filepath="/lib/x.png", tags=["red"]),
     )
     monkeypatch.setattr(
         pipeline, "extract_metadata",
-        lambda d, f, m: {"prompt": "p", "tags": ["red"], "params": {}, "references": {}},
+        lambda d, f, m: pipeline.ExtractResult(prompt="p", tags=["red"], params={}),
     )
     monkeypatch.setattr(
         pipeline, "describe_image",
-        lambda d, f, m, prompt_hint=None: {
-            "description": "a red thing", "safety": "sfw", "tags": ["green"],
-        },
+        lambda d, f, m, prompt_hint=None: pipeline.DescribeResult(
+            description="a red thing", safety="sfw", tags=["green"],
+        ),
     )
     monkeypatch.setattr(
         pipeline, "_post_with_retry", lambda url, body, *a, **k: posts.append((url, body))
@@ -328,11 +342,29 @@ def test_label_image_patches_catalog_and_merges_tags(monkeypatch):
 
 def test_label_image_is_noop_when_describe_empty(monkeypatch):
     data = _png_bytes()
-    posts: list = []
+    posts: list[tuple[object, ...]] = []
     monkeypatch.setattr(pipeline, "fetch_image_bytes", lambda sha256: (data, "image/png"))
-    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha256: {"tags": []})
-    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: {"prompt": "p", "tags": []})
-    monkeypatch.setattr(pipeline, "describe_image", lambda d, f, m, prompt_hint=None: {})
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha256: pipeline.CatalogImageRow(tags=[]))
+    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: pipeline.ExtractResult(prompt="p", tags=[]))
+    monkeypatch.setattr(pipeline, "describe_image", lambda d, f, m, prompt_hint=None: None)
+    monkeypatch.setattr(pipeline, "_post_with_retry", lambda *a, **k: posts.append(a))
+
+    assert asyncio.run(pipeline.label_image("a" * 64)) is False
+    assert posts == []  # nothing patched -> no catalog write
+
+
+def test_label_image_is_noop_when_describe_result_is_empty(monkeypatch):
+    """Regression: DescribeResult() is a truthy model instance even when every
+    field is empty, so the no-op check must inspect its fields, not the
+    instance's truthiness."""
+    data = _png_bytes()
+    posts: list[tuple[object, ...]] = []
+    monkeypatch.setattr(pipeline, "fetch_image_bytes", lambda sha256: (data, "image/png"))
+    monkeypatch.setattr(pipeline, "fetch_image_record", lambda sha256: pipeline.CatalogImageRow(tags=[]))
+    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: pipeline.ExtractResult(prompt="p", tags=[]))
+    monkeypatch.setattr(
+        pipeline, "describe_image", lambda d, f, m, prompt_hint=None: pipeline.DescribeResult()
+    )
     monkeypatch.setattr(pipeline, "_post_with_retry", lambda *a, **k: posts.append(a))
 
     assert asyncio.run(pipeline.label_image("a" * 64)) is False
@@ -342,7 +374,7 @@ def test_label_image_is_noop_when_describe_empty(monkeypatch):
 def test_label_handler_patches_then_reprojects_sparse_and_graph(monkeypatch):
     # ADR 0002: a label patch re-runs only the cheap stages — embed.sparse (which
     # fans into index.search) + index.graph — never embed.dense (bytes unchanged).
-    published: list[tuple] = []
+    published: list[tuple[str, str, str | None]] = []
 
     monkeypatch.setattr(pipeline, "label_image", lambda sha256: True)
 
@@ -414,14 +446,17 @@ async def _noop_publish(*a, **k):
 
 
 def _run_delivery(headers, handler, **kw):
-    events: list[tuple] = []
+    events: list[tuple[str, int, str | None]] = []
 
     def on_event(status, attempts, error):
         events.append((status, attempts, error))
 
     action = asyncio.run(
         broker_module.process_delivery(
-            "embed.dense", b'{"sha256":"x","type":"embed.dense"}', headers, handler,
+            broker_module.Delivery(
+                "embed.dense", b'{"sha256":"x","type":"embed.dense"}', headers
+            ),
+            handler,
             publish=_noop_publish, on_event=on_event, **kw,
         )
     )

@@ -16,22 +16,22 @@ actually owns the ingest filesystem rather than the UI host.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import TypedDict
+
+from pydantic import BaseModel
 
 
-class FsEntry(TypedDict):
+class FsEntry(BaseModel):
     name: str
     path: str
     isDirectory: bool
 
 
-class FsRoot(TypedDict):
+class FsRoot(BaseModel):
     label: str
     path: str
 
 
-class FsBrowseResult(TypedDict):
+class FsBrowseResult(BaseModel):
     # Absolute path being listed, or None for the synthetic "roots" view.
     path: str | None
     # Parent directory, or None when already at a drive/filesystem root.
@@ -64,7 +64,7 @@ def _windows_drives() -> list[FsRoot]:
     for letter in "CDEFGHIJKLMNOPQRSTUVWXYZ":
         root = f"{letter}:\\"
         if os.path.exists(root):
-            roots.append({"label": root, "path": root})
+            roots.append(FsRoot(label=root, path=root))
     return roots
 
 
@@ -73,19 +73,19 @@ def _quick_roots() -> list[FsRoot]:
     if os.name == "nt":
         roots.extend(_windows_drives())
     else:
-        roots.append({"label": "/", "path": "/"})
+        roots.append(FsRoot(label="/", path="/"))
 
     home = os.path.expanduser("~")
     if home and home != "~":
-        roots.append({"label": "Home", "path": home})
-    roots.append({"label": "App dir", "path": os.getcwd()})
+        roots.append(FsRoot(label="Home", path=home))
+    roots.append(FsRoot(label="App dir", path=os.getcwd()))
 
     seen: set[str] = set()
     deduped: list[FsRoot] = []
     for root in roots:
-        if root["path"] in seen:
+        if root.path in seen:
             continue
-        seen.add(root["path"])
+        seen.add(root.path)
         deduped.append(root)
     return deduped
 
@@ -110,16 +110,15 @@ def browse_directory(target: str | None) -> FsBrowseResult:
     roots = _quick_roots()
 
     if not target or not target.strip():
-        return {
-            "path": None,
-            "parent": None,
-            "separator": os.sep,
-            "entries": [
-                {"name": r["label"], "path": r["path"], "isDirectory": True}
-                for r in roots
+        return FsBrowseResult(
+            path=None,
+            parent=None,
+            separator=os.sep,
+            entries=[
+                FsEntry(name=r.label, path=r.path, isDirectory=True) for r in roots
             ],
-            "roots": roots,
-        }
+            roots=roots,
+        )
 
     resolved = os.path.abspath(target.strip())
 
@@ -137,22 +136,20 @@ def browse_directory(target: str | None) -> FsBrowseResult:
             # A broken symlink or inaccessible entry: treat it as a file rather
             # than failing the whole listing.
             is_dir = False
-        entries.append(
-            {"name": dirent.name, "path": dirent.path, "isDirectory": is_dir}
-        )
+        entries.append(FsEntry(name=dirent.name, path=dirent.path, isDirectory=is_dir))
         if len(entries) >= MAX_ENTRIES:
             break
 
     # Directories first, then files; case-insensitive alphabetical within each.
-    entries.sort(key=lambda e: (not e["isDirectory"], e["name"].casefold()))
+    entries.sort(key=lambda e: (not e.isDirectory, e.name.casefold()))
 
     parent_dir = os.path.dirname(resolved)
     parent = None if parent_dir == resolved else parent_dir
 
-    return {
-        "path": resolved,
-        "parent": parent,
-        "separator": os.sep,
-        "entries": entries,
-        "roots": roots,
-    }
+    return FsBrowseResult(
+        path=resolved,
+        parent=parent,
+        separator=os.sep,
+        entries=entries,
+        roots=roots,
+    )

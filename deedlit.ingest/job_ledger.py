@@ -13,9 +13,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Any
 
 import httpx
+from pydantic import JsonValue, TypeAdapter
 
 log = logging.getLogger("deedlit.ingest.job_ledger")
 
@@ -25,7 +25,8 @@ LEDGER_TIMEOUT = float(os.getenv("LEDGER_HTTP_TIMEOUT", "5.0"))
 # Own pooled async client (mirrors ledger.get_client), loop-bound + lazily
 # created, so best-effort writes reuse keep-alive connections.
 _client: httpx.AsyncClient | None = None
-_client_loop: Any = None
+_client_loop: asyncio.AbstractEventLoop | None = None
+_JSON_ADAPTER: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
 def _get_client() -> httpx.AsyncClient:
@@ -46,7 +47,7 @@ async def aclose() -> None:
     _client_loop = None
 
 
-async def record_job(snapshot: dict[str, Any]) -> bool:
+async def record_job(snapshot: dict[str, JsonValue]) -> bool:
     """Upsert a job snapshot to catalog ``POST /jobs`` (best-effort).
 
     ``snapshot`` is ``Job.to_persist()`` (snake_case columns). Returns True on a
@@ -62,14 +63,16 @@ async def record_job(snapshot: dict[str, Any]) -> bool:
         return False
 
 
-async def list_jobs(limit: int = 200) -> list[dict[str, Any]]:
+async def list_jobs(limit: int = 200) -> list[dict[str, JsonValue]]:
     """Fetch the persisted job snapshots (newest-updated first) for the restart
     hydrate. Returns [] on any failure so a cold catalog never blocks startup."""
     try:
         resp = await _get_client().get(f"{CATALOG_URL}/jobs", params={"limit": limit})
         resp.raise_for_status()
-        body = resp.json()
-        return body if isinstance(body, list) else []
+        body = _JSON_ADAPTER.validate_json(resp.content)
+        if not isinstance(body, list):
+            return []
+        return [item for item in body if isinstance(item, dict)]
     except Exception as exc:  # noqa: BLE001 — best-effort
         log.debug("job ledger list failed: %s", exc)
         return []
@@ -81,8 +84,13 @@ async def interrupt_stale() -> list[str]:
     try:
         resp = await _get_client().post(f"{CATALOG_URL}/jobs/interrupt-stale")
         resp.raise_for_status()
-        body = resp.json()
-        return body.get("interrupted", []) if isinstance(body, dict) else []
+        body = _JSON_ADAPTER.validate_json(resp.content)
+        if not isinstance(body, dict):
+            return []
+        interrupted = body.get("interrupted", [])
+        return [item for item in interrupted if isinstance(item, str)] if isinstance(
+            interrupted, list
+        ) else []
     except Exception as exc:  # noqa: BLE001 — best-effort
         log.debug("job ledger interrupt-stale failed: %s", exc)
         return []

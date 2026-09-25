@@ -8,8 +8,10 @@ helpers run against a monkeypatched ``publish_task`` — so the suite stays offl
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import broker as broker_module
+from aio_pika.abc import AbstractChannel
 
 SHA = "a" * 64
 
@@ -33,7 +35,7 @@ def test_task_queues_cover_every_stage():
 # ---------------------------------------------------------------------------
 class _FakeChannel:
     def __init__(self) -> None:
-        self.declared: list[tuple[str, dict]] = []
+        self.declared: list[tuple[str, dict[str, object]]] = []
 
     async def declare_queue(self, name, *, durable=False, arguments=None):
         self.declared.append((name, arguments or {}))
@@ -41,7 +43,7 @@ class _FakeChannel:
 
 def test_declare_topology_declares_main_retry_dlq_for_each():
     ch = _FakeChannel()
-    asyncio.run(broker_module.declare_topology(ch, ("embed.dense",)))
+    asyncio.run(broker_module.declare_topology(cast(AbstractChannel, ch), ("embed.dense",)))
     names = [n for n, _ in ch.declared]
     assert names == ["embed.dense.dlq", "embed.dense.retry", "embed.dense"]
     # The retry queue dead-letters BACK to the main queue when its TTL expires.
@@ -64,7 +66,7 @@ def test_fast_queues_use_high_prefetch_and_share():
 
 def test_declare_topology_covers_all_task_queues():
     ch = _FakeChannel()
-    asyncio.run(broker_module.declare_topology(ch, broker_module.TASK_QUEUES))
+    asyncio.run(broker_module.declare_topology(cast(AbstractChannel, ch), broker_module.TASK_QUEUES))
     declared = {n for n, _ in ch.declared}
     for q in broker_module.TASK_QUEUES:
         assert {q, f"{q}.retry", f"{q}.dlq"} <= declared
@@ -73,8 +75,8 @@ def test_declare_topology_covers_all_task_queues():
 # ---------------------------------------------------------------------------
 # (3) publish helpers route to the right queue with the right payload
 # ---------------------------------------------------------------------------
-def _capture(monkeypatch) -> list[tuple]:
-    sent: list[tuple] = []
+def _capture(monkeypatch) -> list[tuple[str, object]]:
+    sent: list[tuple[str, object]] = []
 
     async def fake_publish_task(queue, payload, *, headers=None, expiration_ms=None):
         sent.append((queue, payload))
@@ -111,6 +113,6 @@ def test_per_stage_publish_helpers_route_by_sha(monkeypatch):
     ]
     for fn, _q in cases:
         asyncio.run(fn(SHA, parent_op_id="op2"))
-    for (queue, payload), (_fn, expected) in zip(sent, cases):
+    for (queue, payload), (_fn, expected) in zip(sent, cases, strict=True):
         assert queue == expected
         assert payload == {"sha256": SHA, "type": expected, "parent_op_id": "op2"}

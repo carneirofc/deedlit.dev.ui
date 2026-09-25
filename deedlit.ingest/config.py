@@ -14,10 +14,12 @@ prefetch, worker replicas) is deploy-time and lives in the worker, not here.
 from __future__ import annotations
 
 import os
-from typing import Any
+
+from models import IngestRuntimeConfig
+from pydantic import JsonValue
 
 # Live overrides set via PUT /config; empty => fall back to the env default.
-_overrides: dict[str, Any] = {}
+_overrides: dict[str, JsonValue] = {}
 
 
 def _env_int(name: str, default: int) -> int:
@@ -35,31 +37,48 @@ def _env_bool_default(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
-def runtime() -> dict[str, Any]:
+def _override_int(value: JsonValue, default: int) -> int:
+    """Coerce a loosely-typed override to int, falling back to ``default``."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float, str)):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def runtime() -> IngestRuntimeConfig:
     """The effective config = env defaults with any live overrides applied."""
-    return {
+    concurrency_override = _overrides.get("ingest_concurrency")
+    llm_override = _overrides.get("llm_enabled")
+    return IngestRuntimeConfig(
         # How many files a folder scan fast-paths at once (inline mode). The fast
         # path is now natively async (pooled HTTP + threaded pixel work), so the
         # default is higher than the old thread-bound value — many files overlap
         # their metadata/catalog round-trips with only a handful of sockets.
-        "ingest_concurrency": max(
-            1, int(_overrides.get("ingest_concurrency", _env_int("INGEST_CONCURRENCY", 32)))
+        ingest_concurrency=max(
+            1,
+            _override_int(concurrency_override, _env_int("INGEST_CONCURRENCY", 32)),
         ),
         # Master switch for the vision-LLM (labelagent) enrichment stage. When off,
         # ingest skips publishing `label` tasks (and the label worker no-ops any
         # already-queued ones), so images are cataloged + projected WITHOUT an AI
         # description/safety/tags. On by default; the labelagent must also be
         # configured (LABELAGENT_URL) for it to actually run.
-        "llm_enabled": _env_bool_default("INGEST_LLM_ENABLED", True)
-        if _overrides.get("llm_enabled") is None
-        else bool(_overrides["llm_enabled"]),
-    }
+        llm_enabled=_env_bool_default("INGEST_LLM_ENABLED", True)
+        if llm_override is None
+        else bool(llm_override),
+    )
 
 
-def update(patch: dict[str, Any]) -> dict[str, Any]:
+def update(patch: dict[str, JsonValue]) -> IngestRuntimeConfig:
     """Apply a partial config patch (validated) and return the effective config."""
     if patch.get("ingest_concurrency") is not None:
-        _overrides["ingest_concurrency"] = max(1, int(patch["ingest_concurrency"]))
+        _overrides["ingest_concurrency"] = _override_int(patch["ingest_concurrency"], 1)
     if patch.get("llm_enabled") is not None:
         _overrides["llm_enabled"] = bool(patch["llm_enabled"])
     return runtime()

@@ -20,14 +20,13 @@ import io
 import time
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-from PIL import Image
-
 import app as app_module
 import broker as broker_module
 import jobs as jobs_module
 import pipeline
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +62,7 @@ def mock_outbound(monkeypatch):
     ``pub_dense``/``pub_sparse``/``pub_graph``/``pub_label`` record the per-stage
     DAG publishes (reindex reproject + any direct stage publish).
     """
-    calls: dict = {
+    calls: dict[str, list[str]] = {
         "pub_ingest": [],
         "pub_dense": [], "pub_sparse": [], "pub_graph": [], "pub_label": [],
     }
@@ -86,7 +85,7 @@ def mock_outbound(monkeypatch):
     return calls
 
 
-def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0) -> dict:
+def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: float = 5.0):
     deadline = time.time() + timeout
     last = None
     while time.time() < deadline:
@@ -94,6 +93,7 @@ def _wait_for(client: TestClient, job_id: str, statuses: set[str], timeout: floa
         if last["status"] in statuses:
             return last
         time.sleep(0.02)
+    assert last is not None
     return last
 
 

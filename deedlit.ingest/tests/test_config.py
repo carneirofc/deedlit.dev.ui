@@ -4,11 +4,10 @@ the jobs read-through, and the GET/PUT /config endpoints. The autouse
 """
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 import app as app_module
 import config
 import jobs as jobs_module
+from fastapi.testclient import TestClient
 
 
 def test_runtime_defaults(monkeypatch):
@@ -17,34 +16,34 @@ def test_runtime_defaults(monkeypatch):
     config.reset()
     r = config.runtime()
     # LLM enrichment is ON by default (the labelagent must also be configured).
-    assert r == {"ingest_concurrency": 32, "llm_enabled": True}
+    assert r.model_dump() == {"ingest_concurrency": 32, "llm_enabled": True}
 
 
 def test_llm_enabled_env_default_then_override(monkeypatch):
     monkeypatch.setenv("INGEST_LLM_ENABLED", "false")
     config.reset()
-    assert config.runtime()["llm_enabled"] is False  # env default
+    assert config.runtime().llm_enabled is False  # env default
     assert jobs_module.llm_enabled() is False
 
     config.update({"llm_enabled": True})
-    assert config.runtime()["llm_enabled"] is True  # override wins
+    assert config.runtime().llm_enabled is True  # override wins
     assert jobs_module.llm_enabled() is True
 
 
 def test_env_default_then_override(monkeypatch):
     monkeypatch.setenv("INGEST_CONCURRENCY", "2")
     config.reset()
-    assert config.runtime()["ingest_concurrency"] == 2  # env default
+    assert config.runtime().ingest_concurrency == 2  # env default
 
     config.update({"ingest_concurrency": 12})
-    assert config.runtime()["ingest_concurrency"] == 12  # override wins
+    assert config.runtime().ingest_concurrency == 12  # override wins
     # jobs reads the live config (no restart).
     assert jobs_module.ingest_concurrency() == 12
 
 
 def test_update_clamps_concurrency_to_at_least_one():
     config.update({"ingest_concurrency": 0})
-    assert config.runtime()["ingest_concurrency"] == 1
+    assert config.runtime().ingest_concurrency == 1
 
 
 def test_config_endpoints_round_trip():
@@ -73,7 +72,7 @@ def test_put_config_persists_to_catalog(monkeypatch):
     survives an ingest restart (best-effort; the in-memory override applies now)."""
     import settings_client
 
-    saved: list[dict] = []
+    saved: list[dict[str, object]] = []
 
     async def _save(overrides):
         saved.append(overrides)
