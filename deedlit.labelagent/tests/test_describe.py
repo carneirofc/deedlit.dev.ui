@@ -6,26 +6,25 @@ arbitrary since the stub never decodes them.
 """
 from __future__ import annotations
 
+import app as app_module
 import pytest
 from fastapi.testclient import TestClient
-
-import app as app_module
 
 
 @pytest.fixture
 def mock_agent(monkeypatch):
-    captured: dict = {}
+    captured = {}
 
     def fake_run_label(data, fmt, prompt_hint=None):
         captured["fmt"] = fmt
         captured["prompt_hint"] = prompt_hint
         captured["len"] = len(data)
-        return {
-            "label": "abstract swatch",
-            "description": "A solid purple square filling the frame.",
-            "tags": ["purple", "square", "solid color"],
-            "safety": "sfw",
-        }
+        return app_module.ImageLabel(
+            label="abstract swatch",
+            description="A solid purple square filling the frame.",
+            tags=["purple", "square", "solid color"],
+            safety="sfw",
+        )
 
     monkeypatch.setattr(app_module, "run_label", fake_run_label)
     return captured
@@ -71,32 +70,37 @@ def test_coerce_label_passes_through_valid_dict():
     out = app_module._coerce_label(
         {"label": "x", "description": "d", "tags": ["a", "b"], "safety": "explicit"}
     )
-    assert out == {"label": "x", "description": "d", "tags": ["a", "b"], "safety": "explicit"}
+    assert out.model_dump() == {
+        "label": "x",
+        "description": "d",
+        "tags": ["a", "b"],
+        "safety": "explicit",
+    }
 
 
 def test_coerce_label_normalizes_offenum_safety():
     # Odd casing / synonym -> mapped onto the contract enum, not rejected.
-    assert app_module._coerce_label({"safety": "  Questionable "})["safety"] == "nsfw"
-    assert app_module._coerce_label({"safety": "SFW"})["safety"] == "sfw"
-    assert app_module._coerce_label({"safety": "hardcore"})["safety"] == "explicit"
+    assert app_module._coerce_label({"safety": "  Questionable "}).safety == "nsfw"
+    assert app_module._coerce_label({"safety": "SFW"}).safety == "sfw"
+    assert app_module._coerce_label({"safety": "hardcore"}).safety == "explicit"
 
 
 def test_coerce_label_missing_safety_defaults_sfw():
     out = app_module._coerce_label({"description": "d"})
-    assert out["safety"] == "sfw"
+    assert out.safety == "sfw"
 
 
 def test_coerce_label_salvages_json_string():
     out = app_module._coerce_label('{"label":"k","description":"d","tags":[],"safety":"EXPLICIT"}')
-    assert out["label"] == "k"
-    assert out["safety"] == "explicit"
+    assert out.label == "k"
+    assert out.safety == "explicit"
 
 
 def test_coerce_label_unparseable_string_keeps_prose_and_defaults_sfw():
     out = app_module._coerce_label("the model rambled without emitting json")
-    assert out["safety"] == "sfw"
-    assert "rambled" in out["description"]
+    assert out.safety == "sfw"
+    assert "rambled" in out.description
 
 
 def test_coerce_label_unknown_safety_defaults_sfw():
-    assert app_module._coerce_label({"safety": "weird-value"})["safety"] == "sfw"
+    assert app_module._coerce_label({"safety": "weird-value"}).safety == "sfw"

@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import io
 
+import app as app_module
 import pytest
 from PIL import Image as PILImage
-
-import app as app_module
 
 
 def _png_bytes(w: int, h: int, color=(120, 40, 200)) -> bytes:
@@ -35,7 +34,7 @@ def test_large_image_is_downscaled_to_max_dim_and_webp():
 
 def test_small_image_is_not_upscaled():
     small = _png_bytes(64, 48)
-    out, fmt = app_module._downscale_for_vlm(small, "png")
+    out, _fmt = app_module._downscale_for_vlm(small, "png")
     # Never enlarge — dimensions stay as-is even though we may re-encode to WebP.
     assert _dims(out) == (64, 48)
 
@@ -44,7 +43,7 @@ def test_alpha_is_flattened_onto_white_not_black():
     buf = io.BytesIO()
     # Fully transparent RGBA — flattening must yield white, not the PIL default black.
     PILImage.new("RGBA", (10, 10), (0, 0, 0, 0)).save(buf, format="PNG")
-    out, fmt = app_module._downscale_for_vlm(buf.getvalue(), "png")
+    out, _fmt = app_module._downscale_for_vlm(buf.getvalue(), "png")
     px = PILImage.open(io.BytesIO(out)).convert("RGB").getpixel((5, 5))
     assert px == (255, 255, 255)
 

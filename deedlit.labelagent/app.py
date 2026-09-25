@@ -17,16 +17,18 @@ import json
 import logging
 import os
 import time
-
-from agno.media import Image
-from agno.os import AgentOS
-from fastapi import File, Form, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image as PILImage, ImageOps
+from typing import Annotated, Protocol, cast
 
 from activity import install_activity
-from agent import ImageLabel, agent
+from agent import ImageLabel, Safety, agent
+from agno.media import Image
+from agno.os import AgentOS
 from config import VISION_MAX_DIM, VISION_WEBP_EFFORT
+from fastapi import File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image as PILImage
+from PIL import ImageOps
+from pydantic import BaseModel, JsonValue
 
 
 # Health probes are polled on a tight interval (Docker HEALTHCHECK + the status
@@ -100,7 +102,7 @@ _SAFETY_ALIASES = {
 }
 
 
-def _coerce_safety(value: object) -> str:
+def _coerce_safety(value: JsonValue | None) -> Safety:
     """Normalize the model's safety value to exactly one of the contract classes.
 
     Local GGUFs don't honor a provider structured-output API, so ``safety`` can
@@ -113,41 +115,52 @@ def _coerce_safety(value: object) -> str:
     s = str(value or "").strip().lower()
     if s in _SAFETY_CLASSES:
         return s
-    return _SAFETY_ALIASES.get(s, "sfw")
+    return cast(Safety, _SAFETY_ALIASES.get(s, "sfw"))
 
 
-def _coerce_label(content: object) -> dict:
-    """Coerce arbitrary agent output into a valid ImageLabel-shaped dict.
+def _extract_label_fields(content: object) -> dict[str, JsonValue]:
+    """Coerce arbitrary agent output into a raw field dict for :class:`ImageLabel`.
 
     ``agent.run`` may yield the parsed ImageLabel, a plain dict, or — when the
     GGUF's JSON-mode completion fails to parse into the schema — a raw string.
     Salvage all three (parse a JSON string; otherwise keep the prose as the
-    description) and always emit a valid ``safety`` so the label task produces a
-    usable, persistable result instead of raising on malformed model output.
+    description).
     """
-    if hasattr(content, "model_dump"):  # ImageLabel (output_schema)
-        data = content.model_dump()
-    elif isinstance(content, dict):
-        data = dict(content)
-    else:
-        text = str(content or "").strip()
-        data = {}
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                data = parsed
-        except (ValueError, TypeError):
-            pass
-        if not data:
-            # Unparseable completion: keep the raw text as the description so the
-            # image is still labeled/searchable, with a safe default class.
-            data = {"description": text}
-    return {
-        "label": str(data.get("label") or ""),
-        "description": str(data.get("description") or ""),
-        "tags": [str(t) for t in (data.get("tags") or []) if str(t).strip()],
-        "safety": _coerce_safety(data.get("safety")),
-    }
+    if isinstance(content, ImageLabel):
+        return cast("dict[str, JsonValue]", content.model_dump())
+    if isinstance(content, dict):
+        return cast("dict[str, JsonValue]", content)
+    text = str(content or "").strip()
+    try:
+        parsed = cast(JsonValue, json.loads(text))
+    except (ValueError, TypeError):
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+    # Unparseable completion: keep the raw text as the description so the
+    # image is still labeled/searchable, with a safe default class.
+    return {"description": text}
+
+
+def _as_tags(value: JsonValue | None) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(t) for t in value if str(t).strip()]
+
+
+def _coerce_label(content: object) -> ImageLabel:
+    """Coerce arbitrary agent output into a valid :class:`ImageLabel`.
+
+    Always emits a valid ``safety`` so the label task produces a usable,
+    persistable result instead of raising on malformed model output.
+    """
+    data = _extract_label_fields(content)
+    return ImageLabel(
+        label=str(data.get("label") or ""),
+        description=str(data.get("description") or ""),
+        tags=_as_tags(data.get("tags")),
+        safety=_coerce_safety(data.get("safety")),
+    )
 
 
 def _downscale_for_vlm(data: bytes, fmt: str) -> tuple[bytes, str]:
@@ -182,9 +195,11 @@ def _downscale_for_vlm(data: bytes, fmt: str) -> tuple[bytes, str]:
         downscaled = longest > VISION_MAX_DIM
         if downscaled:
             scale = VISION_MAX_DIM / longest
-            img = img.resize(
+            # Pillow's own stub leaves part of Image.resize's `size` union
+            # unknown (a genuine stub gap, not our typing).
+            img = img.resize(  # pyright: ignore[reportUnknownMemberType]
                 (max(1, round(img.width * scale)), max(1, round(img.height * scale))),
-                PILImage.LANCZOS,
+                PILImage.Resampling.LANCZOS,
             )
         buf = io.BytesIO()
         img.save(buf, format="WEBP", lossless=True, quality=VISION_WEBP_EFFORT, method=6)
@@ -200,8 +215,19 @@ def _downscale_for_vlm(data: bytes, fmt: str) -> tuple[bytes, str]:
     return out, "webp"
 
 
-def run_label(data: bytes, fmt: str, prompt_hint: str | None = None) -> dict:
-    """Run the agent over one image and return ``{label, description, tags, safety}``.
+class _RunResult(Protocol):
+    """The subset of agno's ``agent.run`` return value this module relies on.
+
+    agno ships no type stubs, so its declared return types are opaque to
+    basedpyright; narrow to this Protocol at the boundary instead of trusting
+    the library's Unknown-typed attributes.
+    """
+
+    content: object
+
+
+def run_label(data: bytes, fmt: str, prompt_hint: str | None = None) -> ImageLabel:
+    """Run the agent over one image and return its structured label.
 
     This is the agent boundary — monkeypatched in tests so the suite stays
     offline (no llama-server required). Output is normalized via
@@ -223,15 +249,21 @@ def run_label(data: bytes, fmt: str, prompt_hint: str | None = None) -> dict:
     # that crawls while the CLIP GPU sits idle).
     log.info("labeling image (%d bytes, %s) …", len(data), fmt)
     started = time.perf_counter()
-    resp = agent.run(user_msg, images=[Image(content=data, format=fmt)])
+    # agno ships no type stubs; its Agent.run overloads use `Any` internally
+    # (session_state/dependencies/**kwargs), so the member access itself is
+    # partially-unknown to basedpyright. Narrow immediately via _RunResult.
+    raw_resp = agent.run(  # pyright: ignore[reportUnknownMemberType]
+        user_msg, images=[Image(content=data, format=fmt)]
+    )
+    resp = cast(_RunResult, raw_resp)
     log.info("labeled image in %.0f ms", (time.perf_counter() - started) * 1000)
     return _coerce_label(resp.content)
 
 
 @app.post("/describe", response_model=ImageLabel, tags=["labelagent"])
 async def describe(
-    file: UploadFile = File(...),
-    prompt_hint: str | None = Form(default=None),
+    file: Annotated[UploadFile, File(...)],
+    prompt_hint: Annotated[str | None, Form()] = None,
 ) -> ImageLabel:
     """Label + describe one uploaded image for semantic indexing."""
     data = await file.read()
@@ -240,15 +272,18 @@ async def describe(
     # inference can't stall the event loop — otherwise this service can't answer
     # /health (the dashboard/HEALTHCHECK poll) or a concurrent /describe while one
     # image is being labeled.
-    result = await asyncio.to_thread(
-        run_label, data, _format_for(file.content_type), prompt_hint
-    )
-    return ImageLabel(**result)
+    return await asyncio.to_thread(run_label, data, _format_for(file.content_type), prompt_hint)
+
+
+class HealthStatus(BaseModel):
+    """The ``GET /health`` body — mirrors AgentOS's own built-in route."""
+
+    status: str
 
 
 # AgentOS already serves GET /health (matched first); this is a guaranteed
 # fallback returning the same {"status": "ok"} shape the healthcheck/dashboard
 # expect, so the probe survives any change to AgentOS's built-in route.
 @app.get("/health", tags=["labelagent"])
-def health() -> dict:
-    return {"status": "ok"}
+def health() -> HealthStatus:
+    return HealthStatus(status="ok")

@@ -1,9 +1,8 @@
 """Health probe — what Docker HEALTHCHECK + the status dashboard poll."""
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 import app as app_module
+from fastapi.testclient import TestClient
 
 
 def test_health_ok():

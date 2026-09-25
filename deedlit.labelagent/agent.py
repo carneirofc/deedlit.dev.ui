@@ -9,11 +9,10 @@ from __future__ import annotations
 
 from typing import Literal
 
+import config
 from agno.agent import Agent
 from agno.models.llama_cpp import LlamaCpp  # subclass of OpenAILike
 from pydantic import BaseModel, Field
-
-import config
 
 # The content-safety classes the app filters on (also the catalog `safety`
 # column + Qdrant payload value). Ordered least -> most explicit.
