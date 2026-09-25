@@ -1,46 +1,60 @@
 from __future__ import annotations
 
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
-
-import asyncio
-import io
-import logging
-from concurrent.futures import ThreadPoolExecutor
-import os
-import time
-import warnings
-from pathlib import Path
-from typing import Annotated, Literal
 
 # Keep HuggingFace strictly to "download the model only if required": no
 # telemetry, no implicit-token lookups, and no noisy unauthenticated-request
 # warnings at runtime. The vision tower already loads from local safetensors;
 # only the text tower fetches from the Hub on first use, then it is cached.
 # Set HF_HUB_OFFLINE=1 after that first download to disable all Hub network
-# calls entirely. These must be set before huggingface_hub is imported.
+# calls entirely. These must be set before huggingface_hub is imported (i.e.
+# before `open_clip`/`transformers` below).
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
-warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
-logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
+
+import asyncio
+import io
+import logging
+import time
+import warnings
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Literal, Protocol, TypeVar, cast
 
 import httpx
 import open_clip
 import torch
+from activity import install_activity
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel, Field
 from PIL import Image
-from safetensors.torch import load_file
+from pydantic import BaseModel, Field, JsonValue
+
+# safetensors' stub leaves `PathLike[Unknown]` unresolved on `load_file`, a
+# genuine upstream typing gap (its actual return type, `dict[str, Tensor]`, is
+# concrete and used as such below).
+from safetensors.torch import load_file  # pyright: ignore[reportUnknownVariableType]
 from torchvision import transforms
 from torchvision.transforms import v2
 from torchvision.transforms.functional import pil_to_tensor
 from transformers import CLIPVisionConfig, CLIPVisionModelWithProjection
+from transformers.models.clip.modeling_clip import CLIPVisionModelOutput
 
-from activity import install_activity
+if TYPE_CHECKING:
+    # fastembed is imported lazily in `_load_sparse_model` (see there for why);
+    # this import is type-checking only so `_sparse_models` can be typed concretely.
+    from fastembed import SparseTextEmbedding
+
+warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
+logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
 
 
 # ---------------------------------------------------------------------
@@ -130,16 +144,27 @@ _GPU_PREPROCESS = v2.Compose(
 )
 
 
-MODEL_CONFIGS = {
-    "vit_h": {
-        "model_name": "ViT-H-14",
-        "pretrained": "laion2b_s32b_b79k",
-        "expected_dim": 1024,
-        "local_safetensors": COMFYUI_ROOT
+@dataclass(frozen=True, slots=True)
+class ModelPreset:
+    """Settings for one selectable CLIP preset (`vit_h` / `big_g`)."""
+
+    model_name: str
+    pretrained: str
+    expected_dim: int
+    local_safetensors: Path
+    vision_config: CLIPVisionConfig
+
+
+MODEL_CONFIGS: dict[str, ModelPreset] = {
+    "vit_h": ModelPreset(
+        model_name="ViT-H-14",
+        pretrained="laion2b_s32b_b79k",
+        expected_dim=1024,
+        local_safetensors=COMFYUI_ROOT
         / "models"
         / "clip_vision"
         / "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
-        "vision_config": CLIPVisionConfig(
+        vision_config=CLIPVisionConfig(
             hidden_size=1280,
             intermediate_size=5120,
             num_attention_heads=16,
@@ -150,16 +175,16 @@ MODEL_CONFIGS = {
             layer_norm_eps=1e-5,
             projection_dim=1024,
         ),
-    },
-    "big_g": {
-        "model_name": "ViT-bigG-14",
-        "pretrained": "laion2b_39b_b160k",
-        "expected_dim": 1280,
-        "local_safetensors": COMFYUI_ROOT
+    ),
+    "big_g": ModelPreset(
+        model_name="ViT-bigG-14",
+        pretrained="laion2b_39b_b160k",
+        expected_dim=1280,
+        local_safetensors=COMFYUI_ROOT
         / "models"
         / "clip_vision"
         / "CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors",
-        "vision_config": CLIPVisionConfig(
+        vision_config=CLIPVisionConfig(
             hidden_size=1664,
             intermediate_size=8192,
             num_attention_heads=16,
@@ -170,7 +195,7 @@ MODEL_CONFIGS = {
             layer_norm_eps=1e-5,
             projection_dim=1280,
         ),
-    },
+    ),
 }
 
 if DEFAULT_PRESET not in MODEL_CONFIGS:
@@ -275,7 +300,7 @@ install_activity(app)
 class TextEmbeddingRequest(BaseModel):
     text: str = Field(..., description="Text to embed.", examples=["red-haired anime knight in gothic ruins"])
     model: str | None = Field(
-        None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
+        default=None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
     )
 
     model_config = {
@@ -293,7 +318,7 @@ class TextsEmbeddingRequest(BaseModel):
         examples=[["a red sports car", "a bowl of fruit"]],
     )
     model: str | None = Field(
-        None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
+        default=None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
     )
 
     model_config = {
@@ -312,7 +337,7 @@ class TextSimilarityRequest(BaseModel):
         examples=[["a blue sedan", "a bowl of fruit"]],
     )
     model: str | None = Field(
-        None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
+        default=None, description="Model preset to use (`vit_h` or `big_g`). Omit for the server default."
     )
 
     model_config = {
@@ -402,26 +427,31 @@ class QdrantStatusResponse(BaseModel):
     collection: str = Field(..., description="Configured Qdrant collection name.")
     reachable: bool = Field(..., description="Whether the Qdrant HTTP API responded.")
     collection_exists: bool = Field(..., description="Whether the configured collection exists.")
-    vector_size: int | None = Field(None, description="Vector dimensionality of the collection, if known.")
-    distance: str | None = Field(None, description="Distance metric of the collection, if known.")
-    points_count: int | None = Field(None, description="Number of points in the collection, if known.")
+    vector_size: int | None = Field(
+        default=None, description="Vector dimensionality of the collection, if known.")
+    distance: str | None = Field(
+        default=None, description="Distance metric of the collection, if known.")
+    points_count: int | None = Field(
+        default=None, description="Number of points in the collection, if known.")
     model_dim: int = Field(..., description="Embedding dimensionality this model produces.")
     dim_matches: bool = Field(..., description="Whether the collection vector size matches this model's dim.")
-    detail: str | None = Field(None, description="Human-readable explanation when search is unavailable.")
+    detail: str | None = Field(
+        default=None, description="Human-readable explanation when search is unavailable.")
 
 
 class QdrantTextSearchRequest(BaseModel):
     text: str = Field(..., description="Text query to embed and search.", examples=["anime knight in gothic ruins"])
     limit: int = Field(12, ge=1, le=100, description="Maximum number of hits to return.")
     model: str | None = Field(
-        None, description="Model preset to embed the query with (`vit_h` or `big_g`). Omit for the server default."
+        default=None, description="Model preset to embed the query with (`vit_h` or `big_g`). Omit for the server default."
     )
 
 
 class QdrantSearchResult(BaseModel):
     id: str = Field(..., description="Qdrant point id.")
     score: float = Field(..., description="Similarity score returned by Qdrant.")
-    payload: dict | None = Field(None, description="Stored point payload, if any.")
+    payload: dict[str, JsonValue] | None = Field(
+        default=None, description="Stored point payload, if any.")
 
 
 class QdrantSearchResponse(BaseModel):
@@ -431,13 +461,46 @@ class QdrantSearchResponse(BaseModel):
     results: list[QdrantSearchResult] = Field(..., description="Hits ordered by score, descending.")
 
 
+# --- Qdrant's own HTTP response shapes (parsed at the boundary, not re-exposed) ---
+class _QdrantCollectionParams(BaseModel):
+    """`vectors` is either `{"size": .., "distance": ..}` or `{name: {...}}`."""
+
+    vectors: JsonValue = None
+
+
+class _QdrantCollectionConfig(BaseModel):
+    params: _QdrantCollectionParams | None = None
+
+
+class _QdrantCollectionResult(BaseModel):
+    points_count: int | None = None
+    config: _QdrantCollectionConfig | None = None
+
+
+class _QdrantCollectionInfoResponse(BaseModel):
+    result: _QdrantCollectionResult | None = None
+
+
+class _QdrantPointHit(BaseModel):
+    id: str | int
+    score: float = 0.0
+    payload: dict[str, JsonValue] | None = None
+
+
+class _QdrantSearchHTTPResponse(BaseModel):
+    result: list[_QdrantPointHit] = Field(default_factory=list)
+
+
 class ServiceStatus(BaseModel):
     key: str = Field(..., description="Stable identifier for the service.")
     name: str = Field(..., description="Display name.")
     reachable: bool = Field(..., description="Whether the service responded to a probe.")
-    detail: str | None = Field(None, description="Human-readable status explanation.")
-    console_url: str | None = Field(None, description="Web console/UI to open in a browser, if any.")
-    info: str | None = Field(None, description="Short extra info (version, counts, endpoint).")
+    detail: str | None = Field(
+        default=None, description="Human-readable status explanation.")
+    console_url: str | None = Field(
+        default=None, description="Web console/UI to open in a browser, if any.")
+    info: str | None = Field(
+        default=None, description="Short extra info (version, counts, endpoint).")
 
 
 class ServicesStatusResponse(BaseModel):
@@ -476,16 +539,31 @@ class ModelsResponse(BaseModel):
     sparse: SparseModelInfo = Field(..., description="SPLADE sparse text model name and readiness.")
 
 
+# open_clip ships no type stubs, so its model/tokenizer objects are `Unknown` at
+# the import boundary. These Protocols describe the subset of their runtime API
+# this module actually calls, so everything downstream of `_load_text_model` is
+# concretely typed instead of `Unknown`/`Any`.
+class _ClipTextModel(Protocol):
+    def to(self, device: str) -> _ClipTextModel: ...
+    def eval(self) -> _ClipTextModel: ...
+    def half(self) -> _ClipTextModel: ...
+    def encode_text(self, tokens: torch.Tensor) -> torch.Tensor: ...
+
+
+class _ClipTokenizer(Protocol):
+    def __call__(self, texts: list[str]) -> torch.Tensor: ...
+
+
 # Per-preset model caches. Both presets can be loaded at once so consumers can
 # compare the smaller (vit_h) and larger (big_g) embeddings; each loads lazily.
 _vision_models: dict[str, CLIPVisionModelWithProjection] = {}
 _vision_preprocess: dict[str, transforms.Compose] = {}
-_text_models: dict[str, object] = {}
-_tokenizers: dict[str, object] = {}
+_text_models: dict[str, _ClipTextModel] = {}
+_tokenizers: dict[str, _ClipTokenizer] = {}
 
 # SPLADE sparse text model. Single-element cache keyed by model name so the
 # heavy fastembed import + ONNX model download happen only on first use.
-_sparse_models: dict[str, object] = {}
+_sparse_models: dict[str, SparseTextEmbedding] = {}
 
 
 # All model loads and forward passes run on this one worker thread. The (async)
@@ -535,20 +613,27 @@ DENSE_BATCH_MAX = max(1, int(os.getenv("VISION_DENSE_BATCH_MAX", "32")))
 DENSE_BATCH_WAIT_MS = max(0.0, float(os.getenv("VISION_DENSE_BATCH_WAIT_MS", "10")))
 
 
-async def _run_gpu(fn, *args):
+_T = TypeVar("_T")
+
+
+async def _run_gpu(fn: Callable[..., _T], *args: object) -> _T:
     """Run a blocking GPU/CPU torch call on the single torch inference worker thread."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(_gpu_pool, fn, *args)
 
 
-async def _run_sparse(fn, *args):
+async def _run_sparse(fn: Callable[..., _T], *args: object) -> _T:
     """Run a blocking SPLADE/onnxruntime call on the dedicated sparse worker thread."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(_sparse_pool, fn, *args)
 
 
 def _normalize(x: torch.Tensor) -> torch.Tensor:
-    return x / x.norm(dim=-1, keepdim=True)
+    # torch's own stub leaves `Tensor.norm`'s overloaded signature/return
+    # partially unknown; the runtime always returns a Tensor here (no
+    # `dtype=`/`p=` str), so cast + a narrow ignore for the member access.
+    norm = x.norm(dim=-1, keepdim=True)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return x / cast(torch.Tensor, norm)
 
 
 def _cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> float:
@@ -590,9 +675,24 @@ def _preprocess_image(image: Image.Image, preset: str) -> torch.Tensor:
     longer pegs a CPU thread while the GPU idles. On CPU it falls back to the
     original PIL/torchvision Compose for byte-identical numerics.
     """
+    # torchvision ships no type stubs, so `pil_to_tensor`/`Compose.__call__`
+    # return `Unknown`; cast to their documented Tensor return at this boundary.
     if PREPROCESS_ON_GPU:
-        return _GPU_PREPROCESS(pil_to_tensor(image).to(DEVICE))
-    return _vision_preprocess[preset](image).to(DEVICE)
+        raw = pil_to_tensor(image).to(DEVICE)
+        return cast(torch.Tensor, _GPU_PREPROCESS(raw))
+    return cast(torch.Tensor, _vision_preprocess[preset](image)).to(DEVICE)
+
+
+def _vision_embeds(preset: str, pixel_values: torch.Tensor) -> torch.Tensor:
+    """Run the vision tower forward and return ``image_embeds`` as a concrete Tensor.
+
+    ``nn.Module.__call__`` is typed ``-> Any`` in torch's own stubs (the base
+    class can't know each subclass's return type), so cast once to
+    CLIPVisionModelWithProjection's documented output type.
+    """
+    output = cast(CLIPVisionModelOutput, _vision_models[preset](pixel_values=pixel_values))
+    assert output.image_embeds is not None
+    return output.image_embeds
 
 
 def _embed_image_vec(image: Image.Image, preset: str = DEFAULT_PRESET) -> torch.Tensor:
@@ -605,8 +705,7 @@ def _embed_image_vec(image: Image.Image, preset: str = DEFAULT_PRESET) -> torch.
         image_tensor = image_tensor.half()
 
     with torch.no_grad():
-        vec = _vision_models[preset](pixel_values=image_tensor).image_embeds
-        vec = _normalize(vec)
+        vec = _normalize(_vision_embeds(preset, image_tensor))
 
     # Per-request GPU timing: if this is fast but ingest is slow, the bottleneck
     # is elsewhere (labelagent/metadata/network), not the CLIP forward pass.
@@ -621,11 +720,16 @@ def _embed_image_vec(image: Image.Image, preset: str = DEFAULT_PRESET) -> torch.
 # Worker-thread entry points: run the full embed + ``.cpu().tolist()`` copy off
 # the event loop and return a plain list, so the routes only build the response.
 def _embed_image_list(image: Image.Image, preset: str) -> list[float]:
-    return _embed_image_vec(image, preset).float().cpu().tolist()
+    # Tensor.tolist()'s element type is unresolved in torch's stub (varies by dtype).
+    return cast(
+        "list[float]", _embed_image_vec(image, preset).float().cpu().tolist()  # pyright: ignore[reportUnknownMemberType]
+    )
 
 
 def _embed_text_list(text: str, preset: str) -> list[float]:
-    return _embed_text_vec(text, preset).float().cpu().tolist()
+    return cast(
+        "list[float]", _embed_text_vec(text, preset).float().cpu().tolist()  # pyright: ignore[reportUnknownMemberType]
+    )
 
 
 def _embed_images_batch(images: list[Image.Image], preset: str) -> list[list[float]]:
@@ -651,8 +755,7 @@ def _embed_images_batch(images: list[Image.Image], preset: str) -> list[list[flo
 
     fwd_started = time.perf_counter()
     with torch.no_grad():
-        vecs = _vision_models[preset](pixel_values=batch).image_embeds
-        vecs = _normalize(vecs)
+        vecs = _normalize(_vision_embeds(preset, batch))
     if on_cuda:
         torch.cuda.synchronize()
     fwd_ms = (time.perf_counter() - fwd_started) * 1000
@@ -665,13 +768,15 @@ def _embed_images_batch(images: list[Image.Image], preset: str) -> list[list[flo
         preset, len(images), prep_ms, fwd_ms, DEVICE,
         " fp16" if (USE_FP16 and on_cuda) else "",
     )
-    return vecs.float().cpu().tolist()
+    return cast(
+        "list[list[float]]", vecs.float().cpu().tolist()  # pyright: ignore[reportUnknownMemberType]
+    )
 
 
 def _embed_images_list(items: list[tuple[str, Image.Image]], preset: str) -> list[tuple[str, list[float]]]:
     # One batched forward for the whole upload rather than a per-image loop.
     vectors = _embed_images_batch([image for _, image in items], preset)
-    return [(label, vector) for (label, _), vector in zip(items, vectors)]
+    return [(label, vector) for (label, _), vector in zip(items, vectors, strict=True)]
 
 
 def _embed_texts_list(texts: list[str], preset: str) -> list[tuple[str, list[float]]]:
@@ -684,16 +789,18 @@ def _embed_texts_list(texts: list[str], preset: str) -> list[tuple[str, list[flo
 # within DENSE_BATCH_WAIT_MS (capped at DENSE_BATCH_MAX) into a single batched GPU
 # forward, then resolves each future. Lazily started on the uvicorn event loop on
 # the first request (single uvicorn worker => one loop, so no cross-loop hazard).
-_dense_queues: dict[str, asyncio.Queue] = {}
-_dense_tasks: dict[str, asyncio.Task] = {}
+_DenseQueueItem = tuple[Image.Image, "asyncio.Future[list[float]]"]
+
+_dense_queues: dict[str, asyncio.Queue[_DenseQueueItem]] = {}
+_dense_tasks: dict[str, asyncio.Task[None]] = {}
 
 
-async def _dense_batch_loop(preset: str, queue: asyncio.Queue) -> None:
+async def _dense_batch_loop(preset: str, queue: asyncio.Queue[_DenseQueueItem]) -> None:
     """Drain ``queue`` forever, embedding each coalesced batch in one GPU job."""
     loop = asyncio.get_running_loop()
     while True:
         image, fut = await queue.get()
-        batch: list[tuple[Image.Image, asyncio.Future]] = [(image, fut)]
+        batch: list[_DenseQueueItem] = [(image, fut)]
 
         # Accumulate more requests that arrive within the wait window, so a burst
         # of concurrent single-image calls fires as one big forward. A free worker
@@ -705,13 +812,13 @@ async def _dense_batch_loop(preset: str, queue: asyncio.Queue) -> None:
                 break
             try:
                 batch.append(await asyncio.wait_for(queue.get(), remaining))
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
 
         images = [im for im, _ in batch]
         try:
             vectors = await _run_gpu(_embed_images_batch, images, preset)
-            for (_, f), vector in zip(batch, vectors):
+            for (_, f), vector in zip(batch, vectors, strict=True):
                 if not f.done():
                     f.set_result(vector)
         except Exception as exc:  # propagate the same failure to every waiter
@@ -720,11 +827,11 @@ async def _dense_batch_loop(preset: str, queue: asyncio.Queue) -> None:
                     f.set_exception(exc)
 
 
-def _dense_queue(preset: str) -> asyncio.Queue:
+def _dense_queue(preset: str) -> asyncio.Queue[_DenseQueueItem]:
     """Return (lazily creating) the per-preset queue + its running drain task."""
     queue = _dense_queues.get(preset)
     if queue is None:
-        queue = asyncio.Queue()
+        queue = asyncio.Queue[_DenseQueueItem]()
         _dense_queues[preset] = queue
         # Keep a reference so the long-lived task is never GC'd mid-flight.
         _dense_tasks[preset] = asyncio.create_task(_dense_batch_loop(preset, queue))
@@ -737,7 +844,7 @@ async def _embed_image_batched(image: Image.Image, preset: str) -> list[float]:
     Concurrent callers coalesce into a shared GPU forward; a single caller still
     gets a (batch-of-one) embedding after at most DENSE_BATCH_WAIT_MS.
     """
-    fut: asyncio.Future = asyncio.get_running_loop().create_future()
+    fut: asyncio.Future[list[float]] = asyncio.get_running_loop().create_future()
     await _dense_queue(preset).put((image, fut))
     return await fut
 
@@ -779,7 +886,7 @@ def _load_vision_model(preset: str) -> None:
         return
 
     config = MODEL_CONFIGS[preset]
-    local_path = config["local_safetensors"]
+    local_path = config.local_safetensors
     if not local_path.exists():
         raise RuntimeError(f"Local clip_vision safetensors not found for {preset!r}: {local_path}")
 
@@ -798,11 +905,16 @@ def _load_vision_model(preset: str) -> None:
     # under the device context puts the random-init weights straight on the GPU,
     # and load_file(device=DEVICE) lands the checkpoint there too.
     with torch.device(DEVICE):
-        m = CLIPVisionModelWithProjection(config["vision_config"])
+        m = CLIPVisionModelWithProjection(config.vision_config)
 
     state_dict = load_file(str(local_path), device=DEVICE)
     state_dict.pop("vision_model.embeddings.position_ids", None)
-    missing, unexpected = m.load_state_dict(state_dict, strict=False)
+    # nn.Module.load_state_dict's return type is unresolved in torch's own stubs
+    # (a genuine upstream gap); it is documented (and used here) as the 2-tuple
+    # `_IncompatibleKeys(missing_keys, unexpected_keys)`.
+    missing, unexpected = cast(
+        "tuple[list[str], list[str]]", m.load_state_dict(state_dict, strict=False)
+    )
     if missing or unexpected:
         raise RuntimeError(
             f"Unexpected clip_vision state dict layout for {preset!r}. missing={missing} unexpected={unexpected}"
@@ -811,10 +923,14 @@ def _load_vision_model(preset: str) -> None:
     # stays at ~1x the weights rather than 2x once they're copied into the module.
     del state_dict
 
-    m = m.to(DEVICE).eval()
+    # nn.Module.to()/.half() are wrapped by torch's own `@overload`-emulating
+    # decorator, which basedpyright cannot resolve precisely (self-type
+    # confusion on the wrapper) — a genuine upstream torch/basedpyright gap;
+    # the runtime call is correct (`Module.to(device: str)` / `Module.half()`).
+    m = m.to(DEVICE).eval()  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
 
     if USE_FP16 and DEVICE.startswith("cuda"):
-        m = m.half()
+        m = m.half()  # pyright: ignore[reportUnknownMemberType]
 
     _vision_models[preset] = m
     _vision_preprocess[preset] = transforms.Compose(
@@ -838,11 +954,18 @@ def _load_text_model(preset: str) -> None:
         return
 
     config = MODEL_CONFIGS[preset]
-    m, _, _ = open_clip.create_model_and_transforms(
-        config["model_name"],
-        pretrained=config["pretrained"],
+    # open_clip ships no py.typed marker and its own signatures rely on
+    # untyped `**kwargs` internally, a genuine upstream typing gap; cast at
+    # this one boundary to the Protocols the rest of the module relies on.
+    raw_model, _, _ = open_clip.create_model_and_transforms(  # pyright: ignore[reportUnknownMemberType]
+        config.model_name,
+        pretrained=config.pretrained,
     )
-    tok = open_clip.get_tokenizer(config["model_name"])
+    m = cast(_ClipTextModel, raw_model)
+    tok = cast(
+        _ClipTokenizer,
+        open_clip.get_tokenizer(config.model_name),  # pyright: ignore[reportUnknownMemberType]
+    )
 
     m = m.to(DEVICE).eval()
 
@@ -853,7 +976,25 @@ def _load_text_model(preset: str) -> None:
     _tokenizers[preset] = tok
 
 
-def _load_sparse_model() -> object:
+def _active_onnx_providers(model: SparseTextEmbedding) -> list[str] | None:
+    """Best-effort introspection of the onnxruntime providers fastembed selected.
+
+    fastembed exposes no public API for this — ``model.model.model`` is an
+    internal onnxruntime ``InferenceSession`` that varies across fastembed
+    versions, so this is a genuine library typing gap; the two casts below are
+    narrowly scoped to this lookup and failures are swallowed (log-only).
+    """
+    try:
+        inner = cast(object, getattr(getattr(model, "model", None), "model", None))
+        get_providers = getattr(inner, "get_providers", None)
+        if callable(get_providers):
+            return cast(list[str], get_providers())
+    except Exception:
+        pass
+    return None
+
+
+def _load_sparse_model() -> SparseTextEmbedding:
     """
     Lazy-load the SPLADE sparse text model via fastembed. Like the text tower,
     no local checkpoint is available, so the first call downloads the (small)
@@ -889,13 +1030,7 @@ def _load_sparse_model() -> object:
     # (e.g. CPU-only fastembed installed on a GPU box) is visible in the logs
     # rather than hiding behind "sparse is slow". Best-effort across fastembed
     # versions — never fail the load over an introspection miss.
-    active = None
-    try:
-        inner = getattr(getattr(model, "model", None), "model", None)
-        if inner is not None and hasattr(inner, "get_providers"):
-            active = inner.get_providers()
-    except Exception:
-        active = None
+    active = _active_onnx_providers(model)
     log.info(
         "loaded SPLADE sparse model %s in %.0f ms (active providers=%s)",
         SPARSE_MODEL_NAME, (time.perf_counter() - _load_started) * 1000, active or "unknown",
@@ -915,8 +1050,10 @@ def _embed_sparse(text: str) -> tuple[list[int], list[float]]:
     model = _load_sparse_model()
     started = time.perf_counter()
     embedding = next(iter(model.embed([text])))
-    indices = [int(i) for i in embedding.indices.tolist()]
-    values = [float(v) for v in embedding.values.tolist()]
+    # numpy's ndarray.tolist() is typed to return Any (element type isn't
+    # tracked), a genuine numpy-stub limitation; int()/float() below narrow it.
+    indices: list[int] = [int(i) for i in embedding.indices.tolist()]  # pyright: ignore[reportAny]
+    values: list[float] = [float(v) for v in embedding.values.tolist()]  # pyright: ignore[reportAny]
     log.info(
         "embed sparse %.0f ms on %s",
         (time.perf_counter() - started) * 1000, SPARSE_DEVICE,
@@ -964,13 +1101,13 @@ def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         model_preset=DEFAULT_PRESET,
-        model_name=CONFIG["model_name"],
-        pretrained=CONFIG["pretrained"],
+        model_name=CONFIG.model_name,
+        pretrained=CONFIG.pretrained,
         device=DEVICE,
         fp16=USE_FP16 and DEVICE.startswith("cuda"),
-        expected_dim=CONFIG["expected_dim"],
-        local_safetensors=str(CONFIG["local_safetensors"]),
-        local_safetensors_exists=CONFIG["local_safetensors"].exists(),
+        expected_dim=CONFIG.expected_dim,
+        local_safetensors=str(CONFIG.local_safetensors),
+        local_safetensors_exists=CONFIG.local_safetensors.exists(),
         vision_ready=DEFAULT_PRESET in _vision_models,
         text_ready=DEFAULT_PRESET in _text_models,
         sparse_model=SPARSE_MODEL_NAME,
@@ -981,12 +1118,12 @@ def health() -> HealthResponse:
 
 def _model_info(preset: str) -> ModelInfo:
     config = MODEL_CONFIGS[preset]
-    local_path = config["local_safetensors"]
+    local_path = config.local_safetensors
     return ModelInfo(
         preset=preset,
-        model_name=config["model_name"],
-        pretrained=config["pretrained"],
-        dim=config["expected_dim"],
+        model_name=config.model_name,
+        pretrained=config.pretrained,
+        dim=config.expected_dim,
         distance=EMBEDDING_DISTANCE,
         device=DEVICE,
         fp16=USE_FP16 and DEVICE.startswith("cuda"),
@@ -1048,7 +1185,7 @@ async def embed_text(request: TextEmbeddingRequest) -> EmbeddingResponse:
 
     return EmbeddingResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         device=DEVICE,
         dim=len(embedding),
         embedding=embedding,
@@ -1103,7 +1240,7 @@ async def embed_texts(request: TextsEmbeddingRequest) -> BatchEmbeddingResponse:
 
     return BatchEmbeddingResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         device=DEVICE,
         results=results,
     )
@@ -1130,7 +1267,7 @@ async def embed_image(
 
     return EmbeddingResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         device=DEVICE,
         dim=len(embedding),
         embedding=embedding,
@@ -1168,7 +1305,7 @@ async def embed_images(
 
     return BatchEmbeddingResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         device=DEVICE,
         results=results,
     )
@@ -1233,7 +1370,7 @@ async def similarity_text(request: TextSimilarityRequest) -> SimilarityResponse:
 
     return SimilarityResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         reference=request.reference,
         results=results,
     )
@@ -1277,7 +1414,7 @@ async def similarity_image(
 
     return SimilarityResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         reference=reference.filename or "reference",
         results=results,
     )
@@ -1319,7 +1456,7 @@ async def similarity_text_to_image(
 
     return SimilarityResponse(
         model_preset=preset,
-        model_name=MODEL_CONFIGS[preset]["model_name"],
+        model_name=MODEL_CONFIGS[preset].model_name,
         reference=text,
         results=results,
     )
@@ -1349,7 +1486,15 @@ async def misspelled_similarity_text_to_image(
 # ---------------------------------------------------------------------
 # Optional Qdrant search (test UI only)
 # ---------------------------------------------------------------------
-def _extract_vector_params(vectors: object) -> tuple[int | None, str | None, str | None]:
+def _as_int(value: JsonValue) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _as_str(value: JsonValue) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _extract_vector_params(vectors: JsonValue) -> tuple[int | None, str | None, str | None]:
     """Pull (size, distance, name) from a Qdrant collection's vectors config.
 
     Handles both the unnamed default vector (``{"size": .., "distance": ..}`` →
@@ -1361,7 +1506,7 @@ def _extract_vector_params(vectors: object) -> tuple[int | None, str | None, str
     if not isinstance(vectors, dict):
         return None, None, None
     if "size" in vectors:
-        return vectors.get("size"), vectors.get("distance"), None
+        return _as_int(vectors.get("size")), _as_str(vectors.get("distance")), None
     name = (
         QDRANT_DENSE_VECTOR_NAME
         if QDRANT_DENSE_VECTOR_NAME in vectors
@@ -1369,12 +1514,12 @@ def _extract_vector_params(vectors: object) -> tuple[int | None, str | None, str
     )
     cfg = vectors.get(name) if name is not None else None
     if isinstance(cfg, dict) and "size" in cfg:
-        return cfg.get("size"), cfg.get("distance"), name
+        return _as_int(cfg.get("size")), _as_str(cfg.get("distance")), name
     return None, None, name
 
 
 async def _fetch_qdrant_status(preset: str = DEFAULT_PRESET) -> QdrantStatusResponse:
-    model_dim = MODEL_CONFIGS[preset]["expected_dim"]
+    model_dim = MODEL_CONFIGS[preset].expected_dim
     status = QdrantStatusResponse(
         configured_url=QDRANT_URL,
         collection=QDRANT_COLLECTION,
@@ -1404,10 +1549,12 @@ async def _fetch_qdrant_status(preset: str = DEFAULT_PRESET) -> QdrantStatusResp
         status.detail = f"Qdrant returned HTTP {resp.status_code} for collection {QDRANT_COLLECTION!r}."
         return status
 
-    result = resp.json().get("result", {}) or {}
+    info = _QdrantCollectionInfoResponse.model_validate(resp.json())
+    result = info.result
     status.collection_exists = True
-    status.points_count = result.get("points_count")
-    vectors = (((result.get("config") or {}).get("params") or {}).get("vectors"))
+    status.points_count = result.points_count if result else None
+    params = result.config.params if result and result.config else None
+    vectors = params.vectors if params else None
     size, distance, _name = _extract_vector_params(vectors)
     status.vector_size = size
     status.distance = distance
@@ -1436,8 +1583,10 @@ async def _resolve_search_vector_name() -> str | None:
         resp.raise_for_status()
     except httpx.HTTPError:
         return QDRANT_DENSE_VECTOR_NAME
-    result = resp.json().get("result", {}) or {}
-    vectors = (((result.get("config") or {}).get("params") or {}).get("vectors"))
+    info = _QdrantCollectionInfoResponse.model_validate(resp.json())
+    result = info.result
+    params = result.config.params if result and result.config else None
+    vectors = params.vectors if params else None
     _size, _distance, name = _extract_vector_params(vectors)
     return name
 
@@ -1465,9 +1614,9 @@ async def _qdrant_search(vector: list[float], limit: int, preset: str = DEFAULT_
     if resp.status_code >= 400:
         raise HTTPException(status_code=502, detail=f"Qdrant search returned HTTP {resp.status_code}: {resp.text[:200]}")
 
-    hits = resp.json().get("result", []) or []
+    hits = _QdrantSearchHTTPResponse.model_validate(resp.json()).result
     return [
-        QdrantSearchResult(id=str(h.get("id")), score=float(h.get("score", 0.0)), payload=h.get("payload"))
+        QdrantSearchResult(id=str(h.id), score=h.score, payload=h.payload)
         for h in hits
     ]
 
@@ -1547,6 +1696,11 @@ async def qdrant_search_image(
 # ---------------------------------------------------------------------
 # Backing-stack service reachability (test UI only)
 # ---------------------------------------------------------------------
+class _Neo4jVersionResponse(BaseModel):
+    neo4j_version: str | None = None
+    version: str | None = None
+
+
 async def _probe_http(url: str) -> tuple[bool, int | None, str | None]:
     """GET a URL; return (responded, status_code, error_class)."""
     try:
@@ -1570,8 +1724,8 @@ async def _probe_neo4j() -> ServiceStatus:
     info = None
     if resp.status_code < 400:
         try:
-            data = resp.json()
-            ver = data.get("neo4j_version") or data.get("version")
+            data = _Neo4jVersionResponse.model_validate(resp.json())
+            ver = data.neo4j_version or data.version
             if ver:
                 info = f"v{ver}"
         except Exception:
@@ -1601,7 +1755,7 @@ async def _probe_qdrant_service() -> ServiceStatus:
 
 
 async def _probe_rustfs() -> ServiceStatus:
-    responded, status_code, err = await _probe_http(RUSTFS_S3_URL)
+    responded, _status_code, err = await _probe_http(RUSTFS_S3_URL)
     if not responded:
         return ServiceStatus(
             key="rustfs", name="RustFS", reachable=False,
@@ -1617,7 +1771,7 @@ async def _probe_rustfs() -> ServiceStatus:
 
 async def _probe_postgres() -> ServiceStatus:
     try:
-        reader, writer = await asyncio.wait_for(
+        _reader, writer = await asyncio.wait_for(
             asyncio.open_connection(POSTGRES_HOST, POSTGRES_PORT), timeout=SERVICE_TIMEOUT
         )
         writer.close()
@@ -1630,7 +1784,7 @@ async def _probe_postgres() -> ServiceStatus:
             detail="TCP port open (no web console).",
             info=f"{POSTGRES_HOST}:{POSTGRES_PORT}", console_url=None,
         )
-    except (OSError, asyncio.TimeoutError) as exc:
+    except (TimeoutError, OSError) as exc:
         return ServiceStatus(
             key="postgres", name="PostgreSQL", reachable=False,
             detail=f"TCP {POSTGRES_HOST}:{POSTGRES_PORT} closed ({exc.__class__.__name__}).",

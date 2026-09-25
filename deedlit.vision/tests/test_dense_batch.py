@@ -8,6 +8,7 @@ forward (``_embed_images_batch``) so they stay offline and fast — no model loa
 import asyncio
 
 import app
+from PIL import Image
 
 
 def _reset_batcher():
@@ -17,15 +18,21 @@ def _reset_batcher():
     app._dense_tasks.clear()
 
 
+def _tagged_image(tag: int) -> Image.Image:
+    # A real (but tiny) PIL image whose single pixel value doubles as an
+    # identity tag, so tests can assert order/content without a real model.
+    return Image.new("L", (1, 1), color=tag)
+
+
 def test_concurrent_requests_coalesce_into_one_batch(monkeypatch):
     _reset_batcher()
     seen_batch_sizes: list[int] = []
 
     def fake_batch(images, preset):
         seen_batch_sizes.append(len(images))
-        # Encode each stand-in "image" (an int) into its vector so we can assert
-        # every caller got the embedding for its own image, in order.
-        return [[float(im)] for im in images]
+        # Encode each stand-in image's tag pixel into its vector so we can
+        # assert every caller got the embedding for its own image, in order.
+        return [[float(im.getpixel((0, 0)))] for im in images]
 
     monkeypatch.setattr(app, "_embed_images_batch", fake_batch)
     # Widen the window so the burst below deterministically coalesces.
@@ -33,7 +40,7 @@ def test_concurrent_requests_coalesce_into_one_batch(monkeypatch):
     monkeypatch.setattr(app, "DENSE_BATCH_MAX", 16)
 
     async def run():
-        images = list(range(8))
+        images = [_tagged_image(i) for i in range(8)]
         results = await asyncio.gather(
             *(app._embed_image_batched(im, "vit_h") for im in images)
         )
@@ -56,7 +63,7 @@ def test_batch_size_is_capped(monkeypatch):
 
     def fake_batch(images, preset):
         seen_batch_sizes.append(len(images))
-        return [[float(im)] for im in images]
+        return [[float(im.getpixel((0, 0)))] for im in images]
 
     monkeypatch.setattr(app, "_embed_images_batch", fake_batch)
     monkeypatch.setattr(app, "DENSE_BATCH_WAIT_MS", 50.0)
@@ -64,7 +71,7 @@ def test_batch_size_is_capped(monkeypatch):
 
     async def run():
         results = await asyncio.gather(
-            *(app._embed_image_batched(i, "vit_h") for i in range(10))
+            *(app._embed_image_batched(_tagged_image(i), "vit_h") for i in range(10))
         )
         for task in app._dense_tasks.values():
             task.cancel()
@@ -88,7 +95,7 @@ def test_failure_propagates_to_every_waiter(monkeypatch):
 
     async def run():
         tasks = [
-            asyncio.create_task(app._embed_image_batched(i, "vit_h"))
+            asyncio.create_task(app._embed_image_batched(_tagged_image(i), "vit_h"))
             for i in range(3)
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)

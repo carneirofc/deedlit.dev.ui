@@ -4,9 +4,8 @@ These exercise the real fastembed SPLADE model, which downloads on first use
 (small). The endpoint lazy-loads the model exactly like the CLIP towers, so
 `/health` should report `sparse_ready=true` only after a sparse call.
 """
-from fastapi.testclient import TestClient
-
 from app import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

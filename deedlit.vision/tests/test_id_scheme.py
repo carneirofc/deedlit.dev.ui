@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from id_scheme import NAMESPACE, point_id_for_sha256
 
 _VECTORS = json.loads(
