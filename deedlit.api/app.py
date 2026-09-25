@@ -142,7 +142,7 @@ async def activity() -> dict[str, Any]:
     )
     # The gateway answered, so include its own live work first (mirrors how the
     # comfyhelper health route prepends the gateway component).
-    gateway = {"name": "gateway", **gateway_tracker.snapshot(), "reachable": True}
+    gateway = {"name": "gateway", **gateway_tracker.snapshot().model_dump(), "reachable": True}
     return {"services": [gateway, *downstream]}
 
 

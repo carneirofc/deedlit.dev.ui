@@ -33,16 +33,16 @@ def _png_bytes(color: tuple[int, int, int] = (255, 0, 0), size: int = 16) -> byt
 # ---------------------------------------------------------------------------
 def test_activity_tracker_counts_inflight_throughput_and_last_op():
     t = ActivityTracker()
-    assert t.snapshot() == {"inflight": 0, "per_min": 0.0, "busy": False, "last_op": None}
+    assert t.snapshot().model_dump() == {"inflight": 0, "per_min": 0.0, "busy": False, "last_op": None}
 
     t.begin("GET /jobs")
-    s = t.snapshot()
+    s = t.snapshot().model_dump()
     assert s["inflight"] == 1
     assert s["busy"] is True
     assert s["last_op"] == "GET /jobs"
 
     t.end()
-    s = t.snapshot()
+    s = t.snapshot().model_dump()
     assert s["inflight"] == 0
     assert s["busy"] is False
     assert s["per_min"] == 1.0  # one completion inside the 60s window

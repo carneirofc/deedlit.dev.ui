@@ -24,6 +24,10 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
+
+from fastapi import FastAPI, Request, Response
+from pydantic import BaseModel
 
 # Trailing window over which throughput is measured. With a 60s window the
 # completion count IS the per-minute rate.
@@ -32,6 +36,17 @@ WINDOW_SECONDS = 60.0
 # Probe endpoints excluded from the counters so tight health/activity polling
 # (the board polls /activity every ~2s) doesn't drown out real work.
 _IGNORED_PATHS = frozenset({"/health", "/activity"})
+
+CallNext = Callable[[Request], Awaitable[Response]]
+
+
+class ActivitySnapshot(BaseModel):
+    """Point-in-time view of one service's activity (the ``GET /activity`` body)."""
+
+    inflight: int
+    per_min: float
+    busy: bool
+    last_op: str | None
 
 
 class ActivityTracker:
@@ -63,23 +78,23 @@ class ActivityTracker:
         while self._completions and self._completions[0] < cutoff:
             self._completions.popleft()
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> ActivitySnapshot:
         now = time.monotonic()
         self._trim(now)
         recent = len(self._completions)
-        return {
-            "inflight": self._inflight,
-            "per_min": round(recent * 60.0 / self._window, 1),
-            "busy": self._inflight > 0,
-            "last_op": self._last_op,
-        }
+        return ActivitySnapshot(
+            inflight=self._inflight,
+            per_min=round(recent * 60.0 / self._window, 1),
+            busy=self._inflight > 0,
+            last_op=self._last_op,
+        )
 
 
 # Module-level singleton: one tracker per service process.
 tracker = ActivityTracker()
 
 
-def install_activity(app, register_route: bool = True) -> ActivityTracker:
+def install_activity(app: FastAPI, register_route: bool = True) -> ActivityTracker:
     """Register the activity middleware (+ ``GET /activity``) on ``app``.
 
     Returns the tracker so tests/callers can introspect it. Pass
@@ -89,7 +104,7 @@ def install_activity(app, register_route: bool = True) -> ActivityTracker:
     """
 
     @app.middleware("http")
-    async def _activity_middleware(request, call_next):
+    async def _activity_middleware(request: Request, call_next: CallNext) -> Response:
         if request.url.path in _IGNORED_PATHS:
             return await call_next(request)
         tracker.begin(f"{request.method} {request.url.path}")
@@ -101,7 +116,7 @@ def install_activity(app, register_route: bool = True) -> ActivityTracker:
     if register_route:
 
         @app.get("/activity", tags=["observability"])
-        async def activity() -> dict:
+        async def activity() -> ActivitySnapshot:
             return tracker.snapshot()
 
     return tracker
