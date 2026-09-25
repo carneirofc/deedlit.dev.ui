@@ -6,19 +6,26 @@ Pixel work (sha256/phash/dims/thumbnail) is NOT done here — ingest owns it.
 The ``references{}`` field is deferred to #7 (always empty here).
 See contracts/metadata.openapi.yaml.
 """
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import logging
-
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from typing import cast
 
 from activity import install_activity
-from extract import interpret_metadata
+from extract import ExtractResult, interpret_metadata
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from png_metadata import read_embedded_metadata_from_png
+
+# fastapi.File() is typed as returning Any (it's a dependency-injection
+# descriptor, not a real UploadFile); cast it to the parameter's declared
+# type rather than letting the untyped default leak `Any` into the signature.
+_UPLOAD_FILE = cast(UploadFile, File(...))
 
 
 # Health probes are polled on a tight interval (Docker HEALTHCHECK + the status
@@ -42,17 +49,17 @@ install_activity(app)
 
 
 @app.get("/health")
-def health() -> dict:
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.post("/extract")
-async def extract(file: UploadFile = File(...)) -> dict:
+async def extract(file: UploadFile = _UPLOAD_FILE) -> ExtractResult:
     image_bytes = await file.read()
     embedded = read_embedded_metadata_from_png(image_bytes)
-    metadata = embedded.get("metadata")
+    metadata = embedded.get("metadata") if isinstance(embedded, dict) else None
 
     result = interpret_metadata(metadata)
-    if result["sourceTool"] == "unknown":
+    if result.sourceTool == "unknown":
         raise HTTPException(status_code=422, detail="No recognized image metadata")
     return result

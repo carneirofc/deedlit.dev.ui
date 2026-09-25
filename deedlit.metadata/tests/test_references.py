@@ -8,22 +8,22 @@ response return the expected ``{name, hash?}`` entries per category.
 """
 import json
 
-from fastapi.testclient import TestClient
-
 from app import app
 from extract import REFERENCE_CATEGORIES, interpret_metadata
-from metadata_parsing import resolve_references
+from fastapi.testclient import TestClient
+from metadata_parsing import References, resolve_references
+from pydantic import JsonValue
 
 client = TestClient(app)
 
 
-def _names(refs, category):
-    return [r["name"] for r in refs[category]]
+def _names(refs: References, category: str) -> list[str]:
+    return [entry["name"] for entry in refs.model_dump()[category]]
 
 
 # ---- checkpoints + loras (tracer) ---------------------------------------
 
-CHECKPOINT_LORA_GRAPH = {
+CHECKPOINT_LORA_GRAPH: JsonValue = {
     "3": {
         "class_type": "KSampler",
         "inputs": {"model": ["10", 0], "positive": ["6", 0], "negative": ["7", 0]},
@@ -45,7 +45,7 @@ CHECKPOINT_LORA_GRAPH = {
 def test_resolve_checkpoints():
     refs = resolve_references(CHECKPOINT_LORA_GRAPH)
     assert _names(refs, "checkpoints") == ["sd_xl_base.safetensors"]
-    assert refs["checkpoints"][0]["hash"] is None
+    assert refs.checkpoints[0].hash is None
 
 
 def test_resolve_loras():
@@ -54,7 +54,7 @@ def test_resolve_loras():
 
 
 def test_resolve_unet_loader_as_checkpoint():
-    graph = {"1": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux_dev.safetensors"}}}
+    graph: JsonValue = {"1": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux_dev.safetensors"}}}
     refs = resolve_references(graph)
     assert _names(refs, "checkpoints") == ["flux_dev.safetensors"]
 
@@ -62,7 +62,7 @@ def test_resolve_unet_loader_as_checkpoint():
 # ---- vae -----------------------------------------------------------------
 
 def test_resolve_vae():
-    graph = {"1": {"class_type": "VAELoader", "inputs": {"vae_name": "sdxl_vae.safetensors"}}}
+    graph: JsonValue = {"1": {"class_type": "VAELoader", "inputs": {"vae_name": "sdxl_vae.safetensors"}}}
     refs = resolve_references(graph)
     assert _names(refs, "vae") == ["sdxl_vae.safetensors"]
 
@@ -70,7 +70,7 @@ def test_resolve_vae():
 # ---- controlnets ---------------------------------------------------------
 
 def test_resolve_controlnets():
-    graph = {
+    graph: JsonValue = {
         "1": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": "canny.pth"}},
         "2": {
             "class_type": "ControlNetApply",
@@ -84,7 +84,7 @@ def test_resolve_controlnets():
 # ---- upscalers -----------------------------------------------------------
 
 def test_resolve_upscalers():
-    graph = {"1": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": "4x-UltraSharp.pth"}}}
+    graph: JsonValue = {"1": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": "4x-UltraSharp.pth"}}}
     refs = resolve_references(graph)
     assert _names(refs, "upscalers") == ["4x-UltraSharp.pth"]
 
@@ -93,7 +93,7 @@ def test_resolve_upscalers():
 
 def test_resolve_loras_rgthree_power_lora_loader():
     # "Power Lora Loader (rgthree)" stores each lora under lora_N: {lora: name}
-    graph = {
+    graph: JsonValue = {
         "1": {
             "class_type": "Power Lora Loader (rgthree)",
             "inputs": {
@@ -110,7 +110,7 @@ def test_resolve_loras_rgthree_power_lora_loader():
 
 def test_resolve_loras_loramanager_value_list():
     # "Lora Loader (LoraManager)" stores loras under loras.__value__[].name
-    graph = {
+    graph: JsonValue = {
         "1": {
             "class_type": "Lora Loader (LoraManager)",
             "inputs": {
@@ -132,7 +132,7 @@ def test_resolve_loras_loramanager_value_list():
 # ---- embeddings (from CLIPTextEncode text, graph-sourced) ----------------
 
 def test_resolve_embeddings_from_clip_text():
-    graph = {
+    graph: JsonValue = {
         "6": {
             "class_type": "CLIPTextEncode",
             "inputs": {"text": "masterpiece, embedding:EasyNegative, (embedding:badhandv4:1.2)"},
@@ -146,16 +146,16 @@ def test_resolve_embeddings_from_clip_text():
 
 def test_resolve_embeddings_ignores_non_text_inputs():
     # text inputs that are node references (lists) must not be regex'd
-    graph = {
+    graph: JsonValue = {
         "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ["99", 0], "clip": ["4", 1]}},
     }
     refs = resolve_references(graph)
-    assert refs["embeddings"] == []
+    assert refs.embeddings == []
 
 
 # ---- combined fixture: loras + embeddings + controlnets ------------------
 
-COMBINED_GRAPH = {
+COMBINED_GRAPH: JsonValue = {
     "3": {
         "class_type": "KSampler",
         "inputs": {"model": ["10", 0], "positive": ["6", 0], "negative": ["7", 0]},
@@ -187,11 +187,12 @@ def test_resolve_combined():
     assert _names(refs, "loras") == ["style.safetensors"]
     assert _names(refs, "embeddings") == ["myStyle", "EasyNegative"]
     assert _names(refs, "controlnets") == ["openpose.pth"]
-    assert refs["vae"] == []
-    assert refs["upscalers"] == []
+    assert refs.vae == []
+    assert refs.upscalers == []
     # every entry has the {name, hash?} shape
+    dumped = refs.model_dump()
     for cat in REFERENCE_CATEGORIES:
-        for entry in refs[cat]:
+        for entry in dumped[cat]:
             assert set(entry.keys()) <= {"name", "hash"}
             assert "name" in entry
 
@@ -199,13 +200,13 @@ def test_resolve_combined():
 # ---- integration through interpret_metadata / endpoint -------------------
 
 def test_interpret_metadata_populates_references():
-    md = {"source": "embedded-png", "fields": {"prompt": COMBINED_GRAPH}}
+    md: JsonValue = {"source": "embedded-png", "fields": {"prompt": COMBINED_GRAPH}}
     r = interpret_metadata(md)
-    assert r["sourceTool"] == "comfyui"
-    assert [c["name"] for c in r["references"]["checkpoints"]] == ["base.safetensors"]
-    assert [c["name"] for c in r["references"]["loras"]] == ["style.safetensors"]
-    assert [c["name"] for c in r["references"]["embeddings"]] == ["myStyle", "EasyNegative"]
-    assert [c["name"] for c in r["references"]["controlnets"]] == ["openpose.pth"]
+    assert r.sourceTool == "comfyui"
+    assert _names(r.references, "checkpoints") == ["base.safetensors"]
+    assert _names(r.references, "loras") == ["style.safetensors"]
+    assert _names(r.references, "embeddings") == ["myStyle", "EasyNegative"]
+    assert _names(r.references, "controlnets") == ["openpose.pth"]
 
 
 def test_extract_endpoint_resolves_references(make_png_bytes):
@@ -231,6 +232,7 @@ def test_a1111_image_has_empty_references():
         "masterpiece, <lora:foo:0.8>, embedding:bar\n"
         "Negative prompt: lowres\nSteps: 10, Seed: 1"
     )
-    md = {"source": "embedded-png", "fields": {"parameters": a1111}}
+    md: JsonValue = {"source": "embedded-png", "fields": {"parameters": a1111}}
     r = interpret_metadata(md)
-    assert all(r["references"][cat] == [] for cat in REFERENCE_CATEGORIES)
+    dumped = r.references.model_dump()
+    assert all(dumped[cat] == [] for cat in REFERENCE_CATEGORIES)

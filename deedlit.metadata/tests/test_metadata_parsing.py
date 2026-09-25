@@ -7,7 +7,7 @@ from metadata_parsing import (
     parse_automatic1111_parameters,
     to_display_value,
 )
-
+from pydantic import JsonValue
 
 # ---- helpers -------------------------------------------------------------
 
@@ -30,19 +30,19 @@ def test_maybe_parse_json_string():
 
 
 def test_get_searchable_metadata_unwraps_fields():
-    md = {"source": "embedded-png", "fields": {"parameters": "x"}}
+    md: JsonValue = {"source": "embedded-png", "fields": {"parameters": "x"}}
     assert get_searchable_metadata(md) == {"parameters": "x"}
     assert get_searchable_metadata("plain") == "plain"
 
 
 def test_find_first_value_by_keys_normalizes_keys():
-    root = {"fields": {"CFG scale": "7"}}
+    root: JsonValue = {"fields": {"CFG scale": "7"}}
     # normalized key match ignores case & non-alphanumerics
     assert find_first_value_by_keys(root, ["cfgscale"]) == "7"
 
 
 def test_find_first_value_descends_and_parses_json_strings():
-    root = {"prompt": '{"deep": {"seed": 42}}'}
+    root: JsonValue = {"prompt": '{"deep": {"seed": 42}}'}
     assert find_first_value_by_keys(root, ["seed"]) == 42
 
 
@@ -82,7 +82,7 @@ def test_a1111_no_negative_with_first_line_option():
 
 # ---- ComfyUI graph -------------------------------------------------------
 
-COMFY = {
+COMFY: JsonValue = {
     "3": {
         "class_type": "KSampler",
         "inputs": {
@@ -115,7 +115,7 @@ def test_comfy_graph_walk():
 
 
 def test_comfy_sdxl_text_g_l_joined():
-    graph = {
+    graph: JsonValue = {
         "3": {"class_type": "KSampler", "inputs": {"positive": ["6", 0]}},
         "6": {"class_type": "CLIPTextEncodeSDXL", "inputs": {"text_g": "g part", "text_l": "l part"}},
     }

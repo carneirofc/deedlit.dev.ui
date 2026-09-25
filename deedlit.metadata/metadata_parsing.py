@@ -9,12 +9,21 @@ Ported faithfully from ``lib/metadata-parsing.ts``:
 The ComfyUI walk is intentionally structured so #7 (references) can extend the
 node-graph traversal here to resolve checkpoints/loras/embeddings/etc. without
 reworking the prompt/param extraction.
+
+The embedded PNG metadata tree and the ComfyUI api-prompt graph are both
+genuinely opaque JSON (arbitrary third-party shapes) -- they are typed as
+``pydantic.JsonValue`` throughout this module and narrowed with ``is_record``
+(an ``isinstance`` TypeGuard) wherever dict access is needed.
 """
 from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import TypeGuard, cast
+
+from pydantic import BaseModel, Field, JsonValue
 
 __all__ = [
     "is_record",
@@ -27,12 +36,14 @@ __all__ = [
     "extract_from_comfy_prompt_graph",
     "resolve_references",
     "REFERENCE_CATEGORIES",
+    "ReferenceEntry",
+    "References",
 ]
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
 
-def is_record(value: Any) -> bool:
+def is_record(value: JsonValue) -> TypeGuard[dict[str, JsonValue]]:
     """TS ``isRecord``: plain object (dict), not a list."""
     return isinstance(value, dict)
 
@@ -41,19 +52,21 @@ def _normalize_key(key: str) -> str:
     return _NON_ALNUM_RE.sub("", key.lower())
 
 
-def maybe_parse_json_string(value: Any) -> Any:
+def maybe_parse_json_string(value: JsonValue) -> JsonValue:
     if not isinstance(value, str):
         return value
     trimmed = value.strip()
     if not trimmed or not (trimmed.startswith("{") or trimmed.startswith("[")):
         return value
     try:
-        return json.loads(trimmed)
+        # json.loads is untyped (returns Any); the value is coerced right back
+        # into JsonValue since it was parsed from JSON text.
+        return cast(JsonValue, json.loads(trimmed))
     except json.JSONDecodeError:
         return value
 
 
-def to_display_value(value: Any) -> str | None:
+def to_display_value(value: JsonValue) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -67,13 +80,59 @@ def to_display_value(value: Any) -> str | None:
     return None
 
 
-def get_searchable_metadata(metadata: Any) -> Any:
+def get_searchable_metadata(metadata: JsonValue) -> JsonValue:
     if is_record(metadata) and is_record(metadata.get("fields")):
         return metadata["fields"]
     return metadata
 
 
-def find_first_value_by_keys(root: Any, keys: list[str]) -> Any:
+def _visit_list_for_keys(items: list[JsonValue], key_set: set[str], seen: set[int]) -> JsonValue:
+    for item in items:
+        found = _visit_for_keys(item, key_set, seen)
+        if found is not None:
+            return found
+    return None
+
+
+def _find_direct_key_match(parsed: dict[str, JsonValue], key_set: set[str]) -> JsonValue:
+    for key, nested in parsed.items():
+        if _normalize_key(key) in key_set:
+            return nested
+    return None
+
+
+def _visit_children_for_keys(
+    parsed: dict[str, JsonValue], key_set: set[str], seen: set[int]
+) -> JsonValue:
+    for nested in parsed.values():
+        found = _visit_for_keys(nested, key_set, seen)
+        if found is not None:
+            return found
+    return None
+
+
+def _visit_for_keys(value: JsonValue, key_set: set[str], seen: set[int]) -> JsonValue:
+    parsed = maybe_parse_json_string(value)
+
+    if isinstance(parsed, list):
+        return _visit_list_for_keys(parsed, key_set, seen)
+
+    if not is_record(parsed):
+        return None
+
+    ident = id(parsed)
+    if ident in seen:
+        return None
+    seen.add(ident)
+
+    direct = _find_direct_key_match(parsed, key_set)
+    if direct is not None:
+        return direct
+
+    return _visit_children_for_keys(parsed, key_set, seen)
+
+
+def find_first_value_by_keys(root: JsonValue, keys: list[str]) -> JsonValue:
     """Recursive first-match search over the metadata tree.
 
     Mirrors the TS DFS: at each record, return the value of the first own key
@@ -85,40 +144,10 @@ def find_first_value_by_keys(root: Any, keys: list[str]) -> Any:
 
     key_set = {_normalize_key(k) for k in keys}
     seen: set[int] = set()
-
-    def visit(value: Any) -> Any:
-        parsed = maybe_parse_json_string(value)
-
-        if isinstance(parsed, list):
-            for item in parsed:
-                found = visit(item)
-                if found is not None:
-                    return found
-            return None
-
-        if not is_record(parsed):
-            return None
-
-        ident = id(parsed)
-        if ident in seen:
-            return None
-        seen.add(ident)
-
-        for key, nested in parsed.items():
-            if _normalize_key(key) in key_set:
-                return nested
-
-        for nested in parsed.values():
-            found = visit(nested)
-            if found is not None:
-                return found
-
-        return None
-
-    return visit(root)
+    return _visit_for_keys(root, key_set, seen)
 
 
-def extract_prompt_text_from_metadata(metadata: Any, keys: list[str]) -> str | None:
+def extract_prompt_text_from_metadata(metadata: JsonValue, keys: list[str]) -> str | None:
     return to_display_value(find_first_value_by_keys(metadata, keys))
 
 
@@ -200,7 +229,13 @@ def parse_automatic1111_parameters(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_node_reference(value: Any) -> str | None:
+@dataclass(frozen=True, slots=True)
+class _ComfyNode:
+    class_type: str
+    inputs: dict[str, JsonValue]
+
+
+def _resolve_node_reference(value: JsonValue) -> str | None:
     if isinstance(value, list) and len(value) > 0:
         first = value[0]
         if isinstance(first, (str, int, float)) and not isinstance(first, bool):
@@ -212,13 +247,13 @@ def _resolve_node_reference(value: Any) -> str | None:
     return None
 
 
-def _extract_text_from_prompt_node(node_id: str | None, nodes: dict[str, dict]) -> str | None:
+def _extract_text_from_prompt_node(node_id: str | None, nodes: dict[str, _ComfyNode]) -> str | None:
     if not node_id:
         return None
     node = nodes.get(node_id)
-    if not node or not node.get("inputs"):
+    if node is None or not node.inputs:
         return None
-    inputs = node["inputs"]
+    inputs = node.inputs
     parts = [
         to_display_value(inputs.get("text")),
         to_display_value(inputs.get("text_g")),
@@ -230,7 +265,70 @@ def _extract_text_from_prompt_node(node_id: str | None, nodes: dict[str, dict]) 
     return "\n".join(parts)
 
 
-def extract_from_comfy_prompt_graph(prompt_value: Any) -> dict[str, str | None]:
+def _collect_comfy_nodes(parsed_prompt: dict[str, JsonValue]) -> dict[str, _ComfyNode]:
+    nodes: dict[str, _ComfyNode] = {}
+    for node_id, node_value in parsed_prompt.items():
+        if not is_record(node_value):
+            continue
+        class_type = to_display_value(node_value.get("class_type"))
+        inputs = node_value.get("inputs")
+        if not class_type or not is_record(inputs):
+            continue
+        nodes[node_id] = _ComfyNode(class_type=class_type, inputs=inputs)
+    return nodes
+
+
+def _find_ksampler_and_loader(
+    nodes: dict[str, _ComfyNode],
+) -> tuple[tuple[str, _ComfyNode] | None, _ComfyNode | None]:
+    ksampler_entry: tuple[str, _ComfyNode] | None = None
+    loader_node: _ComfyNode | None = None
+
+    for node_id, node in nodes.items():
+        class_type = node.class_type.lower()
+        if ksampler_entry is None and "ksampler" in class_type:
+            ksampler_entry = (node_id, node)
+        if loader_node is None and (
+            "checkpointloader" in class_type or "unetloader" in class_type
+        ):
+            loader_node = node
+        if ksampler_entry and loader_node:
+            break
+
+    return ksampler_entry, loader_node
+
+
+def _resolve_model_name(
+    nodes: dict[str, _ComfyNode], model_ref: str | None, loader_node: _ComfyNode | None
+) -> str | None:
+    if model_ref:
+        model_node = nodes.get(model_ref)
+        if model_node is not None and model_node.inputs:
+            model_name = (
+                to_display_value(model_node.inputs.get("ckpt_name"))
+                or to_display_value(model_node.inputs.get("model_name"))
+                or to_display_value(model_node.inputs.get("unet_name"))
+            )
+            if model_name:
+                return model_name
+
+    if loader_node is None:
+        for node in nodes.values():
+            class_type = node.class_type.lower()
+            if "checkpointloader" in class_type or "unetloader" in class_type:
+                loader_node = node
+                break
+
+    if loader_node is not None and loader_node.inputs:
+        return (
+            to_display_value(loader_node.inputs.get("ckpt_name"))
+            or to_display_value(loader_node.inputs.get("model_name"))
+            or to_display_value(loader_node.inputs.get("unet_name"))
+        )
+    return None
+
+
+def extract_from_comfy_prompt_graph(prompt_value: JsonValue) -> dict[str, str | None]:
     """Port of ``extractFromComfyPromptGraph``.
 
     Walks the ComfyUI api-prompt node graph: find the first KSampler-like node
@@ -242,62 +340,17 @@ def extract_from_comfy_prompt_graph(prompt_value: Any) -> dict[str, str | None]:
     if not is_record(parsed_prompt):
         return {}
 
-    nodes: dict[str, dict] = {}
-    for node_id, node_value in parsed_prompt.items():
-        if not is_record(node_value):
-            continue
-        class_type = to_display_value(node_value.get("class_type"))
-        inputs = node_value.get("inputs") if is_record(node_value.get("inputs")) else None
-        if not class_type or inputs is None:
-            continue
-        nodes[node_id] = {"classType": class_type, "inputs": inputs}
-
-    ksampler_entry: tuple[str, dict] | None = None
-    loader_node: dict | None = None
-
-    for node_id, node in nodes.items():
-        class_type = (node.get("classType") or "").lower()
-        if ksampler_entry is None and "ksampler" in class_type:
-            ksampler_entry = (node_id, node)
-        if loader_node is None and (
-            "checkpointloader" in class_type or "unetloader" in class_type
-        ):
-            loader_node = node
-        if ksampler_entry and loader_node:
-            break
-
+    nodes = _collect_comfy_nodes(parsed_prompt)
+    ksampler_entry, loader_node = _find_ksampler_and_loader(nodes)
     if ksampler_entry is None:
         return {}
 
     _, sampler_node = ksampler_entry
-    inputs = sampler_node.get("inputs") or {}
+    inputs = sampler_node.inputs
     positive_ref = _resolve_node_reference(inputs.get("positive"))
     negative_ref = _resolve_node_reference(inputs.get("negative"))
     model_ref = _resolve_node_reference(inputs.get("model"))
-
-    model_name: str | None = None
-    if model_ref and nodes.get(model_ref, {}).get("inputs"):
-        model_inputs = nodes[model_ref]["inputs"] or {}
-        model_name = (
-            to_display_value(model_inputs.get("ckpt_name"))
-            or to_display_value(model_inputs.get("model_name"))
-            or to_display_value(model_inputs.get("unet_name"))
-        )
-
-    if not model_name and not loader_node:
-        for node in nodes.values():
-            class_type = (node.get("classType") or "").lower()
-            if "checkpointloader" in class_type or "unetloader" in class_type:
-                loader_node = node
-                break
-
-    if not model_name and loader_node and loader_node.get("inputs"):
-        loader_inputs = loader_node["inputs"]
-        model_name = (
-            to_display_value(loader_inputs.get("ckpt_name"))
-            or to_display_value(loader_inputs.get("model_name"))
-            or to_display_value(loader_inputs.get("unet_name"))
-        )
+    model_name = _resolve_model_name(nodes, model_ref, loader_node)
 
     return {
         "positivePrompt": _extract_text_from_prompt_node(positive_ref, nodes),
@@ -351,24 +404,44 @@ _LOADER_RULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 _EMBEDDING_TOKEN_RE = re.compile(r"embedding:([^\s,:()<>]+)", re.IGNORECASE)
 
 
-def _empty_references() -> dict[str, list[dict[str, Any]]]:
+class ReferenceEntry(BaseModel):
+    """One resolved asset reference: the ``AssetRef`` contract shape.
+
+    ``hash`` is virtually never present in ComfyUI graphs, so it is always
+    ``None`` here; the field is kept to match the contract.
+    """
+
+    name: str
+    hash: str | None = None
+
+
+class References(BaseModel):
+    """The full ``references{}`` field of the ExtractResult contract."""
+
+    checkpoints: list[ReferenceEntry] = Field(default_factory=list)
+    loras: list[ReferenceEntry] = Field(default_factory=list)
+    embeddings: list[ReferenceEntry] = Field(default_factory=list)
+    vae: list[ReferenceEntry] = Field(default_factory=list)
+    controlnets: list[ReferenceEntry] = Field(default_factory=list)
+    upscalers: list[ReferenceEntry] = Field(default_factory=list)
+
+
+def _empty_reference_buckets() -> dict[str, list[ReferenceEntry]]:
+    """Working accumulator keyed by category name; converted to ``References``
+    once resolution is done (categories are always exactly REFERENCE_CATEGORIES)."""
     return {category: [] for category in REFERENCE_CATEGORIES}
 
 
-def _append_unique(bucket: list[dict[str, Any]], name: str | None) -> None:
-    """Append a ``{name, hash: None}`` ref, deduped by name (order preserved).
-
-    Hashes are virtually never present in ComfyUI graphs, so ``hash`` is always
-    ``None`` here. The field is kept to match the ``AssetRef`` contract shape.
-    """
+def _append_unique(bucket: list[ReferenceEntry], name: str | None) -> None:
+    """Append a ``{name, hash: None}`` ref, deduped by name (order preserved)."""
     if not name:
         return
-    if any(existing["name"] == name for existing in bucket):
+    if any(existing.name == name for existing in bucket):
         return
-    bucket.append({"name": name, "hash": None})
+    bucket.append(ReferenceEntry(name=name, hash=None))
 
 
-def _node_iter(parsed_prompt: dict) -> Any:
+def _node_iter(parsed_prompt: dict[str, JsonValue]) -> Iterator[tuple[str, dict[str, JsonValue]]]:
     """Yield ``(class_type_lower_normalized, inputs)`` for graph nodes."""
     for node_value in parsed_prompt.values():
         if not is_record(node_value):
@@ -381,7 +454,9 @@ def _node_iter(parsed_prompt: dict) -> Any:
         yield normalized, inputs
 
 
-def _resolve_lora_loader_inputs(inputs: dict, bucket: list[dict[str, Any]]) -> None:
+def _resolve_lora_loader_inputs(
+    inputs: dict[str, JsonValue], bucket: list[ReferenceEntry]
+) -> None:
     """Resolve lora names from community lora-loader node input shapes.
 
     Handles two widespread custom-node layouts (observed in real ComfyUI PNGs):
@@ -404,7 +479,43 @@ def _resolve_lora_loader_inputs(inputs: dict, bucket: list[dict[str, Any]]) -> N
                     _append_unique(bucket, to_display_value(entry.get("name")))
 
 
-def resolve_references(prompt_value: Any) -> dict[str, list[dict[str, Any]]]:
+def _resolve_loader_rule(
+    normalized: str, inputs: dict[str, JsonValue], refs: dict[str, list[ReferenceEntry]]
+) -> None:
+    for needle, category, keys in _LOADER_RULES:
+        if needle not in normalized:
+            continue
+        matched = False
+        for key in keys:
+            name = to_display_value(inputs.get(key))
+            if name:
+                _append_unique(refs[category], name)
+                matched = True
+                break
+        # Community lora nodes don't use the canonical ``lora_name`` scalar:
+        # rgthree's "Power Lora Loader" nests ``lora_N: {lora: name}`` and
+        # ComfyUI-Lora-Manager nests ``loras.__value__: [{name: ...}]``.
+        if category == "loras" and not matched:
+            _resolve_lora_loader_inputs(inputs, refs["loras"])
+
+
+def _resolve_embeddings(
+    normalized: str, inputs: dict[str, JsonValue], bucket: list[ReferenceEntry]
+) -> None:
+    # Embeddings: scan literal CLIPTextEncode text inputs for tokens. Only
+    # plain string inputs are scanned; node-reference lists (["6", 0]) are
+    # skipped so we never regex over a wired-in value we can't see here.
+    if "cliptextencode" not in normalized:
+        return
+    for key in ("text", "text_g", "text_l"):
+        raw = inputs.get(key)
+        if not isinstance(raw, str):
+            continue
+        for match in _EMBEDDING_TOKEN_RE.finditer(raw):
+            _append_unique(bucket, match.group(1))
+
+
+def resolve_references(prompt_value: JsonValue) -> References:
     """Resolve the full asset-reference graph from a ComfyUI api-prompt graph.
 
     Walks every node's ``class_type`` + ``inputs`` (NOT a regex over the final
@@ -421,40 +532,17 @@ def resolve_references(prompt_value: Any) -> dict[str, list[dict[str, Any]]]:
 
     Each entry matches the ``AssetRef`` contract shape ``{name, hash}`` with
     ``hash`` always ``None`` (ComfyUI graphs carry names, not hashes). Returns a
-    dict with all six categories present (possibly empty). A non-graph value
-    (e.g. an A1111 ``parameters`` blob) yields the all-empty skeleton.
+    ``References`` with all six categories present (possibly empty). A
+    non-graph value (e.g. an A1111 ``parameters`` blob) yields the all-empty
+    skeleton.
     """
-    refs = _empty_references()
+    refs = _empty_reference_buckets()
     parsed_prompt = maybe_parse_json_string(prompt_value)
     if not is_record(parsed_prompt):
-        return refs
+        return References(**refs)
 
     for normalized, inputs in _node_iter(parsed_prompt):
-        for needle, category, keys in _LOADER_RULES:
-            if needle not in normalized:
-                continue
-            matched = False
-            for key in keys:
-                name = to_display_value(inputs.get(key))
-                if name:
-                    _append_unique(refs[category], name)
-                    matched = True
-                    break
-            # Community lora nodes don't use the canonical ``lora_name`` scalar:
-            # rgthree's "Power Lora Loader" nests ``lora_N: {lora: name}`` and
-            # ComfyUI-Lora-Manager nests ``loras.__value__: [{name: ...}]``.
-            if category == "loras" and not matched:
-                _resolve_lora_loader_inputs(inputs, refs["loras"])
+        _resolve_loader_rule(normalized, inputs, refs)
+        _resolve_embeddings(normalized, inputs, refs["embeddings"])
 
-        # Embeddings: scan literal CLIPTextEncode text inputs for tokens. Only
-        # plain string inputs are scanned; node-reference lists (["6", 0]) are
-        # skipped so we never regex over a wired-in value we can't see here.
-        if "cliptextencode" in normalized:
-            for key in ("text", "text_g", "text_l"):
-                raw = inputs.get(key)
-                if not isinstance(raw, str):
-                    continue
-                for match in _EMBEDDING_TOKEN_RE.finditer(raw):
-                    _append_unique(refs["embeddings"], match.group(1))
-
-    return refs
+    return References(**refs)

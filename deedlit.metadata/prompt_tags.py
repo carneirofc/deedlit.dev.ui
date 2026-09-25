@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["normalize_tag", "normalize_prompt_tags", "parse_loras_from_prompt"]
+from pydantic import BaseModel
+
+__all__ = ["normalize_tag", "normalize_prompt_tags", "parse_loras_from_prompt", "LoraRef"]
 
 
 def normalize_tag(tag: str) -> str:
@@ -84,16 +86,23 @@ def normalize_prompt_tags(prompt: str | None) -> list[str]:
     return tags
 
 
-def parse_loras_from_prompt(prompt: str | None) -> list[dict]:
+class LoraRef(BaseModel):
+    """A ``<lora:name:weight>`` / ``<lyco:name:weight>`` tag parsed out of a prompt."""
+
+    name: str
+    weight: float | None = None
+
+
+def parse_loras_from_prompt(prompt: str | None) -> list[LoraRef]:
     """Port of ``parseLorasFromPrompt``: ``<lora:name:0.8>`` / ``<lyco:...>``.
 
     Not part of the #6 ExtractResult contract, but ported for completeness and
-    reuse by later issues. Returns ``[{"name": str, "weight": float | None}]``.
+    reuse by later issues.
     """
     if not prompt:
         return []
-    out: list[dict] = []
+    out: list[LoraRef] = []
     for match in _LORA_PARSE_RE.finditer(prompt):
         weight = float(match.group(2)) if match.group(2) else None
-        out.append({"name": match.group(1).strip(), "weight": weight})
+        out.append(LoraRef(name=match.group(1).strip(), weight=weight))
     return out

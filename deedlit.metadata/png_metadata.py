@@ -10,11 +10,21 @@ from __future__ import annotations
 import json
 import struct
 import zlib
-from typing import Any
+from dataclasses import dataclass
+from typing import cast
+
+from pydantic import JsonValue
 
 __all__ = ["read_embedded_metadata_from_png"]
 
 PNG_SIGNATURE = bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+
+@dataclass(frozen=True, slots=True)
+class _TextChunk:
+    keyword: str
+    chunk_type: str
+    text: str
 
 
 def _looks_like_json(value: str) -> bool:
@@ -22,18 +32,18 @@ def _looks_like_json(value: str) -> bool:
     return trimmed.startswith("{") or trimmed.startswith("[")
 
 
-def _parse_text_chunk(data: bytes) -> dict | None:
+def _parse_text_chunk(data: bytes) -> _TextChunk | None:
     separator = data.find(0)
     if separator <= 0:
         return None
-    return {
-        "keyword": data[:separator].decode("latin1"),
-        "chunkType": "tEXt",
-        "text": data[separator + 1 :].decode("latin1"),
-    }
+    return _TextChunk(
+        keyword=data[:separator].decode("latin1"),
+        chunk_type="tEXt",
+        text=data[separator + 1 :].decode("latin1"),
+    )
 
 
-def _parse_ztxt_chunk(data: bytes) -> dict | None:
+def _parse_ztxt_chunk(data: bytes) -> _TextChunk | None:
     separator = data.find(0)
     if separator <= 0 or separator + 2 > len(data):
         return None
@@ -44,14 +54,10 @@ def _parse_ztxt_chunk(data: bytes) -> dict | None:
         text = zlib.decompress(data[separator + 2 :]).decode("utf-8")
     except (zlib.error, UnicodeDecodeError):
         return None
-    return {
-        "keyword": data[:separator].decode("latin1"),
-        "chunkType": "zTXt",
-        "text": text,
-    }
+    return _TextChunk(keyword=data[:separator].decode("latin1"), chunk_type="zTXt", text=text)
 
 
-def _parse_itxt_chunk(data: bytes) -> dict | None:
+def _parse_itxt_chunk(data: bytes) -> _TextChunk | None:
     keyword_end = data.find(0)
     if keyword_end <= 0:
         return None
@@ -88,14 +94,10 @@ def _parse_itxt_chunk(data: bytes) -> dict | None:
     except UnicodeDecodeError:
         return None
 
-    return {
-        "keyword": data[:keyword_end].decode("latin1"),
-        "chunkType": "iTXt",
-        "text": text,
-    }
+    return _TextChunk(keyword=data[:keyword_end].decode("latin1"), chunk_type="iTXt", text=text)
 
 
-def _parse_chunk(chunk_type: str, data: bytes) -> dict | None:
+def _parse_chunk(chunk_type: str, data: bytes) -> _TextChunk | None:
     if chunk_type == "tEXt":
         return _parse_text_chunk(data)
     if chunk_type == "zTXt":
@@ -105,39 +107,40 @@ def _parse_chunk(chunk_type: str, data: bytes) -> dict | None:
     return None
 
 
-def _to_metadata_object(chunks: list[dict]) -> dict:
-    fields: dict[str, Any] = {}
+def _to_metadata_object(chunks: list[_TextChunk]) -> JsonValue:
+    fields: dict[str, JsonValue] = {}
     for chunk in chunks:
-        normalized_text = chunk["text"].strip()
+        normalized_text = chunk.text.strip()
+        parsed_value: JsonValue
         if _looks_like_json(normalized_text):
             try:
-                parsed_value: Any = json.loads(normalized_text)
+                # json.loads is untyped (returns Any); narrow it to JsonValue since
+                # this module only ever feeds it well-formed JSON text or falls back.
+                parsed_value = cast(JsonValue, json.loads(normalized_text))
             except json.JSONDecodeError:
                 parsed_value = normalized_text
         else:
             parsed_value = normalized_text
 
-        existing = fields.get(chunk["keyword"], _MISSING)
-        if existing is _MISSING:
-            fields[chunk["keyword"]] = parsed_value
-        elif isinstance(existing, list):
-            existing.append(parsed_value)
+        if chunk.keyword not in fields:
+            fields[chunk.keyword] = parsed_value
         else:
-            fields[chunk["keyword"]] = [existing, parsed_value]
+            existing = fields[chunk.keyword]
+            if isinstance(existing, list):
+                existing.append(parsed_value)
+            else:
+                fields[chunk.keyword] = [existing, parsed_value]
 
     return {"source": "embedded-png", "fields": fields}
 
 
-_MISSING = object()
-
-
-def read_embedded_metadata_from_png(image_bytes: bytes) -> dict:
+def read_embedded_metadata_from_png(image_bytes: bytes) -> JsonValue:
     """Return ``{"metadata": {...}}`` or ``{}`` (or ``{"error": msg}``)."""
     try:
         if len(image_bytes) < 8 or image_bytes[:8] != PNG_SIGNATURE:
             return {}
 
-        chunks: list[dict] = []
+        chunks: list[_TextChunk] = []
         offset = 8
         total = len(image_bytes)
         found_iend = False
