@@ -9,32 +9,35 @@ See contracts/search.openapi.yaml.
 """
 from __future__ import annotations
 
-if __import__("os").getenv("OTEL_TRACES_EXPORTER"):
+import os
+
+if os.getenv("OTEL_TRACES_EXPORTER"):
     from opentelemetry.instrumentation.auto_instrumentation import initialize as _otel_initialize
     _otel_initialize()
     del _otel_initialize
 
 import asyncio
 import logging
-import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
-
-from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 
 from activity import install_activity
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from search.config import get_config
 from search.rebuild import rebuild_from_catalog
 from search.schemas import (
     BatchDeletePoints,
+    BatchDeleteResponse,
     Health,
     HybridQuery,
+    PointWriteResponse,
     QueryResponse,
+    RebuildResponse,
     SimilarQuery,
     UpsertPoint,
 )
-from search.store import SearchStore
+from search.store import SearchStore, UpsertItem
 
 _config = get_config()
 _store = SearchStore(_config)
@@ -46,7 +49,7 @@ def get_store() -> SearchStore:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     # Best-effort: create the collection so the service is usable out of the box.
     # Never fail startup just because Qdrant is briefly unreachable.
     try:
@@ -98,48 +101,58 @@ def health() -> Health:
 UPSERT_BATCH_MAX = max(1, int(os.getenv("SEARCH_UPSERT_BATCH_MAX", "64")))
 UPSERT_BATCH_WAIT_MS = max(0.0, float(os.getenv("SEARCH_UPSERT_BATCH_WAIT_MS", "10")))
 
+# One waiter: the item to upsert plus the future its HTTP caller is awaiting.
+UpsertWaiter = tuple[UpsertItem, "asyncio.Future[str]"]
+
 # Loop-bound (recreated if the running loop changes, e.g. across TestClient
 # requests) so a Future is never awaited on a foreign loop.
-_upsert_queue: asyncio.Queue | None = None
-_upsert_task: asyncio.Task | None = None
-_upsert_loop: Any = None
+_upsert_queue: asyncio.Queue[UpsertWaiter] | None = None
+_upsert_task: asyncio.Task[None] | None = None
+_upsert_loop: asyncio.AbstractEventLoop | None = None
 
 
-async def _upsert_batch_loop(queue: asyncio.Queue) -> None:
-    """Drain ``queue`` forever, flushing each coalesced batch in one Qdrant upsert."""
+async def _collect_batch(queue: asyncio.Queue[UpsertWaiter]) -> list[UpsertWaiter]:
+    """Drain up to ``UPSERT_BATCH_MAX`` waiters, closing the window
+    ``UPSERT_BATCH_WAIT_MS`` after the first one arrives."""
     loop = asyncio.get_running_loop()
+    batch = [await queue.get()]
+    deadline = loop.time() + UPSERT_BATCH_WAIT_MS / 1000.0
+    while len(batch) < UPSERT_BATCH_MAX:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
+        try:
+            batch.append(await asyncio.wait_for(queue.get(), remaining))
+        except TimeoutError:
+            break
+    return batch
+
+
+def _resolve_batch(batch: list[UpsertWaiter], store: SearchStore) -> None:
+    """Flush one coalesced batch and settle every waiter's future (success or the
+    same shared failure)."""
+    items = [item for item, _ in batch]
+    try:
+        store.ensure_collection()  # cached after first call (no round-trip)
+        ids = store.upsert_points(items)
+        for (_, fut), pid in zip(batch, ids, strict=True):
+            if not fut.done():
+                fut.set_result(pid)
+    except Exception as exc:  # propagate the same failure to every waiter
+        for _, fut in batch:
+            if not fut.done():
+                fut.set_exception(exc)
+
+
+async def _upsert_batch_loop(queue: asyncio.Queue[UpsertWaiter]) -> None:
+    """Drain ``queue`` forever, flushing each coalesced batch in one Qdrant upsert."""
     store = get_store()
     while True:
-        item, fut = await queue.get()
-        batch: list[tuple[tuple, asyncio.Future]] = [(item, fut)]
-        deadline = loop.time() + UPSERT_BATCH_WAIT_MS / 1000.0
-        while len(batch) < UPSERT_BATCH_MAX:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                break
-            try:
-                batch.append(await asyncio.wait_for(queue.get(), remaining))
-            except asyncio.TimeoutError:
-                break
-
-        items = [it for it, _ in batch]
-
-        def _flush() -> list[str]:
-            store.ensure_collection()  # cached after first call (no round-trip)
-            return store.upsert_points(items)
-
-        try:
-            ids = await asyncio.to_thread(_flush)
-            for (_, f), pid in zip(batch, ids):
-                if not f.done():
-                    f.set_result(pid)
-        except Exception as exc:  # propagate the same failure to every waiter
-            for _, f in batch:
-                if not f.done():
-                    f.set_exception(exc)
+        batch = await _collect_batch(queue)
+        await asyncio.to_thread(_resolve_batch, batch, store)
 
 
-def _get_upsert_queue() -> asyncio.Queue:
+def _get_upsert_queue() -> asyncio.Queue[UpsertWaiter]:
     """Return (lazily creating) the per-loop upsert queue + its drain task."""
     global _upsert_queue, _upsert_task, _upsert_loop
     loop = asyncio.get_running_loop()
@@ -151,18 +164,22 @@ def _get_upsert_queue() -> asyncio.Queue:
 
 
 @app.post("/points")
-async def upsert_point(point: UpsertPoint) -> dict:
-    fut: asyncio.Future = asyncio.get_running_loop().create_future()
-    await _get_upsert_queue().put((
-        (point.sha256, point.dense, point.sparse, point.payload, point.description),
-        fut,
-    ))
+async def upsert_point(point: UpsertPoint) -> PointWriteResponse:
+    fut: asyncio.Future[str] = asyncio.get_running_loop().create_future()
+    item = UpsertItem(
+        sha256=point.sha256,
+        dense=point.dense,
+        sparse=point.sparse,
+        payload=point.payload,
+        description=point.description,
+    )
+    await _get_upsert_queue().put((item, fut))
     point_id = await fut
-    return {"status": "ok", "id": point_id, "sha256": point.sha256.lower()}
+    return PointWriteResponse(id=point_id, sha256=point.sha256.lower())
 
 
 @app.delete("/points/{sha256}")
-def delete_point(sha256: str) -> dict:
+def delete_point(sha256: str) -> PointWriteResponse:
     """Delete the point for ``sha256`` (keyed by uuid5). Idempotent.
 
     Part of un-indexing an image: the gateway calls this after the catalog
@@ -172,11 +189,11 @@ def delete_point(sha256: str) -> dict:
     store = get_store()
     store.ensure_collection()
     point_id = store.delete_point(sha256)
-    return {"status": "ok", "id": point_id, "sha256": sha256.lower()}
+    return PointWriteResponse(id=point_id, sha256=sha256.lower())
 
 
 @app.post("/points/batch-delete")
-def delete_points(body: BatchDeletePoints) -> dict:
+def delete_points(body: BatchDeletePoints) -> BatchDeleteResponse:
     """Delete MANY points in ONE Qdrant call (bulk un-index). Idempotent.
 
     The gateway calls this after the catalog records are gone, with the sha256s
@@ -184,7 +201,7 @@ def delete_points(body: BatchDeletePoints) -> dict:
     store = get_store()
     store.ensure_collection()
     ids = store.delete_points(body.sha256s)
-    return {"status": "ok", "count": len(ids)}
+    return BatchDeleteResponse(count=len(ids))
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -225,7 +242,7 @@ def by_image(body: SimilarQuery) -> QueryResponse:
 
 
 @app.post("/rebuild", status_code=status.HTTP_202_ACCEPTED)
-def rebuild() -> dict:
+def rebuild() -> RebuildResponse:
     store = get_store()
     upserted = rebuild_from_catalog(store, store.config)
-    return {"status": "ok", "upserted": upserted}
+    return RebuildResponse(upserted=upserted)

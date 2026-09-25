@@ -5,14 +5,15 @@ from __future__ import annotations
 
 import hashlib
 
-import pytest
-from fastapi.testclient import TestClient
-
 import app as app_module
+import pytest
 from conftest import TEST_COLLECTION
+from fastapi.testclient import TestClient
 from id_scheme import point_id_for_sha256
 from search import rebuild as rebuild_module
 from search.config import DENSE_DIM
+from search.rebuild import CatalogImage
+from search.schemas import SparseVector
 
 client = TestClient(app_module.app)
 store = app_module.get_store()
@@ -29,19 +30,19 @@ def _dense(seed: int) -> list[float]:
 
 
 CATALOG_ITEMS = [
-    {
-        "sha256": _sha("cat-1"),
-        "dense": _dense(1),
-        "sparse": {"indices": [1, 2], "values": [0.5, 0.5]},
-        "payload": {"name": "cat-1"},
-    },
-    {
-        "sha256": _sha("cat-2"),
-        "dense": _dense(2),
-        "payload": {"name": "cat-2"},
-    },
+    CatalogImage(
+        sha256=_sha("cat-1"),
+        dense=_dense(1),
+        sparse=SparseVector(indices=[1, 2], values=[0.5, 0.5]),
+        payload={"name": "cat-1"},
+    ),
+    CatalogImage(
+        sha256=_sha("cat-2"),
+        dense=_dense(2),
+        payload={"name": "cat-2"},
+    ),
     # No dense vector -> must be skipped (nothing to index on).
-    {"sha256": _sha("cat-3"), "payload": {"name": "cat-3"}},
+    CatalogImage(sha256=_sha("cat-3"), payload={"name": "cat-3"}),
 ]
 
 
@@ -73,8 +74,10 @@ def test_rebuild_upserts_catalog_items(monkeypatch):
     stored = store.client.retrieve(TEST_COLLECTION, ids=[id1, id2], with_payload=True)
     by_id = {str(p.id): p for p in stored}
     assert set(by_id) == {id1, id2}
-    assert by_id[id1].payload["name"] == "cat-1"
-    assert by_id[id1].payload["sha256"] == _sha("cat-1")
+    payload1 = by_id[id1].payload
+    assert payload1 is not None
+    assert payload1["name"] == "cat-1"
+    assert payload1["sha256"] == _sha("cat-1")
 
     # The skipped item is absent.
     id3 = point_id_for_sha256(_sha("cat-3"))

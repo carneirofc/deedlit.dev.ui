@@ -10,11 +10,10 @@ from __future__ import annotations
 import hashlib
 import uuid
 
-import pytest
-from fastapi.testclient import TestClient
-
 import app as app_module
+import pytest
 from conftest import TEST_COLLECTION
+from fastapi.testclient import TestClient
 from id_scheme import NAMESPACE, point_id_for_sha256
 from search.config import (
     DENSE_DIM,
@@ -22,6 +21,7 @@ from search.config import (
     DESCRIPTION_VECTOR_NAME,
     SPARSE_VECTOR_NAME,
 )
+from search.store import UpsertItem
 
 client = TestClient(app_module.app)
 store = app_module.get_store()
@@ -84,6 +84,7 @@ def _seed(_clean_collection):
 def test_collection_has_named_dense_and_sparse_vectors():
     info = store.client.get_collection(TEST_COLLECTION)
     vectors = info.config.params.vectors
+    assert isinstance(vectors, dict)
     assert DENSE_VECTOR_NAME in vectors
     assert vectors[DENSE_VECTOR_NAME].size == DENSE_DIM
     # Cosine distance on the dense named vector.
@@ -95,6 +96,7 @@ def test_collection_has_named_dense_and_sparse_vectors():
 def test_collection_has_description_dense_vector():
     info = store.client.get_collection(TEST_COLLECTION)
     vectors = info.config.params.vectors
+    assert isinstance(vectors, dict)
     # The description (CLIP text) vector lives in the same space as the image one.
     assert DESCRIPTION_VECTOR_NAME in vectors
     assert vectors[DESCRIPTION_VECTOR_NAME].size == DENSE_DIM
@@ -132,16 +134,19 @@ def test_point_id_is_uuid5_of_sha256():
     assert result["id"] == point_id_for_sha256(_sha("idcheck"))
     # The full sha256 is carried in the payload of the stored point.
     stored = store.client.retrieve(TEST_COLLECTION, ids=[expected], with_payload=True)
-    assert stored[0].payload["sha256"] == _sha("idcheck")
+    payload = stored[0].payload
+    assert payload is not None
+    assert payload["sha256"] == _sha("idcheck")
 
 
 def test_upsert_points_writes_whole_batch_in_one_call():
     """The batch upsert writes every point (one Qdrant round-trip) and returns
     their ids in order; each is immediately retrievable (wait=True)."""
     shas = [_sha(f"batch-{i}") for i in range(3)]
-    ids = store.upsert_points(
-        [(s, _dense(800 + i), None, {"name": f"batch{i}"}, None) for i, s in enumerate(shas)]
-    )
+    ids = store.upsert_points([
+        UpsertItem(sha256=s, dense=_dense(800 + i), sparse=None, payload={"name": f"batch{i}"})
+        for i, s in enumerate(shas)
+    ])
     assert ids == [point_id_for_sha256(s) for s in shas]
     for pid in ids:
         assert store.client.retrieve(TEST_COLLECTION, ids=[pid])

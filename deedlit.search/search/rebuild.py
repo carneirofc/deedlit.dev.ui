@@ -20,9 +20,8 @@ it without requiring a running catalog.
 """
 from __future__ import annotations
 
-from typing import Any
-
 import httpx
+from pydantic import BaseModel, JsonValue, TypeAdapter, field_validator
 
 from search.config import SearchConfig
 from search.schemas import SparseVector
@@ -32,9 +31,28 @@ from search.store import SearchStore
 PAGE_SIZE = 500
 
 
-def fetch_catalog_images(config: SearchConfig) -> list[dict[str, Any]]:
+class CatalogImage(BaseModel):
+    """One ``GET /images`` record from deedlit.catalog (only the fields this
+    service reads; extra catalog fields are ignored)."""
+
+    sha256: str | None = None
+    dense: list[float] | None = None
+    sparse: SparseVector | None = None
+    payload: dict[str, JsonValue] | None = None
+
+    @field_validator("sparse", mode="before")
+    @classmethod
+    def _empty_sparse_is_none(cls, value: JsonValue) -> JsonValue:
+        # Catalog may send ``{}``/``null`` for images without a sparse vector.
+        return value or None
+
+
+_CATALOG_PAGE_ADAPTER: TypeAdapter[list[CatalogImage]] = TypeAdapter(list[CatalogImage])
+
+
+def fetch_catalog_images(config: SearchConfig) -> list[CatalogImage]:
     """Fetch all image records from the catalog service (paged)."""
-    items: list[dict[str, Any]] = []
+    items: list[CatalogImage] = []
     offset = 0
     with httpx.Client(timeout=30.0) as client:
         while True:
@@ -43,7 +61,7 @@ def fetch_catalog_images(config: SearchConfig) -> list[dict[str, Any]]:
                 params={"limit": PAGE_SIZE, "offset": offset},
             )
             resp.raise_for_status()
-            page = resp.json()
+            page = _CATALOG_PAGE_ADAPTER.validate_json(resp.content)
             if not page:
                 break
             items.extend(page)
@@ -51,13 +69,6 @@ def fetch_catalog_images(config: SearchConfig) -> list[dict[str, Any]]:
                 break
             offset += PAGE_SIZE
     return items
-
-
-def _sparse_from(item: dict[str, Any]) -> SparseVector | None:
-    sparse = item.get("sparse")
-    if not sparse:
-        return None
-    return SparseVector(indices=sparse["indices"], values=sparse["values"])
 
 
 def rebuild_from_catalog(store: SearchStore, config: SearchConfig) -> int:
@@ -73,15 +84,13 @@ def rebuild_from_catalog(store: SearchStore, config: SearchConfig) -> int:
 
     upserted = 0
     for item in items:
-        dense = item.get("dense")
-        sha256 = item.get("sha256")
-        if not dense or not sha256:
+        if not item.dense or not item.sha256:
             continue
         store.upsert_point(
-            sha256=sha256,
-            dense=dense,
-            sparse=_sparse_from(item),
-            payload=item.get("payload") or {},
+            sha256=item.sha256,
+            dense=item.dense,
+            sparse=item.sparse,
+            payload=item.payload or {},
         )
         upserted += 1
     return upserted

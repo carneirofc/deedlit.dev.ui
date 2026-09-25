@@ -11,21 +11,42 @@ without reversing the uuid5.
 """
 from __future__ import annotations
 
-from typing import Any
-
-from qdrant_client import QdrantClient, models
+from dataclasses import dataclass
 
 from id_scheme import point_id_for_sha256
+from pydantic import JsonValue, TypeAdapter
+from qdrant_client import QdrantClient, models
+
 from search.config import (
     DENSE_VECTOR_NAME,
     DESCRIPTION_VECTOR_NAME,
     SPARSE_VECTOR_NAME,
     SearchConfig,
 )
-from search.schemas import Hit, SparseVector
+from search.schemas import FusionKind, Hit, SparseVector
 
 # Where we stash the cross-service sha256 inside each point's payload.
 SHA256_PAYLOAD_KEY = "sha256"
+
+_PAYLOAD_ADAPTER: TypeAdapter[dict[str, JsonValue]] = TypeAdapter(dict[str, JsonValue])
+
+# What a stored point's vector dict may carry: the dense/description image-space
+# vectors plus the optional sparse (SPLADE) vector, keyed by named-vector name.
+# Typed as ``models.Vector`` (not just ``list[float] | models.SparseVector``) so it
+# matches ``PointStruct.vector``'s ``Dict[str, Vector]`` branch exactly — dict value
+# types are invariant, so a narrower alias would not be assignable.
+PointVector = dict[str, models.Vector]
+
+
+@dataclass(frozen=True, slots=True)
+class UpsertItem:
+    """One point to write: matches :class:`search.schemas.UpsertPoint` minus HTTP concerns."""
+
+    sha256: str
+    dense: list[float]
+    sparse: SparseVector | None
+    payload: dict[str, JsonValue] | None
+    description: list[float] | None = None
 
 
 class SearchStore:
@@ -92,31 +113,24 @@ class SearchStore:
 
     # -- writes -------------------------------------------------------------
 
-    def _point_struct(
-        self,
-        sha256: str,
-        dense: list[float],
-        sparse: SparseVector | None,
-        payload: dict[str, Any] | None,
-        description: list[float] | None = None,
-    ) -> Any:
+    def _point_struct(self, item: UpsertItem) -> models.PointStruct:
         """Build one PointStruct (id = uuid5(sha256), named vectors + payload).
 
-        ``description`` is the optional CLIP-text vector; stored under its own
-        named vector only when present so a point without one still indexes on
-        ``dense`` (+ ``sparse``)."""
-        vector: dict[str, Any] = {DENSE_VECTOR_NAME: dense}
-        if description is not None:
-            vector[DESCRIPTION_VECTOR_NAME] = description
-        if sparse is not None:
+        ``item.description`` is the optional CLIP-text vector; stored under its
+        own named vector only when present so a point without one still indexes
+        on ``dense`` (+ ``sparse``)."""
+        vector: PointVector = {DENSE_VECTOR_NAME: item.dense}
+        if item.description is not None:
+            vector[DESCRIPTION_VECTOR_NAME] = item.description
+        if item.sparse is not None:
             vector[SPARSE_VECTOR_NAME] = models.SparseVector(
-                indices=sparse.indices, values=sparse.values
+                indices=item.sparse.indices, values=item.sparse.values
             )
-        full_payload = dict(payload or {})
+        full_payload: dict[str, JsonValue] = dict(item.payload or {})
         # Always carry the canonical cross-service id in the payload.
-        full_payload[SHA256_PAYLOAD_KEY] = sha256.lower()
+        full_payload[SHA256_PAYLOAD_KEY] = item.sha256.lower()
         return models.PointStruct(
-            id=point_id_for_sha256(sha256), vector=vector, payload=full_payload
+            id=point_id_for_sha256(item.sha256), vector=vector, payload=full_payload
         )
 
     def upsert_point(
@@ -124,18 +138,16 @@ class SearchStore:
         sha256: str,
         dense: list[float],
         sparse: SparseVector | None,
-        payload: dict[str, Any] | None,
+        payload: dict[str, JsonValue] | None,
         description: list[float] | None = None,
     ) -> str:
         """Upsert one point keyed by uuid5(sha256). Returns the point id."""
-        return self.upsert_points(
-            [(sha256, dense, sparse, payload, description)]
-        )[0]
+        item = UpsertItem(
+            sha256=sha256, dense=dense, sparse=sparse, payload=payload, description=description
+        )
+        return self.upsert_points([item])[0]
 
-    def upsert_points(
-        self,
-        items: list[tuple[str, list[float], SparseVector | None, dict[str, Any] | None, list[float] | None]],
-    ) -> list[str]:
+    def upsert_points(self, items: list[UpsertItem]) -> list[str]:
         """Upsert MANY points in ONE Qdrant call. Returns the point ids in order.
 
         The ingest hot path posts one point per image, but a scaled worker pool
@@ -148,9 +160,9 @@ class SearchStore:
         """
         if not items:
             return []
-        points = [self._point_struct(*item) for item in items]
+        points = [self._point_struct(item) for item in items]
         self.client.upsert(collection_name=self.collection, points=points, wait=True)
-        return [p.id for p in points]
+        return [point_id_for_sha256(item.sha256) for item in items]
 
     def delete_point(self, sha256: str) -> str:
         """Delete the point keyed by ``uuid5(sha256)``. Idempotent.
@@ -175,40 +187,61 @@ class SearchStore:
         """
         if not sha256s:
             return []
-        point_ids = [point_id_for_sha256(s) for s in sha256s]
+        point_ids: list[models.ExtendedPointId] = [point_id_for_sha256(s) for s in sha256s]
         self.client.delete(
             collection_name=self.collection,
             points_selector=models.PointIdsList(points=point_ids),
         )
-        return point_ids
+        return [str(pid) for pid in point_ids]
 
     # -- reads --------------------------------------------------------------
 
-    def _to_hits(self, points: list[Any]) -> list[Hit]:
-        hits: list[Hit] = []
-        for p in points:
-            payload = p.payload or {}
-            sha = payload.get(SHA256_PAYLOAD_KEY)
-            if not sha:
-                # Can't map back to a cross-service id; skip rather than emit junk.
-                continue
-            hits.append(Hit(sha256=sha, score=float(p.score), payload=payload))
-        return hits
+    def _to_hit(self, point: models.ScoredPoint) -> Hit | None:
+        payload = _PAYLOAD_ADAPTER.validate_python(point.payload or {})
+        sha = payload.get(SHA256_PAYLOAD_KEY)
+        if not isinstance(sha, str) or not sha:
+            # Can't map back to a cross-service id; skip rather than emit junk.
+            return None
+        return Hit(sha256=sha, score=float(point.score), payload=payload)
 
-    def _filter(self, raw: dict[str, Any] | None) -> models.Filter | None:
+    def _to_hits(self, points: list[models.ScoredPoint]) -> list[Hit]:
+        hits = (self._to_hit(p) for p in points)
+        return [hit for hit in hits if hit is not None]
+
+    def _filter(self, raw: dict[str, JsonValue] | None) -> models.Filter | None:
         if not raw:
             return None
-        return models.Filter(**raw)
+        return models.Filter.model_validate(raw)
+
+    def _prefetch_modalities(
+        self,
+        dense: list[float] | None,
+        sparse: SparseVector | None,
+        description: list[float] | None,
+    ) -> list[tuple[FusionKind, str, list[float] | models.SparseVector]]:
+        """(fusion-name, named-vector, query) per supplied modality, in fusion order."""
+        modalities: list[tuple[FusionKind, str, list[float] | models.SparseVector]] = []
+        if dense is not None:
+            modalities.append(("dense", DENSE_VECTOR_NAME, dense))
+        if description is not None:
+            modalities.append(("description", DESCRIPTION_VECTOR_NAME, description))
+        if sparse is not None:
+            modalities.append((
+                "sparse",
+                SPARSE_VECTOR_NAME,
+                models.SparseVector(indices=sparse.indices, values=sparse.values),
+            ))
+        return modalities
 
     def query_hybrid(
         self,
         dense: list[float] | None,
         sparse: SparseVector | None,
         limit: int,
-        query_filter: dict[str, Any] | None = None,
+        query_filter: dict[str, JsonValue] | None = None,
         description: list[float] | None = None,
         offset: int = 0,
-    ) -> tuple[str, list[Hit]]:
+    ) -> tuple[FusionKind, list[Hit]]:
         """Run a query and return (fusion, hits).
 
         Accepts any subset of the three modalities (image ``dense``, ``description``
@@ -221,19 +254,7 @@ class SearchStore:
         are enough fused candidates to skip past.
         """
         qfilter = self._filter(query_filter)
-
-        # (fusion-name, named-vector, query) per supplied modality, in fusion order.
-        modalities: list[tuple[str, str, Any]] = []
-        if dense is not None:
-            modalities.append(("dense", DENSE_VECTOR_NAME, dense))
-        if description is not None:
-            modalities.append(("description", DESCRIPTION_VECTOR_NAME, description))
-        if sparse is not None:
-            modalities.append((
-                "sparse",
-                SPARSE_VECTOR_NAME,
-                models.SparseVector(indices=sparse.indices, values=sparse.values),
-            ))
+        modalities = self._prefetch_modalities(dense, sparse, description)
 
         if not modalities:
             raise ValueError("query requires at least one of dense/description/sparse")
@@ -267,11 +288,24 @@ class SearchStore:
         )
         return "rrf", self._to_hits(result.points)
 
+    def _exclude_self_filter(
+        self, sha256: str, query_filter: dict[str, JsonValue] | None
+    ) -> models.Filter | None:
+        """The ``query_filter`` for :meth:`query_similar`: the caller's filter (if
+        any) plus a ``must_not`` on ``sha256`` so the query point never eats a
+        result slot (keeps offset paging exact)."""
+        merged = dict(query_filter or {})
+        raw_must_not = merged.get("must_not")
+        must_not = list(raw_must_not) if isinstance(raw_must_not, list) else []
+        must_not.append({"key": SHA256_PAYLOAD_KEY, "match": {"value": sha256.lower()}})
+        merged["must_not"] = must_not
+        return self._filter(merged)
+
     def query_similar(
         self,
         sha256: str,
         limit: int,
-        query_filter: dict[str, Any] | None = None,
+        query_filter: dict[str, JsonValue] | None = None,
         offset: int = 0,
     ) -> list[Hit]:
         """Nearest neighbors to a stored point's dense vector (excludes self).
@@ -291,17 +325,13 @@ class SearchStore:
         # Exclude the query point itself with a payload filter so it never eats a
         # result slot — keeps offset paging exact even when a user filter is also
         # in play (its conditions merge with ours).
-        merged = dict(query_filter or {})
-        must_not = list(merged.get("must_not") or [])
-        must_not.append({"key": SHA256_PAYLOAD_KEY, "match": {"value": sha256.lower()}})
-        merged["must_not"] = must_not
         result = self.client.query_points(
             collection_name=self.collection,
             query=point_id,
             using=DENSE_VECTOR_NAME,
             limit=limit,
             offset=offset,
-            query_filter=self._filter(merged),
+            query_filter=self._exclude_self_filter(sha256, query_filter),
             with_payload=True,
         )
         return self._to_hits(result.points)
