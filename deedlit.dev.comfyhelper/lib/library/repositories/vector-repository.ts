@@ -169,15 +169,15 @@ export async function searchByVectorDetailed(
 ): Promise<ScoredHit[]> {
   const { qdrantCollection } = getLibraryConfig();
   const { scoreThreshold, hnswEf = DEFAULT_HNSW_EF, exact = false, withPayload = false } = options;
-  const result = await getQdrant().search(qdrantCollection, {
-    vector,
+  const { points } = await getQdrant().query(qdrantCollection, {
+    query: vector,
     limit,
     filter: filter as Record<string, unknown> | undefined,
     score_threshold: scoreThreshold && scoreThreshold > 0 ? scoreThreshold : undefined,
     params: { hnsw_ef: hnswEf, exact },
     with_payload: withPayload,
   });
-  return result.map((r) => ({
+  return points.map((r) => ({
     id: String(r.id),
     score: r.score,
     payload: withPayload ? ((r.payload as Record<string, unknown> | null) ?? null) : undefined,
