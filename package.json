@@ -52,7 +52,7 @@
     "prod:all": "npm run prod:infra && npm run prod:build && npm run prod"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
-    "concurrently": "^10.0.3"
+    "@biomejs/biome": "2.5.14",
+    "concurrently": "^10.0.5"
   }
 }
