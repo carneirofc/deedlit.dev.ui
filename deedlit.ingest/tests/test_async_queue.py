@@ -227,26 +227,17 @@ def test_publish_embed_dense_best_effort_happy_path(monkeypatch):
     assert seen == [("a" * 64, "job1")]
 
 
-def test_folder_ingest_completes_when_broker_is_down(tmp_path, monkeypatch):
-    """Broker-outage safety net: the catalog write lands and the job completes
-    even when publishing the index task fails (reconcile re-enqueues later)."""
+def test_folder_ingest_marks_files_failed_when_broker_is_down(tmp_path, monkeypatch):
+    """Broker-outage safety net: RabbitMQ is the durability boundary (ADR 0002),
+    so a failed ``ingest`` publish marks the file failed with no inline fallback,
+    and the job still completes. The next scan re-enqueues it."""
     store = jobs_module.JobStore()
     monkeypatch.setattr(app_module, "store", store)
-    monkeypatch.setattr(pipeline, "extract_metadata", lambda d, f, m: {"prompt": "p", "tags": []})
-    monkeypatch.setattr(pipeline, "_post_with_retry", lambda *a, **k: None)
-    monkeypatch.setattr(pipeline, "_put_blob_with_retry", lambda *a, **k: None)
 
-    async def boom(sha256, parent_op_id=None):
+    async def boom(*a, **k):
         raise RuntimeError("broker down")
 
-    # Every per-stage publish fails (broker down). The inline fast-path catalog
-    # write still lands, so the image is cataloged-but-unprojected and the job
-    # completes; reconcile / backfill re-enqueue the stages later (ADR 0002).
-    for name in (
-        "publish_embed_dense_task", "publish_embed_sparse_task",
-        "publish_index_graph_task", "publish_label_task",
-    ):
-        monkeypatch.setattr(broker_module, name, boom)
+    monkeypatch.setattr(broker_module, "publish_ingest_task", boom)
 
     (tmp_path / "a.png").write_bytes(_png_bytes((7, 8, 9)))
     with TestClient(app_module.app) as client:
@@ -254,8 +245,8 @@ def test_folder_ingest_completes_when_broker_is_down(tmp_path, monkeypatch):
         final = _wait_for(client, job_id, {"completed", "failed"})
 
     assert final["status"] == "completed"
-    assert final["progress"]["done"] == 1
-    assert final["progress"]["failed"] == 0
+    assert final["progress"]["done"] == 0
+    assert final["progress"]["failed"] == 1
 
 
 # ---------------------------------------------------------------------------
