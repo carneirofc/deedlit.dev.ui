@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { method, nextUrl } = req;
   const path = nextUrl.pathname + (nextUrl.search || "");
   const ts = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
