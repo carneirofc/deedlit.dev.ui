@@ -36,7 +36,6 @@ export function DbImageRow({ image, isSelected, isPicked, onTogglePick, onSelect
         className="flex min-w-0 flex-1 items-center gap-2 text-left text-ui-xs"
         data-testid={`db-open-${image.sha256}`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/library/images/${image.sha256}/thumbnail`}
           alt=""

@@ -69,7 +69,6 @@ export function useSimilarImages(
     const ac = new AbortController();
     // Data-fetching effect: marking the loading state synchronously before the
     // async call is the sanctioned fetch-in-effect pattern (not derived state).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSuggestLoading(true);
     fetchSimilarImages(imageId, settings.similarCount, settings.similarMinScore, ac.signal)
       .then((results) => {

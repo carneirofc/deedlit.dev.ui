@@ -40,7 +40,6 @@ export function useCompareData(idsParam: string) {
 
   useEffect(() => {
     load(ids);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsParam]);
 
   return { ids, data, error, loading };

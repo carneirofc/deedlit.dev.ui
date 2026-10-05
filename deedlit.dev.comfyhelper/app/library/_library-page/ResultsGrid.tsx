@@ -30,7 +30,6 @@ type ResultGalleryProps = z.infer<typeof ResultGalleryPropsSchema>;
 
 function ResultMedia(r: CompactResult, ctx: GalleryItemContext, limit: number) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={r.gridUrl ?? r.thumbnailUrl}
       alt={r.summary}

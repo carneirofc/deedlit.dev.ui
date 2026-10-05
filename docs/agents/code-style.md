@@ -1,6 +1,6 @@
 # Code Style: Types & Function Size
 
-Repo-wide rules for every TypeScript and Python package. Enforced by `eslint.config.base.mjs` (TS) and `ruff.toml` + basedpyright (Python). Package guides link here instead of restating the rules.
+Repo-wide rules for every TypeScript and Python package. Enforced by `biome.jsonc` (TS) and `ruff.toml` + basedpyright (Python). Package guides link here instead of restating the rules.
 
 ## TypeScript — zod is the only source of types
 - Every type is derived from a zod schema: `const XSchema = z.object({...})` then `export type X = z.infer<typeof XSchema>`. Reference: `deedlit.dev.comfyhelper/lib/library/schemas.ts`.
@@ -34,6 +34,6 @@ Repo-wide rules for every TypeScript and Python package. Enforced by `eslint.con
 - Prefer extracting a named helper over nesting; early-return instead of deep `if` pyramids.
 
 ## Enforcement
-- TS: `@typescript-eslint/no-explicit-any`, `no-restricted-syntax` (bans `TSInterfaceDeclaration` / `TSTypeLiteral`), `max-lines-per-function`, `complexity`. Relaxed to warnings in stories, tests, e2e, and `*.d.ts`.
+- TS (Biome): `suspicious/noExplicitAny`; the GritQL plugin `biome-plugins/no-hand-written-types.grit` (bans `TsInterfaceDeclaration` / `TsObjectType`); `complexity/noExcessiveLinesPerFunction` (40 lines, 60 in `*.tsx`); `complexity/noExcessiveCognitiveComplexity` (15, warning only — Biome has no cyclomatic rule). Size rules are off in tests, stories and e2e; the plugin skips those plus `*.d.ts`. A justified exception uses `// biome-ignore lint/plugin: <reason>`.
 - Python: ruff `ANN`, `TID251` (bans `typing.Any` / `TypedDict` / `NamedTuple`), `C90`, `PLR0915`; basedpyright `strict` with `reportAny` / `reportExplicitAny`. Tests relax annotation and size rules.
-- Run: `npm run lint` (all TS workspaces + `lint:py`).
+- Run: `npm run lint` (Biome, whole repo) and `npm run lint:py`.

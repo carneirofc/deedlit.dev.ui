@@ -14,7 +14,7 @@ import { useState, useCallback } from "react";
 // Generic hook parameter: the object shape is parameterized by T, so it cannot
 // be expressed as a zod schema (zod schemas are not generic over a
 // caller-supplied type parameter).
-// eslint-disable-next-line no-restricted-syntax -- see comment above
+// biome-ignore lint/plugin: see comment above
 export function useControllableState<T>(options: {
   value?: T;
   defaultValue: T;

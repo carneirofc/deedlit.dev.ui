@@ -1,0 +1,17 @@
+engine biome(1.0)
+language js(typescript,jsx)
+
+// docs/agents/code-style.md: every type is derived from a zod schema via
+// z.infer, so hand-written interfaces and object type literals are banned.
+// Biome overrides cannot switch a plugin off per path, so the exemptions
+// (tests, e2e, stories, third-party *.d.ts augmentation) live here.
+or {
+  TsInterfaceDeclaration(),
+  TsObjectType()
+} as $node where {
+  not $filename <: r".*(/tests/|/e2e/|\.stories\.tsx$|\.unit\.ts$|\.test\.tsx?$|\.d\.ts$).*",
+  register_diagnostic(
+    span = $node,
+    message = "Hand-written object type: derive it from a zod schema with z.infer (docs/agents/code-style.md)."
+  )
+}

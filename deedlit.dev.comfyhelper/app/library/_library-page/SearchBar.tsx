@@ -31,7 +31,6 @@ type SimilarQueryBannerProps = z.infer<typeof SimilarQueryBannerPropsSchema>;
 function SimilarQueryBanner({ similarRef, onClear }: SimilarQueryBannerProps) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-accent-cyan/40 bg-accent-cyan/5 p-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={similarRef.thumbUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-ui-border/60 object-cover" />
       <div className="min-w-0 flex-1">
         <p className="text-ui-xs font-medium text-accent-cyan">Showing images similar to</p>

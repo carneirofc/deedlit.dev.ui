@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
 
   // One config for the whole monorepo. Biome replaced ESLint: `deedlit.dev`
   // ran `next lint`, which Next 16 removed, and comfyhelper had its own
@@ -87,6 +87,22 @@
         "noRedundantAlt": "warn"
       },
 
+      // docs/agents/code-style.md: functions ~40 lines, components ~60 (see
+      // the *.tsx override). Biome only has cognitive complexity, not
+      // cyclomatic; 15 is its default and roughly matches cyclomatic 10.
+      "complexity": {
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": { "maxLines": 40, "skipBlankLines": true }
+        },
+        // Warn, not error: five existing functions score 16-22. They are the
+        // backlog, same as the a11y warnings above.
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": { "maxAllowedComplexity": 15 }
+        }
+      },
+
       "correctness": {
         // Was react-hooks/exhaustive-deps, a warning under eslint-config-next.
         // Same severity here, so the migration changes nothing.
@@ -118,6 +134,10 @@
     }
   },
 
+  // Code-style rules from docs/agents/code-style.md that Biome has no built-in
+  // rule for. noExplicitAny is already on through the recommended preset.
+  "plugins": ["./biome-plugins/no-hand-written-types.grit"],
+
   "assist": {
     "enabled": true,
     "actions": {
@@ -130,6 +150,40 @@
   },
 
   "overrides": [
+    {
+      // Components get ~60 lines instead of ~40 (docs/agents/code-style.md).
+      "includes": ["**/*.tsx"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": {
+              "level": "error",
+              "options": { "maxLines": 60, "skipBlankLines": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      // Size rules are relaxed in tests, stories and e2e, as they were under
+      // ESLint: test bodies are long by nature. The hand-written-type plugin
+      // exempts the same paths itself (see the .grit file).
+      "includes": [
+        "**/tests/**",
+        "**/e2e/**",
+        "**/*.test.{ts,tsx}",
+        "**/*.unit.ts",
+        "**/*.stories.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off",
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    },
     {
       // Module augmentation (e.g. src/types/next-auth.d.ts) legitimately
       // widens third-party types.

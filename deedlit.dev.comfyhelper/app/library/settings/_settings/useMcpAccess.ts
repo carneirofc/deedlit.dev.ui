@@ -15,7 +15,7 @@ function useMcpEndpoint() {
     // to the absolute origin once mounted — computing it during render would
     // mismatch the server-rendered HTML.
     if (typeof window !== "undefined") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safe swap-after-mount, not derivable state
+      // SSR-safe swap-after-mount, not derivable state
       setEndpoint(`${window.location.origin}/api/mcp`);
     }
   }, []);

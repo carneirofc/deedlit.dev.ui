@@ -14,7 +14,6 @@ export function useLightboxDetails(current: LightboxItem | undefined, detailsOpe
     let alive = true;
     // Data-fetching effect: marking the loading state synchronously before the
     // async call is the sanctioned fetch-in-effect pattern (not derived state).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDetailLoading(true);
     setDetail(null);
     setDetailError(false);
@@ -27,7 +26,7 @@ export function useLightboxDetails(current: LightboxItem | undefined, detailsOpe
       .catch(() => { if (alive) setDetailError(true); })
       .finally(() => { if (alive) setDetailLoading(false); });
     return () => { alive = false; };
-  }, [detailsOpen, current?.imageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detailsOpen, current?.imageId]);
 
   return { detail, detailLoading, detailError };
 }

@@ -24,7 +24,6 @@ export function ImageColumns({ images, n, onRemove }: ImageColumnsProps) {
             className="overflow-hidden rounded-xl border border-ui-border/60 hover:border-accent-cyan"
             data-testid={`compare-image-link-${img.id}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={img.imageUrl}
               alt={img.filename}

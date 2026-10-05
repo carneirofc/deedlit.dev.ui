@@ -28,7 +28,6 @@ export function DbImageHeader({
   const path = sourcePath(selected);
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={`/api/library/images/${selected.sha256}/thumbnail`}
         alt={selected.prompt ?? ""}

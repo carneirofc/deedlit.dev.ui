@@ -104,7 +104,6 @@ function useDirectoryBrowse(open: boolean, initialPath: string | undefined, brow
       cancelled = true;
     };
     // Intentionally only re-run when the modal opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return { data, loading, error, manual, setManual, browse };

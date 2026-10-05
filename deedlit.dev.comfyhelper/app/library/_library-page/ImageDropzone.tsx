@@ -34,7 +34,6 @@ export function ImageDropzone({ preview, note, onFile, onClear }: ImageDropzoneP
       }`}
     >
       {preview ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={preview} alt="query" className="h-20 w-20 shrink-0 rounded-lg border border-ui-border/60 object-cover" />
       ) : (
         <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-ui-border/40 text-ui-ink-muted">

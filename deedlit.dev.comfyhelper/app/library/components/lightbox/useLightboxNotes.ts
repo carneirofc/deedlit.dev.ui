@@ -18,14 +18,13 @@ export function useLightboxNotes(
     let alive = true;
     // Data-fetching effect: marking the loading state synchronously before the
     // async call is the sanctioned fetch-in-effect pattern (not derived state).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotesLoading(true);
     fetchNotes(current.imageId)
       .then((n) => { if (alive) setNotes(n); })
       .catch(() => {})
       .finally(() => { if (alive) setNotesLoading(false); });
     return () => { alive = false; };
-  }, [notesOpen, current?.imageId, fetchNotes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notesOpen, current?.imageId, fetchNotes]);
 
   // Reset notes on navigating to a new image (stale data from the old one).
   // Derived during render to avoid a stale-notes flash from an effect.

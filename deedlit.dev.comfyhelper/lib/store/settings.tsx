@@ -272,7 +272,6 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
       const raw = localStorage.getItem(STORAGE_KEY);
       // Syncing React state from an external system (localStorage) on mount,
       // not state derived from props/state — the sanctioned effect pattern.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setSettings(mergeSettings(JSON.parse(raw)));
     } catch {
       // ignore malformed / unavailable storage

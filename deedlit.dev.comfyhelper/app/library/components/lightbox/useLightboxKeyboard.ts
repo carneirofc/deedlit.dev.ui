@@ -15,7 +15,7 @@ export function useLightboxCurrentChangeReport(
   });
   useEffect(() => {
     if (current) onCurrentChangeRef.current?.(current);
-  }, [current?.imageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current?.imageId]);
 }
 
 /** Keep the active filmstrip thumbnail scrolled into view. */

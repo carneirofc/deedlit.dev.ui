@@ -104,7 +104,6 @@ export function LightboxStage({
 
       <StageLoadIndicators imgLoaded={imgLoaded} imgError={imgError} />
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={current.imageId + (fullResolution ? "-hd" : "")}
         src={bigSrc(current, fullResolution)}

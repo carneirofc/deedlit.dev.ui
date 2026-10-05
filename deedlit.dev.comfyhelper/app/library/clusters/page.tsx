@@ -234,7 +234,6 @@ function ClusterCard({ cluster: c, selected, onSelect }: ClusterCardProps) {
       }`}
     >
       <div className="relative overflow-hidden rounded-lg">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/library/images/${c.representativeImageId}/thumbnail`}
           alt={c.label}
@@ -310,7 +309,6 @@ function SelectedClusterSection({ cluster, onClose }: SelectedClusterSectionProp
         {cluster.imageIds.map((id) => (
           <div key={id} className="group relative overflow-hidden rounded-lg border border-ui-border/60">
             <Link href={`/library/${id}`} prefetch={false} data-testid={`clusters-image-link-${id}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/library/images/${id}/thumbnail`}
                 alt=""

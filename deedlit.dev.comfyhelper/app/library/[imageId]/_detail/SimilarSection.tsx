@@ -57,7 +57,6 @@ export function SimilarSection({
               className="group relative overflow-hidden rounded-lg border border-ui-border/60 hover:border-accent-cyan"
               data-testid={`image-detail-similar-link-${s.imageId}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={s.thumbnailUrl} alt={s.summary} loading="lazy" className="aspect-square w-full object-cover" />
               {s.score != null && (
                 <span className="absolute bottom-1 right-1 rounded bg-ui-bg/85 px-1.5 py-0.5 text-ui-2xs font-mono text-accent-cyan">

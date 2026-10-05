@@ -120,7 +120,6 @@ function usePersistedPosition() {
   useEffect(() => {
     const saved = loadSavedPosition();
     // One-time hydration of persisted state from localStorage; see comment above.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setPosition(clampPosition(saved.x, saved.y));
   }, []);
 

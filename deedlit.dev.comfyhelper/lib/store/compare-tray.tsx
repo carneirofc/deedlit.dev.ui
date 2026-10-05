@@ -52,7 +52,6 @@ export function CompareTrayProvider({ children }: CompareTrayProviderProps) {
         // Syncing React state from an external system (sessionStorage) on
         // mount, not state derived from props/state — the sanctioned effect
         // pattern.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (parsed.success) setIds(parsed.data);
       }
     } catch {

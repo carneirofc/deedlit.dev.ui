@@ -47,7 +47,6 @@ export function LightboxFilmstrip({
               i === index ? "border-accent-cyan ring-2 ring-accent-cyan/40" : "border-ui-border/50 opacity-70 hover:opacity-100"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
           </button>
         );

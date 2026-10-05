@@ -17,6 +17,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - `deedlit.labelagent`: labels returned as `ImageLabel`/`HealthStatus` models, no `Any`, passes ruff + basedpyright strict.
 
 ### Added
+- Biome enforcement for the TypeScript code-style rules: GritQL plugin `biome-plugins/no-hand-written-types.grit` bans `interface` and inline object types, `noExcessiveLinesPerFunction` (40 lines, 60 for `*.tsx`), `noExcessiveCognitiveComplexity` (warning). `docs/agents/code-style.md` now points at Biome instead of the removed ESLint config.
+
+### Removed
+- Leftover `eslint-disable` comments in `@carneirofc/ui` and `deedlit.dev.comfyhelper` (Biome ignores them).
 - Python lint enforcement for the code-style rules: shared `ruff.toml` (ANN, banned `Any`/`TypedDict`/`NamedTuple`, complexity/statement limits) and basedpyright strict with `reportAny`/`reportExplicitAny` per service. Root `npm run lint:py`.
 - `zod` added to `deedlit.dev.ui`.
 - `docs/agents/code-style.md`: repo-wide rules — zod-derived TS types (including props), pydantic/dataclass Python models, no `any`/`Any`, small functions. Linked from root and every package `AGENTS.md` and from `CLAUDE.md`.
