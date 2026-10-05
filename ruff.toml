@@ -1,0 +1,35 @@
+# Shared ruff config for every deedlit.<service> package (ruff walks up to this file).
+# Rules: docs/agents/code-style.md
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", "alembic/versions"]
+
+[lint]
+select = [
+  "E", "F", "W", "I", "UP", "B",
+  "ANN",     # full annotations; ANN401 bans Any in signatures
+  "TID251",  # banned-api below
+  "C90",     # cyclomatic complexity
+  "PLR0913", # too many arguments
+  "PLR0915", # too many statements
+]
+ignore = ["E501"]
+
+[lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Use a pydantic model, dataclass, Protocol, union, TypeVar, or pydantic.JsonValue."
+"typing_extensions.Any".msg = "Use a pydantic model, dataclass, Protocol, union, TypeVar, or pydantic.JsonValue."
+"typing.TypedDict".msg = "Use a pydantic BaseModel (I/O) or a dataclass (internal)."
+"typing_extensions.TypedDict".msg = "Use a pydantic BaseModel (I/O) or a dataclass (internal)."
+"typing.NamedTuple".msg = "Use a frozen dataclass."
+"collections.namedtuple".msg = "Use a frozen dataclass."
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-statements = 25
+max-args = 6
+
+[lint.per-file-ignores]
+"**/tests/**" = ["ANN", "PLR0913", "PLR0915", "C90"]
+"**/alembic/**" = ["ANN"]

@@ -49,7 +49,8 @@
     "prod:infra": "npm run infra:up && npm run dev:migrate",
     "prod:build": "npm run build",
     "prod": "mprocs --config mprocs.prod.yaml",
-    "prod:all": "npm run prod:infra && npm run prod:build && npm run prod"
+    "prod:all": "npm run prod:infra && npm run prod:build && npm run prod",
+    "lint:py": "node scripts/lint-py.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
