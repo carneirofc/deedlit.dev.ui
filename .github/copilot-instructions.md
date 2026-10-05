@@ -23,9 +23,9 @@
 - If a task touches shared UI and an app, update the UI package first, then adjust the consuming app.
 
 ## Common Commands
-- Root workspace build: `npm run build`
-- Root shared UI build: `npm run build:ui`
-- Comfyhelper dev: `npm run dev:comfyhelper`
+- Root workspace build: `pnpm build`
+- Root shared UI build: `pnpm build:ui`
+- Comfyhelper dev: `pnpm dev:comfyhelper`
 
 ## Where To Look Next
 - Read the package-local `copilot-instructions.md` before making package-specific changes.

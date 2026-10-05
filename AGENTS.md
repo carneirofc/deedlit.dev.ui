@@ -34,12 +34,12 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - `deedlit.<service>/`: start from `app.py` (FastAPI entry), the package module (`<service>/`), `pyproject.toml`, and `tests/`. Ingest also has `worker.py` (the queue consumer).
 
 ## Command Reference
-- Build shared UI: `npm run build:ui`
-- Run everything (orchestrated): `npm run dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `npm run infra:up`.
-- Run comfyhelper only: `npm run dev:comfyhelper`
-- Build all workspaces: `npm run build`
-- Lint (JS/TS/CSS): `npm run lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `npm run lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
-- Format: `npm run format` reports, `npm run format:write` rewrites. The formatter is configured but has **not** been applied to the tree yet — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change.
+- Build shared UI: `pnpm build:ui`
+- Run everything (orchestrated): `pnpm dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `pnpm infra:up`.
+- Run comfyhelper only: `pnpm dev:comfyhelper`
+- Build all workspaces: `pnpm build`
+- Lint (JS/TS/CSS): `pnpm lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `pnpm lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
+- Format: `pnpm format` reports, `pnpm format:write` rewrites. The formatter is configured but has **not** been applied to the tree yet — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change.
 - `eslint-disable` comments still in `deedlit.dev.comfyhelper/` and `deedlit.dev.ui/` are inert. Biome uses `// biome-ignore <rule>: <reason>`, and the reason is required.
 
 ## Commit Convention
@@ -109,7 +109,7 @@ Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail 
 - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — canonical triage vocabulary.
 - [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.
 
-### Web apps (npm workspace)
+### Web apps (pnpm workspace)
 - The public Next.js site (:3001) — home, books, gallery, PWA, plus the authenticated `/portal` service dashboard — lives in `carneirofc/deedlit.dev.portal`, not here.
 - [`deedlit.dev.comfyhelper/AGENTS.md`](deedlit.dev.comfyhelper/AGENTS.md) — ComfyHelper image-library UI (:3000), gateway client only.
 - [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md) — shared `@carneirofc/ui` component library + tokens.

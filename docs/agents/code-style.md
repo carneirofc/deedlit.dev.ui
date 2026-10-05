@@ -36,4 +36,4 @@ Repo-wide rules for every TypeScript and Python package. Enforced by `biome.json
 ## Enforcement
 - TS (Biome): `suspicious/noExplicitAny`; the GritQL plugin `biome-plugins/no-hand-written-types.grit` (bans `TsInterfaceDeclaration` / `TsObjectType`); `complexity/noExcessiveLinesPerFunction` (40 lines, 60 in `*.tsx`); `complexity/noExcessiveCognitiveComplexity` (15, warning only — Biome has no cyclomatic rule). Size rules are off in tests, stories and e2e; the plugin skips those plus `*.d.ts`. A justified exception uses `// biome-ignore lint/plugin: <reason>`.
 - Python: ruff `ANN`, `TID251` (bans `typing.Any` / `TypedDict` / `NamedTuple`), `C90`, `PLR0915`; basedpyright `strict` with `reportAny` / `reportExplicitAny`. Tests relax annotation and size rules.
-- Run: `npm run lint` (Biome, whole repo) and `npm run lint:py`.
+- Run: `pnpm lint` (Biome, whole repo) and `pnpm lint:py`.

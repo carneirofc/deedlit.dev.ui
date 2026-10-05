@@ -23,8 +23,8 @@ alongside the monorepo landing page at the
 
 ```bash
 # from the repo root
-npm run storybook -w @carneirofc/ui        # dev server on http://localhost:6006
-npm run build-storybook -w @carneirofc/ui  # static build into storybook-static/
+pnpm --filter @carneirofc/ui storybook        # dev server on http://localhost:6006
+pnpm --filter @carneirofc/ui build-storybook  # static build into storybook-static/
 ```
 
 - Stories live next to their component as `src/<Component>.stories.tsx` (CSF).

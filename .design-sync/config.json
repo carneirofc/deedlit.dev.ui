@@ -3,7 +3,7 @@
   "shape": "storybook",
   "storybookConfigDir": "deedlit.dev.ui/.storybook",
   "storybookStatic": ".design-sync/sb-reference",
-  "buildCmd": "cd deedlit.dev.ui && npm run build",
+  "buildCmd": "cd deedlit.dev.ui && pnpm build",
   "readmeHeader": ".design-sync/conventions.md",
   "titleMap": {
     "CyberPanels": "CyberPanel",

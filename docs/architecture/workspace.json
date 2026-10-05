@@ -42,7 +42,7 @@
           } ],
           "tags" : "Container Instance"
         } ],
-        "description" : "npm workspace (Next.js)",
+        "description" : "pnpm workspace (Next.js)",
         "environment" : "Local (Docker Compose)",
         "id" : "59",
         "instances" : "1",

@@ -12,7 +12,6 @@
 
 # Lockfiles: keep as text, but hide from diffs and mark as generated so they
 # don't pollute review/merge noise or language stats.
-package-lock.json   -diff linguist-generated
 uv.lock             -diff linguist-generated
 pnpm-lock.yaml      -diff linguist-generated
 yarn.lock           -diff linguist-generated

@@ -25,4 +25,4 @@ This package is the shared React UI library used by both Next.js apps. It owns r
 - Keep shared UI changes backwards-compatible unless coordinated app updates are part of the same task.
 
 ## Common Command
-- Build the package: `npm run build`
+- Build the package: `pnpm build`

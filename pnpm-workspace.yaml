@@ -1,0 +1,6 @@
+packages:
+  - deedlit.dev.ui
+  - deedlit.dev.comfyhelper
+
+allowBuilds:
+  esbuild: true

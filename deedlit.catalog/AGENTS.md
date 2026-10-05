@@ -16,7 +16,7 @@
 
 ## Work Guidance
 - Follow [`docs/agents/code-style.md`](../docs/agents/code-style.md) (zod/pydantic types, no `any`, small functions).
-- Schema changes go through a new Alembic revision under `alembic/versions/`; apply with `npm run dev:migrate` from repo root.
+- Schema changes go through a new Alembic revision under `alembic/versions/`; apply with `pnpm dev:migrate` from repo root.
 - This service is the durability boundary — persist here before projections (`search`/`graph`) converge.
 
 ## Verification

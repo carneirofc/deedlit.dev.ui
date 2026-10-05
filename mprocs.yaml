@@ -4,27 +4,25 @@
 # holding its port. One pane per service; arrows to switch, r to restart one,
 # q to tear everything down cleanly.
 #
-#   npm run dev            # start everything (datastores must already be up)
-#   npm run infra:up       # start postgres/neo4j/qdrant/rustfs first
+#   pnpm dev            # start everything (datastores must already be up)
+#   pnpm infra:up       # start postgres/neo4j/qdrant/rustfs first
 #
 # Datastores are intentionally NOT managed here — Docker owns their lifecycle.
 
 procs:
-  ui:
-    shell: "npm run dev:dev"        # Next landing app  -> :3001
   comfyhelper:
-    shell: "npm run dev:comfyhelper" # Next comfyhelper -> :3000
-    # shell: "npm run start:comfyhelper" # Next comfyhelper -> :3000
+    shell: "pnpm dev:comfyhelper" # Next comfyhelper -> :3000
+    # shell: "pnpm start:comfyhelper" # Next comfyhelper -> :3000
   api:
-    shell: "npm run dev:api"        # BFF gateway       -> :8088
+    shell: "pnpm dev:api"        # BFF gateway       -> :8088
   catalog:
-    shell: "npm run dev:catalog"    # -> :8001
+    shell: "pnpm dev:catalog"    # -> :8001
   search:
-    shell: "npm run dev:search"     # -> :8002
+    shell: "pnpm dev:search"     # -> :8002
   graph:
-    shell: "npm run dev:graph"      # -> :8003
+    shell: "pnpm dev:graph"      # -> :8003
   ingest:
-    shell: "npm run dev:ingest"     # -> :8004
+    shell: "pnpm dev:ingest"     # -> :8004
   ingest-worker:
     # RabbitMQ consumer (ADR 0002): drains the PER-STAGE DAG queues and builds
     # the search+graph projections. Same codebase as ingest, run as a consumer
@@ -36,14 +34,14 @@ procs:
     # publishes those (publish_post_ingest). Draining only label left them piling
     # up unconsumed — the dense vector was never embedded/configured and the
     # vision endpoint was never called (no logs).
-    shell: "npm run dev:ingest-worker"
+    shell: "pnpm dev:ingest-worker"
     env:
       QUEUES: "ingest,embed.dense,embed.sparse,index.search,index.graph,label"
   metadata:
-    shell: "npm run dev:metadata"   # -> :8005
+    shell: "pnpm dev:metadata"   # -> :8005
   labelagent:
-    shell: "npm run dev:labelagent" # -> :8006 (needs llama-server on :8888)
+    shell: "pnpm dev:labelagent" # -> :8006 (needs llama-server on :8888)
 
   # GPU vision service
   vision:
-    shell: "npm run dev:vision"     # -> :8000
+    shell: "pnpm dev:vision"     # -> :8000

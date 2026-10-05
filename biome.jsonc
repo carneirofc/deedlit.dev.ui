@@ -31,11 +31,11 @@
       "!deedlit.dev.comfyhelper/lib/generated",
       "!deedlit.dev.comfyhelper/library",
       "!**/*.min.js",
-      "!package-lock.json"
+      "!pnpm-lock.yaml"
     ]
   },
 
-  // Configured and usable (`npm run format`), but deliberately NOT applied to
+  // Configured and usable (`pnpm format`), but deliberately NOT applied to
   // the tree: it rewrites ~230 of 318 files. That belongs in its own commit,
   // not smuggled in alongside a behaviour change. Values match .editorconfig.
   "formatter": {

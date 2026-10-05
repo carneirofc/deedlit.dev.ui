@@ -11,7 +11,7 @@ The public deedlit.dev landing site now lives in its own repo,
 and consumes `@carneirofc/ui` from this repo as a published GitHub Packages
 dependency.
 
-The web apps are an npm workspace; the image-library backend is a mesh of standalone
+The web apps are an pnpm workspace; the image-library backend is a mesh of standalone
 **FastAPI** services (database-per-service, HTTP-only) managed with `uv`.
 
 ## Architecture
@@ -37,7 +37,7 @@ The inline Mermaid diagrams below stay as the quick at-a-glance view.
 
 ```mermaid
 flowchart LR
-    subgraph apps["Web apps (npm workspace)"]
+    subgraph apps["Web apps (pnpm workspace)"]
         ch["ComfyHelper<br/>:3000"]
         ui["@carneirofc/ui"]
     end
@@ -73,7 +73,7 @@ flowchart LR
     ingest -. "DAG stages call" .-> vision & catalog & search & graphsvc & metadata & labelagent
 ```
 
-### Web apps (npm workspace)
+### Web apps (pnpm workspace)
 
 | Package | Port | Description |
 |---|---|---|
@@ -156,7 +156,7 @@ the catalog and writes the Qdrant point — catalog presence is the latch.
 
 ## Prerequisites
 
-- **Node** managed by [fnm](https://github.com/Schniz/fnm); npm 10+
+- **Node** managed by [fnm](https://github.com/Schniz/fnm); pnpm 11+ (via corepack or `npm i -g pnpm`)
 - **Python** managed by [uv](https://docs.astral.sh/uv/) (per-service venvs)
 - **Docker** (Compose) for datastores and observability
 
@@ -166,24 +166,24 @@ See [`AGENTS.md`](./AGENTS.md) for the full toolchain layout.
 ## Getting started
 
 ```bash
-npm install                # install all JS workspaces
-npm run infra:up           # start datastores + observability (waits for health)
-npm run dev:migrate        # apply catalog Alembic migrations
-npm run dev                # start every app + service via mprocs (one pane each)
+pnpm install                # install all JS workspaces
+pnpm infra:up           # start datastores + observability (waits for health)
+pnpm dev:migrate        # apply catalog Alembic migrations
+pnpm dev                # start every app + service via mprocs (one pane each)
 ```
 
-`npm run dev` runs [`mprocs`](./mprocs.yaml): one pane per process, `r` restarts
+`pnpm dev` runs [`mprocs`](./mprocs.yaml): one pane per process, `r` restarts
 one, `q` tears the whole tree down cleanly. `predev` runs `infra:up` + `dev:migrate`
-for you. Run a single piece with `npm run dev:<name>` (e.g.
+for you. Run a single piece with `pnpm dev:<name>` (e.g.
 `dev:comfyhelper`, `dev:api`, `dev:catalog`, …) or all services without the web
-apps via `npm run dev:services`.
+apps via `pnpm dev:services`.
 
 ## Building
 
 ```bash
-npm run build:ui           # shared UI only
-npm run build:comfyhelper  # ComfyHelper (+ UI)
-npm run build              # everything
+pnpm build:ui           # shared UI only
+pnpm build:comfyhelper  # ComfyHelper (+ UI)
+pnpm build              # everything
 ```
 
 Python services build via their per-package `Dockerfile`; `docker compose up`
@@ -211,8 +211,8 @@ One-time repo setup: **Settings → Pages → Source: GitHub Actions**.
 Run it locally instead with:
 
 ```bash
-npm run storybook -w @carneirofc/ui          # dev server on :6006
-npm run build-storybook -w @carneirofc/ui    # static build → deedlit.dev.ui/storybook-static
+pnpm --filter @carneirofc/ui storybook          # dev server on :6006
+pnpm --filter @carneirofc/ui build-storybook    # static build → deedlit.dev.ui/storybook-static
 ```
 
 ## Project structure

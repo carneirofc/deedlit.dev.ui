@@ -6,9 +6,9 @@ description: "Use when editing Playwright tests or Playwright configuration in d
 # Testing — Comfyhelper
 
 ## Test Surface
-- Unit-style browser tests run through `playwright.unit.config.ts` with `npm run test:unit`.
-- End-to-end flows run through `playwright.config.ts` with `npm run test:e2e`.
-- Interactive debugging is available through `npm run test:e2e:ui`.
+- Unit-style browser tests run through `playwright.unit.config.ts` with `pnpm test:unit`.
+- End-to-end flows run through `playwright.config.ts` with `pnpm test:e2e`.
+- Interactive debugging is available through `pnpm test:e2e:ui`.
 
 ## Core Rules
 - Prefer semantic selectors first, then `data-testid` via the `testId` prop on `@carneirofc/ui` components when semantics are insufficient.
