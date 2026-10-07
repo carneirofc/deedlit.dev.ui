@@ -534,6 +534,7 @@ export default function AdminPage() {
             />
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 className={cls.btn}
                 onClick={startIngest}
                 disabled={ingestBusy}
@@ -563,6 +564,7 @@ export default function AdminPage() {
               showPreview
             />
             <button
+              type="button"
               className={cls.btn}
               onClick={startIngest}
               disabled={ingestBusy}
@@ -612,6 +614,7 @@ export default function AdminPage() {
                   <p className="text-ui-2xs text-ui-ink-muted">{action.description}</p>
                 </div>
                 <button
+                  type="button"
                   className={cls.btn}
                   onClick={() => runMaintenance(action)}
                   disabled={busy}
@@ -647,6 +650,7 @@ export default function AdminPage() {
             </p>
           </div>
           <button
+            type="button"
             className={cls.btn}
             onClick={scanMissingFiles}
             disabled={missingState === "scanning"}
@@ -702,6 +706,7 @@ export default function AdminPage() {
                     Select all ({selectedMissing.size}/{missing.missing.length})
                   </label>
                   <button
+                    type="button"
                     className={`${cls.btn} border-rose-500/50 text-rose-500 hover:bg-rose-500/10`}
                     onClick={deleteSelectedMissing}
                     disabled={deletingMissing || selectedMissing.size === 0}
@@ -752,7 +757,12 @@ export default function AdminPage() {
             Ingestion jobs
             <span className="ml-2 text-ui-2xs text-ui-ink-muted">live · 3s</span>
           </h2>
-          <button className={cls.btn} onClick={refreshJobs} data-testid="jobs-refresh">
+          <button
+            type="button"
+            className={cls.btn}
+            onClick={refreshJobs}
+            data-testid="jobs-refresh"
+          >
             Refresh
           </button>
         </div>
@@ -769,6 +779,7 @@ export default function AdminPage() {
                 <div key={j.id} className="rounded-lg border border-ui-border/50 bg-ui-bg">
                   <div className="flex items-center gap-3 px-3 py-2">
                     <button
+                      type="button"
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       onClick={() => setExpanded(isOpen ? null : j.id)}
                       data-testid={`job-row-${j.id}`}
@@ -797,6 +808,7 @@ export default function AdminPage() {
                     </button>
                     {ACTIVE_JOB_STATUSES.has(j.status) && (
                       <button
+                        type="button"
                         className="shrink-0 rounded-md border border-rose-500/40 px-2 py-1 text-ui-2xs text-rose-500 transition hover:bg-rose-500/10"
                         onClick={() => cancelJob(j.id)}
                         data-testid={`job-cancel-${j.id}`}

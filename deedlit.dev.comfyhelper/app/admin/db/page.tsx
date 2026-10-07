@@ -404,7 +404,7 @@ export default function DbPage() {
             />
             favorites only
           </label>
-          <button className={cls.btn} onClick={load} data-testid="db-apply">
+          <button type="button" className={cls.btn} onClick={load} data-testid="db-apply">
             Apply
           </button>
         </div>
@@ -422,6 +422,7 @@ export default function DbPage() {
               </span>
             </h2>
             <button
+              type="button"
               className="text-ui-2xs text-ui-ink-muted transition hover:text-accent-cyan"
               onClick={picked.size > 0 ? clearPicked : pickAllLoaded}
               data-testid="db-pick-toggle"
@@ -445,6 +446,7 @@ export default function DbPage() {
                       Un-index {picked.size}? (files stay on disk)
                     </span>
                     <button
+                      type="button"
                       className={cls.danger}
                       onClick={excludeSelected}
                       disabled={bulkBusy}
@@ -453,6 +455,7 @@ export default function DbPage() {
                       {bulkBusy ? "Excluding…" : "Confirm exclude"}
                     </button>
                     <button
+                      type="button"
                       className={cls.btn}
                       onClick={() => setConfirmingBulk(false)}
                       disabled={bulkBusy}
@@ -463,6 +466,7 @@ export default function DbPage() {
                   </>
                 ) : (
                   <button
+                    type="button"
                     className={cls.danger}
                     onClick={() => setConfirmingBulk(true)}
                     data-testid="db-bulk-exclude"
@@ -498,6 +502,7 @@ export default function DbPage() {
                   data-testid={`db-pick-${img.sha256}`}
                 />
                 <button
+                  type="button"
                   onClick={() => select(img)}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left text-ui-xs"
                   data-testid={`db-open-${img.sha256}`}
@@ -557,6 +562,7 @@ export default function DbPage() {
                 </span>
                 <div className="flex shrink-0 flex-wrap gap-1">
                   <button
+                    type="button"
                     className={cls.btn}
                     onClick={() => act("reindex")}
                     data-testid="db-reindex"
@@ -564,13 +570,19 @@ export default function DbPage() {
                     Re-index
                   </button>
                   <button
+                    type="button"
                     className={cls.btn}
                     onClick={() => act("relabel")}
                     data-testid="db-relabel"
                   >
                     Re-label
                   </button>
-                  <button className={cls.danger} onClick={deleteEverywhere} data-testid="db-delete">
+                  <button
+                    type="button"
+                    className={cls.danger}
+                    onClick={deleteEverywhere}
+                    data-testid="db-delete"
+                  >
                     Delete everywhere
                   </button>
                 </div>
@@ -674,6 +686,7 @@ export default function DbPage() {
                   favorite
                 </label>
                 <button
+                  type="button"
                   className={`${cls.btn} mt-4`}
                   onClick={save}
                   disabled={busy}

@@ -766,6 +766,7 @@ export function Lightbox({
                 disabled={noteSaving}
               />
               <button
+                type="button"
                 className="rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-1.5 text-ui-xs font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50"
                 disabled={!noteDraft.trim() || noteSaving}
                 data-testid="lightbox-note-add"

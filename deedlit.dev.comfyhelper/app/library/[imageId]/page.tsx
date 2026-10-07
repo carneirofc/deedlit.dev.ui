@@ -435,6 +435,7 @@ export default function ImageDetailPage() {
                 {detail.filename}
               </h1>
               <button
+                type="button"
                 onClick={toggleFavorite}
                 className="text-ui-xl"
                 aria-label="favorite"
@@ -517,6 +518,7 @@ export default function ImageDetailPage() {
             <div className="mt-3 border-t border-ui-border/40 pt-3">
               {!confirmingDelete ? (
                 <button
+                  type="button"
                   onClick={() => setConfirmingDelete(true)}
                   className="text-ui-xs text-rose-400 transition hover:text-rose-300"
                   data-testid="image-detail-remove-start"
@@ -531,6 +533,7 @@ export default function ImageDetailPage() {
                   </p>
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={removeFromLibrary}
                       disabled={deleting}
                       className="rounded-lg bg-rose-500/90 px-2.5 py-1 text-ui-xs font-medium text-white transition hover:bg-rose-500 disabled:opacity-60"
@@ -539,6 +542,7 @@ export default function ImageDetailPage() {
                       {deleting ? "Removing…" : "Remove"}
                     </button>
                     <button
+                      type="button"
                       onClick={() => setConfirmingDelete(false)}
                       disabled={deleting}
                       className="rounded-lg border border-ui-border/70 px-2.5 py-1 text-ui-xs transition hover:bg-ui-bg-soft disabled:opacity-60"
@@ -669,6 +673,7 @@ export default function ImageDetailPage() {
             <div className="flex items-center gap-3">
               {suggestLoading && <span className="text-ui-xs text-ui-ink-muted">Loading…</span>}
               <button
+                type="button"
                 onClick={loadDebug}
                 className="rounded-lg border border-ui-border/60 px-2 py-1 text-ui-xs text-ui-ink-muted hover:border-accent-cyan hover:text-accent-cyan"
                 data-testid="image-detail-vector-debug-toggle"
@@ -679,6 +684,7 @@ export default function ImageDetailPage() {
           </div>
           {!suggestRequested ? (
             <button
+              type="button"
               onClick={() => setSuggestRequested(true)}
               className="rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10"
               data-testid="image-detail-load-similar"
@@ -755,6 +761,7 @@ export default function ImageDetailPage() {
             data-testid="image-detail-note-input"
           />
           <button
+            type="button"
             className="rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-xs font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50"
             onClick={addNote}
             disabled={!noteDraft.trim() || noteSaving}

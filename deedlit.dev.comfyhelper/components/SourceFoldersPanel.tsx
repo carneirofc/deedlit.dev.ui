@@ -305,6 +305,7 @@ export function SourceFoldersPanel() {
                 min
               </label>
               <button
+                type="button"
                 className={cls.btn}
                 onClick={addMultiple}
                 disabled={adding}
@@ -374,6 +375,7 @@ export function SourceFoldersPanel() {
               min
             </label>
             <button
+              type="button"
               className={cls.btn}
               onClick={addFolder}
               disabled={adding}
@@ -471,6 +473,7 @@ export function SourceFoldersPanel() {
                     min
                   </label>
                   <button
+                    type="button"
                     className={cls.btn}
                     onClick={() => scanNow(f)}
                     data-testid={`folder-scan-${f.id}`}
@@ -478,6 +481,7 @@ export function SourceFoldersPanel() {
                     Scan now
                   </button>
                   <button
+                    type="button"
                     className="rounded-md border border-rose-500/40 px-2 py-1 text-ui-2xs text-rose-500 transition hover:bg-rose-500/10"
                     onClick={() => removeFolder(f.id)}
                     data-testid={`folder-remove-${f.id}`}

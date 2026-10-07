@@ -469,7 +469,7 @@ export default function QueuesPage() {
               {kpis.unreachable > 0 ? ` · ${kpis.unreachable} unreachable` : ""}
             </span>
           </h2>
-          <button className={cls.btn} onClick={refresh} data-testid="queues-refresh">
+          <button type="button" className={cls.btn} onClick={refresh} data-testid="queues-refresh">
             Refresh
           </button>
         </div>
@@ -563,6 +563,7 @@ export default function QueuesPage() {
                         {/* DLQs are inspected in the dead-letter panel below. */}
                         {!isDlq && (
                           <button
+                            type="button"
                             className={cls.btnSm}
                             onClick={() => toggleInspect(q.name)}
                             disabled={!q.reachable}
@@ -586,6 +587,7 @@ export default function QueuesPage() {
                                 : "loading…"}
                             </span>
                             <button
+                              type="button"
                               className={cls.btnSm}
                               onClick={() => peek(q.name)}
                               data-testid={`queue-repeek-${q.name}`}
@@ -658,6 +660,7 @@ export default function QueuesPage() {
                   </p>
                   <div className="flex shrink-0 gap-1">
                     <button
+                      type="button"
                       className={cls.btnSm}
                       onClick={() => peek(name)}
                       data-testid={`dlq-peek-${base}`}
@@ -665,6 +668,7 @@ export default function QueuesPage() {
                       Peek
                     </button>
                     <button
+                      type="button"
                       className={cls.btnSm}
                       onClick={() => requeueDlq(base)}
                       disabled={count === 0}
@@ -673,6 +677,7 @@ export default function QueuesPage() {
                       Requeue
                     </button>
                     <button
+                      type="button"
                       className={cls.danger}
                       onClick={() => purge(name)}
                       data-testid={`dlq-purge-${base}`}
@@ -707,7 +712,12 @@ export default function QueuesPage() {
             placeholder="sha256 (blank = recent tasks across the library)"
             data-testid="task-sha-input"
           />
-          <button className={cls.btn} onClick={lookupTasks} data-testid="task-lookup-btn">
+          <button
+            type="button"
+            className={cls.btn}
+            onClick={lookupTasks}
+            data-testid="task-lookup-btn"
+          >
             Look up
           </button>
         </div>

@@ -228,6 +228,7 @@ export function ServiceStatusBoard({
         <div className="flex items-center gap-2 text-ui-2xs text-ui-ink-muted">
           {health?.checkedAt && <span>updated {relativeTime(health.checkedAt)}</span>}
           <button
+            type="button"
             className="rounded-md border border-ui-border/70 px-2 py-1 transition hover:bg-accent-cyan/10"
             onClick={refresh}
             data-testid="status-refresh"

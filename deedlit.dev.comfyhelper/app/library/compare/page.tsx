@@ -111,6 +111,7 @@ function ComparePageInner() {
                     {img.filename}
                   </span>
                   <button
+                    type="button"
                     onClick={() => {
                       tray.remove(img.id);
                       const next = ids.filter((x) => x !== img.id);

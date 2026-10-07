@@ -77,6 +77,7 @@ export default function CacheDebugPage() {
         </div>
         <div className="flex gap-2">
           <button
+            type="button"
             className={cls.btn}
             onClick={refresh}
             disabled={loading}
@@ -85,6 +86,7 @@ export default function CacheDebugPage() {
             {loading ? "Loading…" : "Refresh"}
           </button>
           <button
+            type="button"
             className={cls.btnDanger}
             onClick={flush}
             disabled={flushing || loading}

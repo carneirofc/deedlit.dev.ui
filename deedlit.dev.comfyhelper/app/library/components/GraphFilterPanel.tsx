@@ -268,6 +268,7 @@ export function GraphFilterPanel({
 
       <div className="mt-2 flex gap-2">
         <button
+          type="button"
           className={btn}
           onClick={() => apply()}
           disabled={checking}
@@ -276,7 +277,7 @@ export function GraphFilterPanel({
           Apply filter
         </button>
         {active && (
-          <button className={btn} onClick={clear} data-testid="graph-filter-clear">
+          <button type="button" className={btn} onClick={clear} data-testid="graph-filter-clear">
             Clear
           </button>
         )}

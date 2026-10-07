@@ -1467,6 +1467,7 @@ export default function LibraryPage() {
       }}
       renderOverlay={(r) => (
         <button
+          type="button"
           data-testid={`library-image-card-similar-${r.imageId}`}
           onClick={() => findSimilar(r.imageId, r.thumbnailUrl, r.summary)}
           className={pillBtnClass}
@@ -1503,6 +1504,7 @@ export default function LibraryPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             data-testid="library-select-mode-toggle"
             onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
             disabled={results.length === 0}
@@ -1530,6 +1532,7 @@ export default function LibraryPage() {
             {selectMode ? "Done" : "Select"}
           </button>
           <button
+            type="button"
             data-testid="library-slideshow-start"
             onClick={() => openLightbox(0, true)}
             disabled={results.length === 0}
@@ -1543,6 +1546,7 @@ export default function LibraryPage() {
           </button>
           {browsePath && (
             <button
+              type="button"
               data-testid="library-group-by-folder-toggle"
               onClick={() => setKey("groupBy", settings.groupBy === "folder" ? "none" : "folder")}
               aria-pressed={settings.groupBy === "folder"}
@@ -1597,6 +1601,7 @@ export default function LibraryPage() {
               ] as Array<[ViewMode, string]>
             ).map(([v, label]) => (
               <button
+                type="button"
                 key={v}
                 data-testid={`library-view-mode-${v}`}
                 onClick={() => setKey("viewMode", v)}
@@ -1643,6 +1648,7 @@ export default function LibraryPage() {
               />
             </div>
             <button
+              type="button"
               data-testid="library-search-by-image-toggle"
               className={`${cls.btn} flex items-center gap-1.5 ${imagePanelOpen ? cls.btnActive : ""}`}
               onClick={() => {
@@ -1672,6 +1678,7 @@ export default function LibraryPage() {
               <span className="hidden sm:inline">By image</span>
             </button>
             <button
+              type="button"
               data-testid="library-search-submit"
               className={cls.btn}
               onClick={search}
@@ -1705,6 +1712,7 @@ export default function LibraryPage() {
                 <p className="truncate text-ui-xs text-ui-ink-muted">{similarRef.summary}</p>
               </div>
               <button
+                type="button"
                 data-testid="library-similar-clear"
                 className="rounded-lg border border-ui-border/60 px-2 py-1 text-ui-xs text-ui-ink-muted transition hover:border-accent-cyan hover:text-accent-cyan"
                 onClick={clearSimilar}
@@ -1855,6 +1863,7 @@ export default function LibraryPage() {
 
           {/* Advanced filters */}
           <button
+            type="button"
             data-testid="library-advanced-filters-toggle"
             className="flex items-center gap-1.5 self-start text-ui-xs font-medium text-ui-ink-muted transition hover:text-ui-ink"
             onClick={() => setShowAdvanced((v) => !v)}
@@ -1988,6 +1997,7 @@ export default function LibraryPage() {
       {/* Freshness banner — newer images landed while browsing; reload from top. */}
       {hasNew && (
         <button
+          type="button"
           data-testid="library-freshness-refresh"
           onClick={() => doFetch(false)}
           className="sticky top-2 z-20 mx-auto flex items-center gap-2 rounded-full border border-accent-cyan/50 bg-accent-cyan/15 px-4 py-1.5 text-ui-xs font-medium text-accent-cyan shadow-sm backdrop-blur-sm transition hover:bg-accent-cyan/25"
@@ -2054,6 +2064,7 @@ export default function LibraryPage() {
               return (
                 <section key={g.key || "__none"} className="flex min-w-0 flex-col gap-2">
                   <button
+                    type="button"
                     data-testid={`library-group-toggle-${g.key}`}
                     onClick={() => toggleDir(g.key)}
                     aria-expanded={!collapsed}
@@ -2110,7 +2121,7 @@ export default function LibraryPage() {
         <>
           <div ref={sentinelRef} aria-hidden="true" className="h-1" />
           <div className="flex justify-center pt-2">
-            <button className={cls.btn} onClick={loadMore} disabled={loading}>
+            <button type="button" className={cls.btn} onClick={loadMore} disabled={loading}>
               {loading ? "Loading…" : "Load more"}
             </button>
           </div>
@@ -2120,6 +2131,7 @@ export default function LibraryPage() {
       {/* Ingest panel */}
       <section className={cls.card}>
         <button
+          type="button"
           data-testid="library-ingest-toggle"
           className="flex w-full items-center justify-between text-ui-sm font-medium text-ui-ink"
           onClick={() => setShowIngest(!showIngest)}
@@ -2152,7 +2164,12 @@ export default function LibraryPage() {
                 placeholder="D:/images/generated"
                 pickerTitle="Choose a folder to ingest"
               />
-              <button data-testid="library-ingest-start" className={cls.btn} onClick={startIngest}>
+              <button
+                type="button"
+                data-testid="library-ingest-start"
+                className={cls.btn}
+                onClick={startIngest}
+              >
                 Start ingestion
               </button>
             </div>
@@ -2315,6 +2332,7 @@ function ImageDropzone({
         {note && <p className="mt-1 text-ui-2xs text-ui-ink-muted/80">{note}</p>}
         <div className="mt-2 flex gap-2">
           <button
+            type="button"
             data-testid="library-image-dropzone-choose-file"
             className={cls.btn}
             onClick={() => inputRef.current?.click()}
@@ -2323,6 +2341,7 @@ function ImageDropzone({
           </button>
           {preview && (
             <button
+              type="button"
               data-testid="library-image-dropzone-clear"
               className={cls.btn}
               onClick={onClear}

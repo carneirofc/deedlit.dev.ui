@@ -105,6 +105,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
     >
       <span className="text-ui-sm font-medium text-ui-ink">{selectedCount} selected</span>
       <button
+        type="button"
         className={btn}
         onClick={onSelectAll}
         disabled={selectedCount === totalCount}
@@ -113,6 +114,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
         Select all
       </button>
       <button
+        type="button"
         className={btn}
         onClick={onClear}
         disabled={none}
@@ -125,6 +127,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
 
       {/* Favorite / unfavorite */}
       <button
+        type="button"
         className={`${btn} flex items-center gap-1.5`}
         onClick={() => onFavorite(true)}
         disabled={none || anyBusy}
@@ -137,6 +140,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
         {busy === "favorite" ? "…" : "Favorite"}
       </button>
       <button
+        type="button"
         className={btn}
         onClick={() => onFavorite(false)}
         disabled={none || anyBusy}
@@ -223,6 +227,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
           />
           <div className="flex gap-2">
             <button
+              type="button"
               className={`${btn} flex-1`}
               disabled={tagDraft.length === 0}
               onClick={() => {
@@ -235,6 +240,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
               Add to selected
             </button>
             <button
+              type="button"
               className={`${btn} flex-1`}
               disabled={tagDraft.length === 0}
               onClick={() => {
@@ -339,6 +345,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
             data-testid="bulk-action-move-input"
           />
           <button
+            type="button"
             className={btn}
             disabled={!moveDraft.trim()}
             onClick={() => {
@@ -357,6 +364,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
       {/* Un-index (delete from library) */}
       {!confirmingDelete ? (
         <button
+          type="button"
           onClick={onRequestDelete}
           disabled={none || anyBusy}
           className="rounded-lg border border-rose-500/60 px-3 py-2 text-ui-sm font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
@@ -371,6 +379,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
             on disk are kept.
           </span>
           <button
+            type="button"
             onClick={onConfirmDelete}
             disabled={busy === "delete"}
             className="rounded-lg bg-rose-500/90 px-3 py-2 text-ui-sm font-medium text-white transition hover:bg-rose-500 disabled:opacity-60"
@@ -379,6 +388,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
             {busy === "delete" ? "Removing…" : "Remove"}
           </button>
           <button
+            type="button"
             onClick={onCancelDelete}
             disabled={busy === "delete"}
             className={btn}
@@ -415,6 +425,7 @@ function Menu({
   return (
     <div className="relative">
       <button
+        type="button"
         className={`${btn} flex items-center gap-1.5`}
         onClick={onToggle}
         disabled={disabled}
@@ -468,6 +479,7 @@ function MenuItem({
 }) {
   return (
     <button
+      type="button"
       role="menuitem"
       onClick={onClick}
       className="flex w-full items-center gap-1 px-3 py-2 text-left text-ui-sm text-ui-ink transition hover:bg-accent-cyan/10"

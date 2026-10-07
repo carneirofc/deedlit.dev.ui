@@ -220,6 +220,7 @@ export default function ClustersPage() {
               </select>
             </div>
             <button
+              type="button"
               className={btn}
               onClick={build}
               disabled={loading}
@@ -260,6 +261,7 @@ export default function ClustersPage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {data.clusters.map((c) => (
                 <button
+                  type="button"
                   key={c.id}
                   onClick={() => setSelected(selected === c.id ? null : c.id)}
                   data-testid={`clusters-cluster-card-${c.id}`}
@@ -310,6 +312,7 @@ export default function ClustersPage() {
                   {selectedCluster.label} · {selectedCluster.size} images
                 </h2>
                 <button
+                  type="button"
                   className="text-ui-xs text-ui-ink-muted hover:text-ui-ink"
                   onClick={() => setSelected(null)}
                   data-testid="clusters-selected-close"
@@ -337,6 +340,7 @@ export default function ClustersPage() {
                       />
                     </Link>
                     <button
+                      type="button"
                       onClick={() => tray.toggle(id)}
                       className={`absolute right-1 top-1 rounded border px-1.5 py-0.5 text-ui-2xs backdrop-blur-sm transition ${
                         tray.has(id)

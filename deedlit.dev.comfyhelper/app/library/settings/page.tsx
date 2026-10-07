@@ -492,6 +492,7 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             className={cls.btn}
             onClick={reset}
             disabled={!dirty}
