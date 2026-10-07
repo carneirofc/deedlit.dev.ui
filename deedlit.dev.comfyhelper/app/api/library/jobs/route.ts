@@ -1,5 +1,5 @@
-import { handleRoute, jsonOk } from "@/lib/library/http";
 import { listJobs } from "@/lib/api-client";
+import { handleRoute, jsonOk } from "@/lib/library/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function GET() {
       createdAt: strOrNull(j.createdAt ?? j.created_at) ?? "",
       // Live pipeline stage + per-stage staircase (which service is active now).
       stage: strOrNull(j.currentStage ?? j.current_stage ?? j.stage),
-      stageCounts: stageCounts(j.stageCounts ?? j.stage_counts),
+      stageCounts: stageCounts(j.stageCounts ?? j.stage_counts)
     }));
     return jsonOk({ jobs });
   });

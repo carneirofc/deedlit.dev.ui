@@ -7,12 +7,12 @@ const meta = {
   component: Checkbox,
   tags: ["autodocs"],
   args: {
-    label: "Only show favorites",
+    label: "Only show favorites"
   },
   argTypes: {
     disabled: { control: "boolean" },
-    defaultChecked: { control: "boolean" },
-  },
+    defaultChecked: { control: "boolean" }
+  }
 } satisfies Meta<typeof Checkbox>;
 
 export default meta;

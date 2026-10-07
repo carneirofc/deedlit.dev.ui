@@ -81,7 +81,7 @@ function clampPosition(x: number, y: number): DragPosition {
   const buttonSize = 40;
   return {
     x: Math.max(4, Math.min(x, viewportW - buttonSize - 4)),
-    y: Math.max(4, Math.min(y, viewportH - buttonSize - 4)),
+    y: Math.max(4, Math.min(y, viewportH - buttonSize - 4))
   };
 }
 
@@ -89,7 +89,7 @@ function clampPosition(x: number, y: number): DragPosition {
 export default function ThemeToggleButton({
   readTheme,
   writeTheme,
-  className,
+  className
 }: ThemeToggleButtonProps) {
   const read = readTheme ?? defaultReadTheme;
   const write = writeTheme ?? defaultWriteTheme;
@@ -170,7 +170,12 @@ export default function ThemeToggleButton({
   const isPositioned = !!position;
 
   const style: React.CSSProperties = isPositioned
-    ? { left: position.x, top: position.y, right: "auto", transition: isDraggingRef.current ? "none" : undefined }
+    ? {
+        left: position.x,
+        top: position.y,
+        right: "auto",
+        transition: isDraggingRef.current ? "none" : undefined
+      }
     : {};
 
   return (
@@ -188,7 +193,7 @@ export default function ThemeToggleButton({
       className={[
         "theme-toggle-btn",
         isPositioned ? "" : "right-4 top-4 md:right-6 md:top-5",
-        className ?? "",
+        className ?? ""
       ]
         .filter(Boolean)
         .join(" ")}

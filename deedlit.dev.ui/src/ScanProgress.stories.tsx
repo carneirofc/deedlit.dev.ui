@@ -6,7 +6,7 @@ const meta = {
   title: "Components/ScanProgress",
   component: ScanProgress,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 } satisfies Meta<typeof ScanProgress>;
 
 export default meta;
@@ -19,7 +19,7 @@ export const Indeterminate: Story = {
     <div className="w-96">
       <ScanProgress {...args} />
     </div>
-  ),
+  )
 };
 
 /** Drive the bar from real progress by passing `progressPercent` + counts. */
@@ -28,11 +28,11 @@ export const Determinate: Story = {
     progressPercent: 64,
     processedCount: 770,
     totalCount: 1204,
-    statusLabel: "Reading sidecar JSON metadata",
+    statusLabel: "Reading sidecar JSON metadata"
   },
   render: (args) => (
     <div className="w-96">
       <ScanProgress {...args} />
     </div>
-  ),
+  )
 };

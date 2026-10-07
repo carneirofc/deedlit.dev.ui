@@ -1,6 +1,6 @@
+import { type CatalogImage, GatewayError, getImage } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { ExportRequestSchema } from "@/lib/library/schemas";
-import { getImage, GatewayError, type CatalogImage } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       requested: ids.length,
       count: images.length,
       images,
-      errors,
+      errors
     });
   });
 }

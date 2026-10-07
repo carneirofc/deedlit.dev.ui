@@ -31,7 +31,7 @@ const cls = {
   card: "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4",
   input:
     "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
-  btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
+  btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50"
 };
 
 function scanStatusColor(status: string | null): string {
@@ -115,16 +115,21 @@ export function SourceFoldersPanel() {
   /** POST one folder; resolves to the per-path outcome (never throws). */
   const postFolder = async (
     path: string,
-    label: string | null,
+    label: string | null
   ): Promise<{ path: string; status: "added" | "exists" | "error"; error?: string }> => {
-    if (isAlreadyConfigured(path, folders.map((f) => f.path))) {
+    if (
+      isAlreadyConfigured(
+        path,
+        folders.map((f) => f.path)
+      )
+    ) {
       return { path, status: "exists" };
     }
     try {
       const res = await fetch("/api/library/folders", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ path, label, scan_interval_seconds: intervalSeconds() }),
+        body: JSON.stringify({ path, label, scan_interval_seconds: intervalSeconds() })
       });
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({})))?.error ?? "Add failed";
@@ -142,7 +147,12 @@ export function SourceFoldersPanel() {
       setError("A folder path is required.");
       return;
     }
-    if (isAlreadyConfigured(path, folders.map((f) => f.path))) {
+    if (
+      isAlreadyConfigured(
+        path,
+        folders.map((f) => f.path)
+      )
+    ) {
       setError("That folder is already configured.");
       return;
     }
@@ -168,7 +178,8 @@ export function SourceFoldersPanel() {
     setAdding(true);
     setError(null);
     setBulkResults([]);
-    const results: Array<{ path: string; status: "added" | "exists" | "error"; error?: string }> = [];
+    const results: Array<{ path: string; status: "added" | "exists" | "error"; error?: string }> =
+      [];
     for (const path of paths) {
       results.push(await postFolder(path, null));
     }
@@ -186,7 +197,7 @@ export function SourceFoldersPanel() {
       const res = await fetch(`/api/library/folders/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
       });
       if (!res.ok) throw new Error("Update failed");
       refresh();
@@ -211,7 +222,7 @@ export function SourceFoldersPanel() {
       const j = await fetchJson<{ job_id?: string | null }>(
         `Scan ${name}`,
         `/api/library/folders/${folder.id}/scan`,
-        { method: "POST" },
+        { method: "POST" }
       );
       trackJob(`Scan ${name}`, j.job_id);
       refresh();

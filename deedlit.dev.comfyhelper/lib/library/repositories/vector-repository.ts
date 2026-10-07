@@ -36,13 +36,17 @@ export async function ensureCollection(): Promise<void> {
   const found = existing.collections.some((c) => c.name === qdrantCollection);
   if (!found) {
     await client.createCollection(qdrantCollection, {
-      vectors: { size: embeddingDimensions, distance: "Cosine" },
+      vectors: { size: embeddingDimensions, distance: "Cosine" }
     });
     // Payload indexes for fast filtered retrieval.
     for (const field of ["tags", "model_family", "checkpoint", "loras", "favorite"]) {
-      await client.createPayloadIndex(qdrantCollection, { field_name: field, field_schema: "keyword" }).catch(() => {});
+      await client
+        .createPayloadIndex(qdrantCollection, { field_name: field, field_schema: "keyword" })
+        .catch(() => {});
     }
-    await client.createPayloadIndex(qdrantCollection, { field_name: "rating", field_schema: "integer" }).catch(() => {});
+    await client
+      .createPayloadIndex(qdrantCollection, { field_name: "rating", field_schema: "integer" })
+      .catch(() => {});
   }
   globalThis.__comfyhelperQdrantReady = true;
 }
@@ -50,12 +54,12 @@ export async function ensureCollection(): Promise<void> {
 export async function upsertPoint(
   id: string,
   vector: number[],
-  payload: ImageVectorPayload,
+  payload: ImageVectorPayload
 ): Promise<void> {
   const { qdrantCollection } = getLibraryConfig();
   await getQdrant().upsert(qdrantCollection, {
     wait: true,
-    points: [{ id, vector, payload: payload as unknown as Record<string, unknown> }],
+    points: [{ id, vector, payload: payload as unknown as Record<string, unknown> }]
   });
 }
 
@@ -100,13 +104,13 @@ export interface SimilarityMatrix {
 export async function searchSimilarityMatrix(
   filter: QdrantFilter | undefined,
   sample: number,
-  neighbors: number,
+  neighbors: number
 ): Promise<SimilarityMatrix> {
   const { qdrantCollection } = getLibraryConfig();
   const res = await getQdrant().searchMatrixOffsets(qdrantCollection, {
     filter: filter as Record<string, unknown> | undefined,
     sample,
-    limit: neighbors,
+    limit: neighbors
   });
   const ids = (res.ids ?? []).map((id) => String(id));
   const rows = res.offsets_row ?? [];
@@ -154,7 +158,7 @@ export async function searchByVector(
   vector: number[],
   filter: QdrantFilter | undefined,
   limit: number,
-  options: VectorSearchOptions = {},
+  options: VectorSearchOptions = {}
 ): Promise<Array<{ id: string; score: number }>> {
   const hits = await searchByVectorDetailed(vector, filter, limit, options);
   return hits.map((h) => ({ id: h.id, score: h.score }));
@@ -165,7 +169,7 @@ export async function searchByVectorDetailed(
   vector: number[],
   filter: QdrantFilter | undefined,
   limit: number,
-  options: VectorSearchOptions = {},
+  options: VectorSearchOptions = {}
 ): Promise<ScoredHit[]> {
   const { qdrantCollection } = getLibraryConfig();
   const { scoreThreshold, hnswEf = DEFAULT_HNSW_EF, exact = false, withPayload = false } = options;
@@ -175,12 +179,12 @@ export async function searchByVectorDetailed(
     filter: filter as Record<string, unknown> | undefined,
     score_threshold: scoreThreshold && scoreThreshold > 0 ? scoreThreshold : undefined,
     params: { hnsw_ef: hnswEf, exact },
-    with_payload: withPayload,
+    with_payload: withPayload
   });
   return points.map((r) => ({
     id: String(r.id),
     score: r.score,
-    payload: withPayload ? ((r.payload as Record<string, unknown> | null) ?? null) : undefined,
+    payload: withPayload ? ((r.payload as Record<string, unknown> | null) ?? null) : undefined
   }));
 }
 
@@ -222,7 +226,9 @@ export async function getCollectionInfo(): Promise<CollectionInfo> {
 
 export async function recreateCollection(): Promise<void> {
   const { qdrantCollection } = getLibraryConfig();
-  await getQdrant().deleteCollection(qdrantCollection).catch(() => {});
+  await getQdrant()
+    .deleteCollection(qdrantCollection)
+    .catch(() => {});
   globalThis.__comfyhelperQdrantReady = false;
   await ensureCollection();
 }

@@ -30,16 +30,27 @@ export default function MediaStage({
   className,
   viewportClassName,
   previousOverlayClassName,
-  nextOverlayClassName,
+  nextOverlayClassName
 }: MediaStageProps) {
   if (hidden) return null;
 
   const showNavigation = canNavigate && typeof onNavigate === "function";
-  const navigationIconClassName = navigationVisibility === "always" ? "opacity-100" : "opacity-0 group-hover:opacity-100";
+  const navigationIconClassName =
+    navigationVisibility === "always" ? "opacity-100" : "opacity-0 group-hover:opacity-100";
 
   return (
-    <div className={cn("relative flex min-h-50 flex-col overflow-hidden bg-ui-bg-tint p-2 sm:min-h-75 sm:p-3 lg:p-4", className)}>
-      <div className={cn("relative min-h-0 flex-1 overflow-hidden rounded-xl bg-panel", viewportClassName)}>
+    <div
+      className={cn(
+        "relative flex min-h-50 flex-col overflow-hidden bg-ui-bg-tint p-2 sm:min-h-75 sm:p-3 lg:p-4",
+        className
+      )}
+    >
+      <div
+        className={cn(
+          "relative min-h-0 flex-1 overflow-hidden rounded-xl bg-panel",
+          viewportClassName
+        )}
+      >
         {children}
         {showNavigation && (
           <>
@@ -50,10 +61,15 @@ export default function MediaStage({
               data-testid="media-stage-previous"
               className={cn(
                 "group absolute inset-y-0 left-0 flex h-full w-1/3 cursor-pointer items-center justify-start pl-3 transition hover:bg-linear-to-r hover:from-black/25",
-                previousOverlayClassName,
+                previousOverlayClassName
               )}
             >
-              <span className={cn("flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition", navigationIconClassName)}>
+              <span
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition",
+                  navigationIconClassName
+                )}
+              >
                 <ChevronLeftIcon size="h-5 w-5" />
               </span>
             </button>
@@ -64,10 +80,15 @@ export default function MediaStage({
               data-testid="media-stage-next"
               className={cn(
                 "group absolute inset-y-0 right-0 flex h-full w-1/3 cursor-pointer items-center justify-end pr-3 transition hover:bg-linear-to-l hover:from-black/25",
-                nextOverlayClassName,
+                nextOverlayClassName
               )}
             >
-              <span className={cn("flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition", navigationIconClassName)}>
+              <span
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition",
+                  navigationIconClassName
+                )}
+              >
                 <ChevronRightIcon size="h-5 w-5" />
               </span>
             </button>

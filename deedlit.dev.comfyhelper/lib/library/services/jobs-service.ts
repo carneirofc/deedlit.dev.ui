@@ -37,28 +37,31 @@ function toSummary(r: JobRow): JobSummary {
     errorMessage: r.error_message,
     startedAt: r.started_at ? r.started_at.toISOString() : null,
     finishedAt: r.finished_at ? r.finished_at.toISOString() : null,
-    createdAt: r.created_at.toISOString(),
+    createdAt: r.created_at.toISOString()
   };
 }
 
 export async function listJobs(limit = 50): Promise<JobSummary[]> {
   const result = await rows<JobRow>(
     `SELECT * FROM ingestion_jobs ORDER BY created_at DESC LIMIT $1`,
-    [limit],
+    [limit]
   );
   return result.map(toSummary);
 }
 
-export async function getJob(jobId: string): Promise<{ job: JobSummary; failedFiles: Array<{ filePath: string; error: string | null }> } | null> {
+export async function getJob(jobId: string): Promise<{
+  job: JobSummary;
+  failedFiles: Array<{ filePath: string; error: string | null }>;
+} | null> {
   const row = await maybeRow<JobRow>(`SELECT * FROM ingestion_jobs WHERE id = $1`, [jobId]);
   if (!row) return null;
   const failed = await rows<{ file_path: string; error: string | null }>(
     `SELECT file_path, error FROM ingestion_job_files WHERE job_id = $1 AND status = 'failed' LIMIT 200`,
-    [jobId],
+    [jobId]
   );
   return {
     job: toSummary(row),
-    failedFiles: failed.map((f) => ({ filePath: f.file_path, error: f.error })),
+    failedFiles: failed.map((f) => ({ filePath: f.file_path, error: f.error }))
   };
 }
 
@@ -66,7 +69,7 @@ export async function cancelJob(jobId: string): Promise<boolean> {
   const row = await maybeRow<{ id: string }>(
     `UPDATE ingestion_jobs SET status='cancelled', finished_at=now()
       WHERE id=$1 AND status IN ('pending','running') RETURNING id`,
-    [jobId],
+    [jobId]
   );
   return row !== null;
 }

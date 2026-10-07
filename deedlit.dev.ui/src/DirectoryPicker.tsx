@@ -9,7 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from "./Dialog";
 import { ChevronRightIcon, DocumentIcon, FolderIcon } from "./Icons";
 import OutlineButton from "./OutlineButton";
@@ -62,7 +62,7 @@ export function DirectoryPicker({
   title = "Select a folder",
   onClose,
   onSelect,
-  browseEndpoint = DEFAULT_FS_BROWSE_ENDPOINT,
+  browseEndpoint = DEFAULT_FS_BROWSE_ENDPOINT
 }: DirectoryPickerProps) {
   const [data, setData] = useState<FsBrowseResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +88,7 @@ export function DirectoryPicker({
         setLoading(false);
       }
     },
-    [browseEndpoint],
+    [browseEndpoint]
   );
 
   // On open: load the roots view first (always succeeds, populates drive
@@ -125,105 +125,105 @@ export function DirectoryPicker({
         </DialogHeader>
 
         <DialogBody>
-      {/* Path bar: up · editable path · go */}
-      <div className="flex flex-wrap items-center gap-2">
-        <OutlineButton
-          controlSize="sm"
-          onClick={() => browse(data?.parent ?? null)}
-          disabled={loading || !data?.path}
-          tooltip="Up one level"
-          data-testid="directory-picker-up"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 19V5" />
-            <path d="m5 12 7-7 7 7" />
-          </svg>
-          Up
-        </OutlineButton>
-        <input
-          className="cyber-input min-w-[12rem] flex-1 rounded-lg px-3 py-2 font-mono text-ui-xs outline-none"
-          value={manual}
-          onChange={(event) => setManual(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") browse(manual.trim() || null);
-          }}
-          placeholder="Type or paste a folder path…"
-          spellCheck={false}
-          data-testid="directory-picker-path"
-        />
-        <OutlineButton
-          controlSize="sm"
-          onClick={() => browse(manual.trim() || null)}
-          disabled={loading}
-          data-testid="directory-picker-go"
-        >
-          Go
-        </OutlineButton>
-      </div>
-
-      {/* Quick roots */}
-      {data?.roots?.length ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {data.roots.map((root) => (
-            <button
-              key={root.path}
-              type="button"
-              onClick={() => browse(root.path)}
-              data-testid={`directory-picker-root-${root.path}`}
-              className="rounded-full border border-ui-border bg-ui-bg-soft px-2.5 py-1 font-mono text-ui-2xs text-ui-ink-muted transition hover:border-accent-cyan hover:text-accent-cyan"
+          {/* Path bar: up · editable path · go */}
+          <div className="flex flex-wrap items-center gap-2">
+            <OutlineButton
+              controlSize="sm"
+              onClick={() => browse(data?.parent ?? null)}
+              disabled={loading || !data?.path}
+              tooltip="Up one level"
+              data-testid="directory-picker-up"
             >
-              {root.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+              Up
+            </OutlineButton>
+            <input
+              className="cyber-input min-w-[12rem] flex-1 rounded-lg px-3 py-2 font-mono text-ui-xs outline-none"
+              value={manual}
+              onChange={(event) => setManual(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") browse(manual.trim() || null);
+              }}
+              placeholder="Type or paste a folder path…"
+              spellCheck={false}
+              data-testid="directory-picker-path"
+            />
+            <OutlineButton
+              controlSize="sm"
+              onClick={() => browse(manual.trim() || null)}
+              disabled={loading}
+              data-testid="directory-picker-go"
+            >
+              Go
+            </OutlineButton>
+          </div>
 
-      {/* Listing */}
-      <div className="mt-3 h-72 overflow-auto rounded-xl border border-ui-border bg-ui-bg/40 custom-scrollbar">
-        {loading && !data ? (
-          <p className="p-4 text-ui-sm text-ui-ink-muted">Loading…</p>
-        ) : error ? (
-          <p className="p-4 text-ui-sm text-error-ink">{error}</p>
-        ) : !data || data.entries.length === 0 ? (
-          <p className="p-4 text-ui-sm text-ui-ink-muted">This folder is empty.</p>
-        ) : (
-          <ul className="divide-y divide-ui-border/50">
-            {data.entries.map((entry) =>
-              entry.isDirectory ? (
-                <li key={entry.path}>
-                  <button
-                    type="button"
-                    onClick={() => browse(entry.path)}
-                    data-testid={`directory-picker-entry-${entry.path}`}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-ui-sm text-ui-ink transition hover:bg-accent-cyan/10"
-                  >
-                    <FolderIcon className="h-4 w-4 text-accent-cyan" />
-                    <span className="truncate">{entry.name}</span>
-                    <ChevronRightIcon className="ml-auto h-4 w-4 text-ui-ink-faint" />
-                  </button>
-                </li>
-              ) : (
-                <li
-                  key={entry.path}
-                  className="flex items-center gap-2 px-3 py-2 text-ui-sm text-ui-ink-faint"
+          {/* Quick roots */}
+          {data?.roots?.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {data.roots.map((root) => (
+                <button
+                  key={root.path}
+                  type="button"
+                  onClick={() => browse(root.path)}
+                  data-testid={`directory-picker-root-${root.path}`}
+                  className="rounded-full border border-ui-border bg-ui-bg-soft px-2.5 py-1 font-mono text-ui-2xs text-ui-ink-muted transition hover:border-accent-cyan hover:text-accent-cyan"
                 >
-                  <DocumentIcon className="h-4 w-4" />
-                  <span className="truncate">{entry.name}</span>
-                </li>
-              ),
+                  {root.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Listing */}
+          <div className="mt-3 h-72 overflow-auto rounded-xl border border-ui-border bg-ui-bg/40 custom-scrollbar">
+            {loading && !data ? (
+              <p className="p-4 text-ui-sm text-ui-ink-muted">Loading…</p>
+            ) : error ? (
+              <p className="p-4 text-ui-sm text-error-ink">{error}</p>
+            ) : !data || data.entries.length === 0 ? (
+              <p className="p-4 text-ui-sm text-ui-ink-muted">This folder is empty.</p>
+            ) : (
+              <ul className="divide-y divide-ui-border/50">
+                {data.entries.map((entry) =>
+                  entry.isDirectory ? (
+                    <li key={entry.path}>
+                      <button
+                        type="button"
+                        onClick={() => browse(entry.path)}
+                        data-testid={`directory-picker-entry-${entry.path}`}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-ui-sm text-ui-ink transition hover:bg-accent-cyan/10"
+                      >
+                        <FolderIcon className="h-4 w-4 text-accent-cyan" />
+                        <span className="truncate">{entry.name}</span>
+                        <ChevronRightIcon className="ml-auto h-4 w-4 text-ui-ink-faint" />
+                      </button>
+                    </li>
+                  ) : (
+                    <li
+                      key={entry.path}
+                      className="flex items-center gap-2 px-3 py-2 text-ui-sm text-ui-ink-faint"
+                    >
+                      <DocumentIcon className="h-4 w-4" />
+                      <span className="truncate">{entry.name}</span>
+                    </li>
+                  )
+                )}
+              </ul>
             )}
-          </ul>
-        )}
-      </div>
+          </div>
         </DialogBody>
 
         <DialogFooter className="justify-between gap-3">

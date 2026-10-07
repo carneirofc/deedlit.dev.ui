@@ -1,17 +1,17 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { resetLibraryConfigCache } from "../../lib/library/config";
-import {
-  extractMetadataFromBuffer,
-  MetadataServiceNotConfiguredError,
-} from "../../lib/library/services/metadata-client";
-import { mapExtractResult } from "../../lib/library/services/metadata-service";
 import {
   generateImageEmbedding,
   generateImageEmbeddingFromBuffer,
   generateTextEmbedding,
-  VisionServiceNotConfiguredError,
+  VisionServiceNotConfiguredError
 } from "../../lib/library/services/embedding-service";
+import {
+  extractMetadataFromBuffer,
+  MetadataServiceNotConfiguredError
+} from "../../lib/library/services/metadata-client";
+import { mapExtractResult } from "../../lib/library/services/metadata-service";
 
 // ---------------------------------------------------------------------------
 // Test harness: stub global.fetch + drive config via env, resetting both.
@@ -65,11 +65,18 @@ const A1111_EXTRACT = {
     denoise: null,
     clipskip: null,
     width: 512,
-    height: 768,
+    height: 768
   },
-  references: { checkpoints: [], loras: [], embeddings: [], vae: [], controlnets: [], upscalers: [] },
+  references: {
+    checkpoints: [],
+    loras: [],
+    embeddings: [],
+    vae: [],
+    controlnets: [],
+    upscalers: []
+  },
   workflow_json: null,
-  api_prompt_json: null,
+  api_prompt_json: null
 };
 
 // ComfyUI ExtractResult.
@@ -87,7 +94,7 @@ const COMFY_EXTRACT = {
     denoise: 1,
     clipskip: null,
     width: 1024,
-    height: 1024,
+    height: 1024
   },
   references: {
     checkpoints: [{ name: "sdxl_base.safetensors", hash: null }],
@@ -95,16 +102,16 @@ const COMFY_EXTRACT = {
     embeddings: [],
     vae: [],
     controlnets: [],
-    upscalers: [],
+    upscalers: []
   },
   workflow_json: { nodes: [{ id: 1 }] },
-  api_prompt_json: { "1": { class_type: "KSampler" } },
+  api_prompt_json: { "1": { class_type: "KSampler" } }
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json" }
   });
 }
 
@@ -172,7 +179,7 @@ test("metadata client throws on non-OK, non-422 responses (service down)", async
     stubFetch(async () => new Response("boom", { status: 500 }));
     try {
       await expect(
-        extractMetadataFromBuffer(Buffer.from("x"), "image/png", "x.png"),
+        extractMetadataFromBuffer(Buffer.from("x"), "image/png", "x.png")
       ).rejects.toThrow(/deedlit\.metadata \/extract 500/);
     } finally {
       restoreFetch();
@@ -199,7 +206,7 @@ test("mapExtractResult maps an A1111 ExtractResult into the monolith shape", () 
     sampler: "DPM++ 2M Karras",
     width: 512,
     height: 768,
-    clipSkip: null, // clipskip → clipSkip rename
+    clipSkip: null // clipskip → clipSkip rename
   });
 });
 
@@ -219,9 +226,16 @@ test("mapExtractResult collapses the 'unknown' source tool to null", () => {
     negative: null,
     tags: [],
     params: {},
-    references: { checkpoints: [], loras: [], embeddings: [], vae: [], controlnets: [], upscalers: [] },
+    references: {
+      checkpoints: [],
+      loras: [],
+      embeddings: [],
+      vae: [],
+      controlnets: [],
+      upscalers: []
+    },
     workflow_json: null,
-    api_prompt_json: null,
+    api_prompt_json: null
   });
   expect(mapped.sourceTool).toBeNull();
   expect(mapped.prompt).toBeNull();
@@ -240,7 +254,7 @@ test("mapExtractResult falls back to api_prompt_json when workflow_json is absen
 test("generateImageEmbedding throws when CLIP_VISION_API_URL is unset (no fallback)", async () => {
   await withEnv({ CLIP_VISION_API_URL: "" }, async () => {
     await expect(generateImageEmbedding("C:/does/not/matter.png")).rejects.toBeInstanceOf(
-      VisionServiceNotConfiguredError,
+      VisionServiceNotConfiguredError
     );
   });
 });
@@ -248,7 +262,7 @@ test("generateImageEmbedding throws when CLIP_VISION_API_URL is unset (no fallba
 test("generateImageEmbeddingFromBuffer throws when CLIP_VISION_API_URL is unset", async () => {
   await withEnv({ CLIP_VISION_API_URL: "" }, async () => {
     await expect(
-      generateImageEmbeddingFromBuffer(Buffer.from("img"), "image/png", "x.png"),
+      generateImageEmbeddingFromBuffer(Buffer.from("img"), "image/png", "x.png")
     ).rejects.toBeInstanceOf(VisionServiceNotConfiguredError);
   });
 });
@@ -256,7 +270,7 @@ test("generateImageEmbeddingFromBuffer throws when CLIP_VISION_API_URL is unset"
 test("generateTextEmbedding throws when CLIP_VISION_API_URL is unset (no hash fallback)", async () => {
   await withEnv({ CLIP_VISION_API_URL: "" }, async () => {
     await expect(generateTextEmbedding("a castle at dusk")).rejects.toBeInstanceOf(
-      VisionServiceNotConfiguredError,
+      VisionServiceNotConfiguredError
     );
   });
 });

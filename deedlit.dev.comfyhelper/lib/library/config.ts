@@ -105,18 +105,22 @@ export function getLibraryConfig(): LibraryConfig {
   cached = {
     databaseUrl: envString(
       "DATABASE_URL",
-      "postgresql://imageapp:imageapp@localhost:5432/imageapp",
+      "postgresql://imageapp:imageapp@localhost:5432/imageapp"
     ),
     neo4j: {
       uri: envString("NEO4J_URI", "bolt://localhost:7687"),
       user: envString("NEO4J_USER", "neo4j"),
-      password: envString("NEO4J_PASSWORD", "password"),
+      password: envString("NEO4J_PASSWORD", "password")
     },
     qdrantUrl: envString("QDRANT_URL", "http://localhost:6333"),
     qdrantApiKey: process.env.QDRANT_API_KEY?.trim() || undefined,
     publicBaseUrl: envString("COMFYHELPER_PUBLIC_URL", "http://localhost:3000").replace(/\/+$/, ""),
-    imageLibraryRoot: path.resolve(envString("IMAGE_LIBRARY_ROOT", path.join(process.cwd(), "data", "library"))),
-    thumbnailRoot: path.resolve(envString("THUMBNAIL_ROOT", path.join(process.cwd(), "data", "thumbnails"))),
+    imageLibraryRoot: path.resolve(
+      envString("IMAGE_LIBRARY_ROOT", path.join(process.cwd(), "data", "library"))
+    ),
+    thumbnailRoot: path.resolve(
+      envString("THUMBNAIL_ROOT", path.join(process.cwd(), "data", "thumbnails"))
+    ),
     enrichment: {
       enabled: envBool("ENABLE_EXTERNAL_VISION_ENRICHMENT", false),
       visionProvider: envString("EXTERNAL_VISION_PROVIDER", "none") as VisionProvider,
@@ -124,12 +128,15 @@ export function getLibraryConfig(): LibraryConfig {
       visionApiKey: envString("EXTERNAL_VISION_API_KEY", ""),
       visionModel: envString("EXTERNAL_VISION_MODEL", ""),
       textEmbeddingProvider: envString("EXTERNAL_TEXT_EMBEDDING_PROVIDER", "local"),
-      imageEmbeddingProvider: envString("EXTERNAL_IMAGE_EMBEDDING_PROVIDER", "local"),
+      imageEmbeddingProvider: envString("EXTERNAL_IMAGE_EMBEDDING_PROVIDER", "local")
     },
     mcpEnabled: envBool("MCP_ENABLED", true),
     clipVisionApiUrl,
     metadataApiUrl: envString("METADATA_API_URL", "http://localhost:8005").replace(/\/+$/, ""),
-    embeddingDimensions: parseInt(envString("EMBEDDING_DIMENSIONS", String(defaultEmbeddingDimensions)), 10),
+    embeddingDimensions: parseInt(
+      envString("EMBEDDING_DIMENSIONS", String(defaultEmbeddingDimensions)),
+      10
+    ),
     // Floor for the SHORTER edge (px); thumbnails are downscaled to this and
     // never upscaled. `medium` doubles as the viewer image, so it stays "1080p"
     // class; `small` feeds dense grids/filmstrips.
@@ -142,8 +149,8 @@ export function getLibraryConfig(): LibraryConfig {
       accessKey: envString("OBJECT_STORE_ACCESS_KEY", "rustfsadmin"),
       secretKey: envString("OBJECT_STORE_SECRET_KEY", "rustfsadmin"),
       bucket: envString("OBJECT_STORE_BUCKET", "comfyhelper"),
-      forcePathStyle: envBool("OBJECT_STORE_FORCE_PATH_STYLE", true),
-    },
+      forcePathStyle: envBool("OBJECT_STORE_FORCE_PATH_STYLE", true)
+    }
   };
 
   return cached;

@@ -1,18 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-
 import { CodeBlock, CopyButton } from "@carneirofc/ui";
+import Link from "next/link";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-import { getIngestConfig, updateIngestConfig, type IngestConfig } from "@/lib/api-client";
+import { getIngestConfig, type IngestConfig, updateIngestConfig } from "@/lib/api-client";
 import {
   DEFAULT_SETTINGS,
+  type LibrarySettings,
   SAFETY_CLASSES,
   SAFETY_LABEL,
-  useSettings,
-  type LibrarySettings,
   type SafetyClass,
+  useSettings
 } from "@/lib/store/settings";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +22,7 @@ const cls = {
   card: "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
   select:
-    "rounded-lg border border-ui-border/70 bg-ui-bg px-2.5 py-1.5 text-ui-xs outline-none focus:border-accent-cyan",
+    "rounded-lg border border-ui-border/70 bg-ui-bg px-2.5 py-1.5 text-ui-xs outline-none focus:border-accent-cyan"
 };
 
 // ---------------------------------------------------------------------------
@@ -72,7 +71,7 @@ function Toggle({
   checked,
   onChange,
   testId,
-  ariaLabel,
+  ariaLabel
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -105,7 +104,7 @@ function Segmented<T extends string>({
   value,
   options,
   onChange,
-  testIdPrefix,
+  testIdPrefix
 }: {
   value: T;
   options: ReadonlyArray<{ value: T; label: string }>;
@@ -141,7 +140,7 @@ function NumberSlider({
   format,
   onChange,
   testId,
-  label,
+  label
 }: {
   value: number;
   min: number;
@@ -244,10 +243,7 @@ function IngestSettingsSection() {
             label="AI labelling (LLM)"
             hint="Run the vision model to add a description, content-safety class & extra tags to each image. Off skips it — images are still cataloged, embedded & searchable. Applies to new ingests (and the label-backfill sweep)."
             control={
-              <Toggle
-                checked={cfg.llm_enabled}
-                onChange={(v) => save({ llm_enabled: v })}
-              />
+              <Toggle checked={cfg.llm_enabled} onChange={(v) => save({ llm_enabled: v })} />
             }
           />
           <Row
@@ -281,7 +277,11 @@ function IngestSettingsSection() {
             value="single · prefetch 1"
             hint="When AI labelling is on, the label queue runs one exclusive consumer at prefetch 1 so the vision model is never hit concurrently. Fixed."
           />
-          <p className="pt-2 text-ui-2xs text-ui-ink-muted" aria-live="polite" data-testid="ingest-config-status">
+          <p
+            className="pt-2 text-ui-2xs text-ui-ink-muted"
+            aria-live="polite"
+            data-testid="ingest-config-status"
+          >
             {rescan === "error"
               ? "Rescan failed — is the ingest service up?"
               : status === "saving"
@@ -326,9 +326,9 @@ function McpAccessSection() {
       JSON.stringify(
         { mcpServers: { "comfyhelper-image-library": { type: "http", url: endpoint } } },
         null,
-        2,
+        2
       ),
-    [endpoint],
+    [endpoint]
   );
 
   const copy = useCallback((text: string, which: "url" | "config") => {
@@ -449,15 +449,15 @@ export default function SettingsPage() {
   // Convenience binders so each row reads/writes a single key.
   const bool = (k: keyof LibrarySettings) => ({
     checked: settings[k] as boolean,
-    onChange: (v: boolean) => setKey(k, v as never),
+    onChange: (v: boolean) => setKey(k, v as never)
   });
   const seg = <T extends string>(k: keyof LibrarySettings) => ({
     value: settings[k] as T,
-    onChange: (v: T) => setKey(k, v as never),
+    onChange: (v: T) => setKey(k, v as never)
   });
   const slide = (k: keyof LibrarySettings) => ({
     value: settings[k] as number,
-    onChange: (v: number) => setKey(k, v as never),
+    onChange: (v: number) => setKey(k, v as never)
   });
 
   // Toggle one content-safety class in/out of the default-shown set.
@@ -486,8 +486,8 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-ui-2xl font-semibold text-ui-ink-title">Settings</h1>
           <p className="text-ui-sm text-ui-ink-muted">
-            Tune browsing, the image viewer, and how suggestions are surfaced.
-            Stored locally in this browser.
+            Tune browsing, the image viewer, and how suggestions are surfaced. Stored locally in
+            this browser.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -505,327 +505,342 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      {!hydrated && (
-        <p className="text-ui-xs text-ui-ink-muted">Loading saved settings…</p>
-      )}
+      {!hydrated && <p className="text-ui-xs text-ui-ink-muted">Loading saved settings…</p>}
 
       {/* Cards flow into 2–3 balanced columns on wide desktops. CSS multi-column
           (not grid) so uneven card heights pack without leaving row gaps. */}
       <div className="columns-1 gap-6 lg:columns-2 2xl:columns-3 [&>section]:mb-6 [&>section]:break-inside-avoid">
-      {/* Browsing & pagination */}
-      <Section
-        title="Browsing & pagination"
-        hint="Controls the library grid, page size, and which tab opens first."
-      >
-        <Row
-          label="Results per page"
-          hint="How many images load per request / “Load more” step."
-          control={
-            <NumberSlider
-              {...slide("pageSize")}
-              min={10}
-              max={200}
-              step={10}
-              testId="settings-slider-page-size"
-              label="Results per page"
-            />
-          }
-        />
-        <Row
-          label="Open search on"
-          hint="Text/tag search runs a hybrid keyword + semantic match; “By image” opens the reverse-image dropzone."
-          control={
-            <Segmented
-              {...seg<LibrarySettings["defaultMode"]>("defaultMode")}
-              options={[
-                { value: "browse", label: "Search" },
-                { value: "image", label: "By image" },
-              ]}
-              testIdPrefix="settings-mode"
-            />
-          }
-        />
-        <Row
-          label="Layout"
-          hint="How result cards are arranged."
-          control={
-            <Segmented
-              {...seg<LibrarySettings["viewMode"]>("viewMode")}
-              options={[
-                { value: "grid", label: "Grid" },
-                { value: "masonry", label: "Masonry" },
-                { value: "list", label: "List" },
-              ]}
-              testIdPrefix="settings-viewmode"
-            />
-          }
-        />
-        <Row
-          label="Density"
-          hint="Card size / columns for grid & masonry."
-          control={
-            <Segmented
-              {...seg<LibrarySettings["gridDensity"]>("gridDensity")}
-              options={[
-                { value: "compact", label: "Compact" },
-                { value: "comfortable", label: "Comfortable" },
-                { value: "spacious", label: "Spacious" },
-              ]}
-              testIdPrefix="settings-density"
-            />
-          }
-        />
-        <Row
-          label="Infinite scroll"
-          hint="Auto-load the next page when you reach the bottom."
-          control={<Toggle {...bool("infiniteScroll")} testId="settings-toggle-infinite-scroll" />}
-        />
-        <Row
-          label="Show score chips"
-          control={<Toggle {...bool("showScores")} testId="settings-toggle-show-scores" />}
-        />
-        <Row
-          label="Show card metadata"
-          control={<Toggle {...bool("showCardMeta")} testId="settings-toggle-show-card-meta" />}
-        />
-      </Section>
+        {/* Browsing & pagination */}
+        <Section
+          title="Browsing & pagination"
+          hint="Controls the library grid, page size, and which tab opens first."
+        >
+          <Row
+            label="Results per page"
+            hint="How many images load per request / “Load more” step."
+            control={
+              <NumberSlider
+                {...slide("pageSize")}
+                min={10}
+                max={200}
+                step={10}
+                testId="settings-slider-page-size"
+                label="Results per page"
+              />
+            }
+          />
+          <Row
+            label="Open search on"
+            hint="Text/tag search runs a hybrid keyword + semantic match; “By image” opens the reverse-image dropzone."
+            control={
+              <Segmented
+                {...seg<LibrarySettings["defaultMode"]>("defaultMode")}
+                options={[
+                  { value: "browse", label: "Search" },
+                  { value: "image", label: "By image" }
+                ]}
+                testIdPrefix="settings-mode"
+              />
+            }
+          />
+          <Row
+            label="Layout"
+            hint="How result cards are arranged."
+            control={
+              <Segmented
+                {...seg<LibrarySettings["viewMode"]>("viewMode")}
+                options={[
+                  { value: "grid", label: "Grid" },
+                  { value: "masonry", label: "Masonry" },
+                  { value: "list", label: "List" }
+                ]}
+                testIdPrefix="settings-viewmode"
+              />
+            }
+          />
+          <Row
+            label="Density"
+            hint="Card size / columns for grid & masonry."
+            control={
+              <Segmented
+                {...seg<LibrarySettings["gridDensity"]>("gridDensity")}
+                options={[
+                  { value: "compact", label: "Compact" },
+                  { value: "comfortable", label: "Comfortable" },
+                  { value: "spacious", label: "Spacious" }
+                ]}
+                testIdPrefix="settings-density"
+              />
+            }
+          />
+          <Row
+            label="Infinite scroll"
+            hint="Auto-load the next page when you reach the bottom."
+            control={
+              <Toggle {...bool("infiniteScroll")} testId="settings-toggle-infinite-scroll" />
+            }
+          />
+          <Row
+            label="Show score chips"
+            control={<Toggle {...bool("showScores")} testId="settings-toggle-show-scores" />}
+          />
+          <Row
+            label="Show card metadata"
+            control={<Toggle {...bool("showCardMeta")} testId="settings-toggle-show-card-meta" />}
+          />
+        </Section>
 
-      {/* Image viewer */}
-      <Section title="Image viewer" hint="Applied on the single-image detail page.">
-        <Row
-          label="Image fit"
-          control={
-            <Segmented
-              {...seg<LibrarySettings["viewerImageFit"]>("viewerImageFit")}
-              options={[
-                { value: "contain", label: "Contain" },
-                { value: "cover", label: "Cover" },
-              ]}
-              testIdPrefix="settings-viewerfit"
-            />
-          }
-        />
-        <Row
-          label="Full-resolution original"
-          hint="Stream the source file instead of the thumbnail (slower, sharper)."
-          control={
-            <Toggle {...bool("viewerFullResolution")} testId="settings-toggle-viewer-full-resolution" />
-          }
-        />
-        <Row
-          label="Show prompt"
-          control={<Toggle {...bool("showPrompt")} testId="settings-toggle-show-prompt" />}
-        />
-        <Row
-          label="Show AI description"
-          hint="The vision-model description generated by the label agent."
-          control={<Toggle {...bool("showDescription")} testId="settings-toggle-show-description" />}
-        />
-        <Row
-          label="Show generation parameters"
-          control={
-            <Toggle {...bool("showGenerationParams")} testId="settings-toggle-show-generation-params" />
-          }
-        />
-        <Row
-          label="Show relationship graph"
-          control={
-            <Toggle
-              {...bool("showRelationshipGraph")}
-              testId="settings-toggle-show-relationship-graph"
-            />
-          }
-        />
-        <Row
-          label="Graph depth"
-          hint="How many relationship hops to expand."
-          control={
-            <NumberSlider
-              {...slide("graphDepth")}
-              min={1}
-              max={3}
-              step={1}
-              testId="settings-slider-graph-depth"
-              label="Graph depth"
-            />
-          }
-        />
-      </Section>
+        {/* Image viewer */}
+        <Section title="Image viewer" hint="Applied on the single-image detail page.">
+          <Row
+            label="Image fit"
+            control={
+              <Segmented
+                {...seg<LibrarySettings["viewerImageFit"]>("viewerImageFit")}
+                options={[
+                  { value: "contain", label: "Contain" },
+                  { value: "cover", label: "Cover" }
+                ]}
+                testIdPrefix="settings-viewerfit"
+              />
+            }
+          />
+          <Row
+            label="Full-resolution original"
+            hint="Stream the source file instead of the thumbnail (slower, sharper)."
+            control={
+              <Toggle
+                {...bool("viewerFullResolution")}
+                testId="settings-toggle-viewer-full-resolution"
+              />
+            }
+          />
+          <Row
+            label="Show prompt"
+            control={<Toggle {...bool("showPrompt")} testId="settings-toggle-show-prompt" />}
+          />
+          <Row
+            label="Show AI description"
+            hint="The vision-model description generated by the label agent."
+            control={
+              <Toggle {...bool("showDescription")} testId="settings-toggle-show-description" />
+            }
+          />
+          <Row
+            label="Show generation parameters"
+            control={
+              <Toggle
+                {...bool("showGenerationParams")}
+                testId="settings-toggle-show-generation-params"
+              />
+            }
+          />
+          <Row
+            label="Show relationship graph"
+            control={
+              <Toggle
+                {...bool("showRelationshipGraph")}
+                testId="settings-toggle-show-relationship-graph"
+              />
+            }
+          />
+          <Row
+            label="Graph depth"
+            hint="How many relationship hops to expand."
+            control={
+              <NumberSlider
+                {...slide("graphDepth")}
+                min={1}
+                max={3}
+                step={1}
+                testId="settings-slider-graph-depth"
+                label="Graph depth"
+              />
+            }
+          />
+        </Section>
 
-      {/* Suggestions & related */}
-      <Section
-        title="Suggestions & related items"
-        hint="The similar-images and related-tags panels on the viewer."
-      >
-        <Row
-          label="Show similar images"
-          control={<Toggle {...bool("showSimilar")} testId="settings-toggle-show-similar" />}
-        />
-        <Row
-          label="Similar images count"
-          control={
-            <NumberSlider
-              {...slide("similarCount")}
-              min={0}
-              max={48}
-              step={4}
-              testId="settings-slider-similar-count"
-              label="Similar images count"
-            />
-          }
-        />
-        <Row
-          label="Similarity threshold"
-          hint="Hide suggestions below this score."
-          control={
-            <NumberSlider
-              {...slide("similarMinScore")}
-              min={0}
-              max={1}
-              step={0.05}
-              format={(v) => v.toFixed(2)}
-              testId="settings-slider-similar-min-score"
-              label="Similarity threshold"
-            />
-          }
-        />
-        <Row
-          label="Load suggestions automatically"
-          hint="Off shows a button so the viewer opens faster."
-          control={
-            <Toggle {...bool("autoLoadSuggestions")} testId="settings-toggle-auto-load-suggestions" />
-          }
-        />
-        <Row
-          label="Show related tags"
-          control={<Toggle {...bool("showRelatedTags")} testId="settings-toggle-show-related-tags" />}
-        />
-        <Row
-          label="Related tags count"
-          control={
-            <NumberSlider
-              {...slide("relatedTagsCount")}
-              min={0}
-              max={40}
-              step={2}
-              testId="settings-slider-related-tags-count"
-              label="Related tags count"
-            />
-          }
-        />
-      </Section>
+        {/* Suggestions & related */}
+        <Section
+          title="Suggestions & related items"
+          hint="The similar-images and related-tags panels on the viewer."
+        >
+          <Row
+            label="Show similar images"
+            control={<Toggle {...bool("showSimilar")} testId="settings-toggle-show-similar" />}
+          />
+          <Row
+            label="Similar images count"
+            control={
+              <NumberSlider
+                {...slide("similarCount")}
+                min={0}
+                max={48}
+                step={4}
+                testId="settings-slider-similar-count"
+                label="Similar images count"
+              />
+            }
+          />
+          <Row
+            label="Similarity threshold"
+            hint="Hide suggestions below this score."
+            control={
+              <NumberSlider
+                {...slide("similarMinScore")}
+                min={0}
+                max={1}
+                step={0.05}
+                format={(v) => v.toFixed(2)}
+                testId="settings-slider-similar-min-score"
+                label="Similarity threshold"
+              />
+            }
+          />
+          <Row
+            label="Load suggestions automatically"
+            hint="Off shows a button so the viewer opens faster."
+            control={
+              <Toggle
+                {...bool("autoLoadSuggestions")}
+                testId="settings-toggle-auto-load-suggestions"
+              />
+            }
+          />
+          <Row
+            label="Show related tags"
+            control={
+              <Toggle {...bool("showRelatedTags")} testId="settings-toggle-show-related-tags" />
+            }
+          />
+          <Row
+            label="Related tags count"
+            control={
+              <NumberSlider
+                {...slide("relatedTagsCount")}
+                min={0}
+                max={40}
+                step={2}
+                testId="settings-slider-related-tags-count"
+                label="Related tags count"
+              />
+            }
+          />
+        </Section>
 
-      {/* Slideshow */}
-      <Section
-        title="Slideshow"
-        hint="The fullscreen viewer opened by clicking an image or the Slideshow button."
-      >
-        <Row
-          label="Auto-advance interval"
-          hint="Seconds each image is shown while the slideshow is playing."
-          control={
-            <NumberSlider
-              {...slide("slideshowInterval")}
-              min={1}
-              max={60}
-              step={1}
-              format={(v) => `${v}s`}
-              testId="settings-slider-slideshow-interval"
-              label="Auto-advance interval"
-            />
-          }
-        />
-        <Row
-          label="Loop"
-          hint="Return to the first image after the last."
-          control={<Toggle {...bool("slideshowLoop")} testId="settings-toggle-slideshow-loop" />}
-        />
-        <Row
-          label="Shuffle"
-          hint="Jump to a random image instead of the next in order."
-          control={<Toggle {...bool("slideshowShuffle")} testId="settings-toggle-slideshow-shuffle" />}
-        />
-      </Section>
+        {/* Slideshow */}
+        <Section
+          title="Slideshow"
+          hint="The fullscreen viewer opened by clicking an image or the Slideshow button."
+        >
+          <Row
+            label="Auto-advance interval"
+            hint="Seconds each image is shown while the slideshow is playing."
+            control={
+              <NumberSlider
+                {...slide("slideshowInterval")}
+                min={1}
+                max={60}
+                step={1}
+                format={(v) => `${v}s`}
+                testId="settings-slider-slideshow-interval"
+                label="Auto-advance interval"
+              />
+            }
+          />
+          <Row
+            label="Loop"
+            hint="Return to the first image after the last."
+            control={<Toggle {...bool("slideshowLoop")} testId="settings-toggle-slideshow-loop" />}
+          />
+          <Row
+            label="Shuffle"
+            hint="Jump to a random image instead of the next in order."
+            control={
+              <Toggle {...bool("slideshowShuffle")} testId="settings-toggle-slideshow-shuffle" />
+            }
+          />
+        </Section>
 
-      {/* Search defaults */}
-      <Section
-        title="Search defaults"
-        hint="Initial filter values the browse page opens with."
-      >
-        <Row
-          label="Minimum rating"
-          control={
-            <select
-              className={cls.select}
-              value={settings.defaultMinRating}
-              onChange={(e) => setKey("defaultMinRating", Number(e.target.value))}
-              data-testid="settings-default-min-rating-select"
-              aria-label="Minimum rating"
-            >
-              <option value={0}>Any</option>
-              <option value={1}>★+</option>
-              <option value={2}>★★+</option>
-              <option value={3}>★★★+</option>
-              <option value={4}>★★★★+</option>
-              <option value={5}>★★★★★</option>
-            </select>
-          }
-        />
-        <Row
-          label="Favorites only"
-          control={
-            <Toggle {...bool("defaultFavoritesOnly")} testId="settings-toggle-default-favorites-only" />
-          }
-        />
-        <Row
-          label="Content safety"
-          hint="Which safety classes the grid shows by default. All on = no filter; turn one off (e.g. Explicit) to hide it everywhere until you re-enable it."
-          control={
-            <div className="flex gap-1.5" data-testid="default-safety">
-              {SAFETY_CLASSES.map((c) => {
-                const on = settings.defaultSafety.includes(c);
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleDefaultSafety(c)}
-                    data-testid={`settings-default-safety-${c}`}
-                    className={`rounded-full border px-2.5 py-1 text-ui-2xs font-medium transition ${
-                      on
-                        ? "border-accent-cyan bg-accent-cyan/15 text-accent-cyan"
-                        : "border-ui-border/60 text-ui-ink-muted hover:text-ui-ink"
-                    }`}
-                  >
-                    {SAFETY_LABEL[c]}
-                  </button>
-                );
-              })}
-            </div>
-          }
-        />
-        <Row
-          label="Minimum match score"
-          hint="Default threshold for semantic / similar / by-image search."
-          control={
-            <NumberSlider
-              {...slide("defaultMinScore")}
-              min={0}
-              max={1}
-              step={0.05}
-              format={(v) => v.toFixed(2)}
-              testId="settings-slider-default-min-score"
-              label="Minimum match score"
-            />
-          }
-        />
-      </Section>
+        {/* Search defaults */}
+        <Section title="Search defaults" hint="Initial filter values the browse page opens with.">
+          <Row
+            label="Minimum rating"
+            control={
+              <select
+                className={cls.select}
+                value={settings.defaultMinRating}
+                onChange={(e) => setKey("defaultMinRating", Number(e.target.value))}
+                data-testid="settings-default-min-rating-select"
+                aria-label="Minimum rating"
+              >
+                <option value={0}>Any</option>
+                <option value={1}>★+</option>
+                <option value={2}>★★+</option>
+                <option value={3}>★★★+</option>
+                <option value={4}>★★★★+</option>
+                <option value={5}>★★★★★</option>
+              </select>
+            }
+          />
+          <Row
+            label="Favorites only"
+            control={
+              <Toggle
+                {...bool("defaultFavoritesOnly")}
+                testId="settings-toggle-default-favorites-only"
+              />
+            }
+          />
+          <Row
+            label="Content safety"
+            hint="Which safety classes the grid shows by default. All on = no filter; turn one off (e.g. Explicit) to hide it everywhere until you re-enable it."
+            control={
+              <div className="flex gap-1.5" data-testid="default-safety">
+                {SAFETY_CLASSES.map((c) => {
+                  const on = settings.defaultSafety.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleDefaultSafety(c)}
+                      data-testid={`settings-default-safety-${c}`}
+                      className={`rounded-full border px-2.5 py-1 text-ui-2xs font-medium transition ${
+                        on
+                          ? "border-accent-cyan bg-accent-cyan/15 text-accent-cyan"
+                          : "border-ui-border/60 text-ui-ink-muted hover:text-ui-ink"
+                      }`}
+                    >
+                      {SAFETY_LABEL[c]}
+                    </button>
+                  );
+                })}
+              </div>
+            }
+          />
+          <Row
+            label="Minimum match score"
+            hint="Default threshold for semantic / similar / by-image search."
+            control={
+              <NumberSlider
+                {...slide("defaultMinScore")}
+                min={0}
+                max={1}
+                step={0.05}
+                format={(v) => v.toFixed(2)}
+                testId="settings-slider-default-min-score"
+                label="Minimum match score"
+              />
+            }
+          />
+        </Section>
 
-      {/* Ingest & indexing (server-backed, not localStorage) */}
-      <IngestSettingsSection />
+        {/* Ingest & indexing (server-backed, not localStorage) */}
+        <IngestSettingsSection />
 
-      {/* Agent access (MCP) — connection details, not stored settings */}
-      <McpAccessSection />
+        {/* Agent access (MCP) — connection details, not stored settings */}
+        <McpAccessSection />
       </div>
     </div>
   );

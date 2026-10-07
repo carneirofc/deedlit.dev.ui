@@ -1,10 +1,9 @@
 "use client";
 
+import { CopyButton } from "@carneirofc/ui";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-
-import { CopyButton } from "@carneirofc/ui";
 
 import { useActivity } from "@/lib/store/activity";
 import { useSettings } from "@/lib/store/settings";
@@ -73,7 +72,12 @@ interface VectorDebug {
     clipVisionApiUrl: string | null;
   };
   params: { limit: number; minScore: number; hnswEf: number; exact: boolean };
-  hits: Array<{ id: string; score: number; isSelf: boolean; payload: Record<string, unknown> | null }>;
+  hits: Array<{
+    id: string;
+    score: number;
+    isSelf: boolean;
+    payload: Record<string, unknown> | null;
+  }>;
   warnings: string[];
   tookMs: number;
 }
@@ -107,7 +111,9 @@ export default function ImageDetailPage() {
   const [ratingBusy, setRatingBusy] = useState(false);
 
   // Notes state.
-  const [notes, setNotes] = useState<{ id: string; title?: string | null; created_at?: string }[]>([]);
+  const [notes, setNotes] = useState<{ id: string; title?: string | null; created_at?: string }[]>(
+    []
+  );
   const [notesLoading, setNotesLoading] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
@@ -119,37 +125,43 @@ export default function ImageDetailPage() {
   // Transient "Copied" state for the source-path copy button.
   const [pathCopied, setPathCopied] = useState(false);
 
-  const rateImage = useCallback(async (rating: number | null) => {
-    if (!detail || ratingBusy) return;
-    setRatingBusy(true);
-    try {
-      const res = await fetch(`/api/library/images/${imageId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rating }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setDetail(updated);
+  const rateImage = useCallback(
+    async (rating: number | null) => {
+      if (!detail || ratingBusy) return;
+      setRatingBusy(true);
+      try {
+        const res = await fetch(`/api/library/images/${imageId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ rating })
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setDetail(updated);
+        }
+      } finally {
+        setRatingBusy(false);
       }
-    } finally {
-      setRatingBusy(false);
-    }
-  }, [detail, imageId, ratingBusy]);
+    },
+    [detail, imageId, ratingBusy]
+  );
 
   // Detail load — independent of settings so the page renders immediately.
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setError(null);
-    try {
-      const res = await fetch(`/api/library/images/${imageId}`, { signal });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Not found");
-      setDetail(json);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(e instanceof Error ? e.message : "Failed to load");
-    }
-  }, [imageId]);
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setError(null);
+      try {
+        const res = await fetch(`/api/library/images/${imageId}`, { signal });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Not found");
+        setDetail(json);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setError(e instanceof Error ? e.message : "Failed to load");
+      }
+    },
+    [imageId]
+  );
 
   useEffect(() => {
     // Cancel the detail fetch if the user navigates away before it lands.
@@ -179,9 +191,9 @@ export default function ImageDetailPage() {
       body: JSON.stringify({
         imageId,
         limit: settings.similarCount,
-        minScore: settings.similarMinScore,
+        minScore: settings.similarMinScore
       }),
-      signal: ac.signal,
+      signal: ac.signal
     })
       .then((r) => r.json())
       .then((j) => {
@@ -203,7 +215,7 @@ export default function ImageDetailPage() {
     suggestRequested,
     settings.showSimilar,
     settings.similarCount,
-    settings.similarMinScore,
+    settings.similarMinScore
   ]);
 
   // Relationship graph.
@@ -214,7 +226,9 @@ export default function ImageDetailPage() {
     }
     let cancelled = false;
     const ac = new AbortController();
-    fetch(`/api/library/images/${imageId}/graph?depth=${settings.graphDepth}`, { signal: ac.signal })
+    fetch(`/api/library/images/${imageId}/graph?depth=${settings.graphDepth}`, {
+      signal: ac.signal
+    })
       .then((r) => r.json())
       .then((j) => {
         if (!cancelled) setGraph(j);
@@ -241,7 +255,10 @@ export default function ImageDetailPage() {
     const seed = detail.tags[0].normalizedName || detail.tags[0].name;
     let cancelled = false;
     const ac = new AbortController();
-    fetch(`/api/library/tags/${encodeURIComponent(seed)}/related?limit=${settings.relatedTagsCount}`, { signal: ac.signal })
+    fetch(
+      `/api/library/tags/${encodeURIComponent(seed)}/related?limit=${settings.relatedTagsCount}`,
+      { signal: ac.signal }
+    )
       .then((r) => r.json())
       .then((j) => {
         if (!cancelled) setRelatedTags(Array.isArray(j.related) ? j.related : []);
@@ -259,11 +276,18 @@ export default function ImageDetailPage() {
     const ac = new AbortController();
     setNotesLoading(true);
     fetch(`/api/library/notes/by-image/${encodeURIComponent(imageId)}`, { signal: ac.signal })
-      .then((r) => r.ok ? r.json() : [])
-      .then((j) => { if (alive) setNotes(Array.isArray(j) ? j : []); })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((j) => {
+        if (alive) setNotes(Array.isArray(j) ? j : []);
+      })
       .catch(() => {})
-      .finally(() => { if (alive) setNotesLoading(false); });
-    return () => { alive = false; ac.abort(); };
+      .finally(() => {
+        if (alive) setNotesLoading(false);
+      });
+    return () => {
+      alive = false;
+      ac.abort();
+    };
   }, [imageId]);
 
   const addNote = useCallback(async () => {
@@ -274,7 +298,7 @@ export default function ImageDetailPage() {
       const res = await fetch("/api/library/notes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] }),
+        body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] })
       });
       if (res.ok) {
         setNoteDraft("");
@@ -297,7 +321,7 @@ export default function ImageDetailPage() {
         const res = await fetch(`/api/library/images/${imageId}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ favorite: next }),
+          body: JSON.stringify({ favorite: next })
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
@@ -407,8 +431,15 @@ export default function ImageDetailPage() {
         <div className="min-w-0 flex-1 columns-[24rem] gap-4 [&>div]:mb-4 [&>div]:break-inside-avoid">
           <div className={panel}>
             <div className="flex items-center justify-between">
-              <h1 className="truncate text-ui-lg font-semibold text-ui-ink-title">{detail.filename}</h1>
-              <button onClick={toggleFavorite} className="text-ui-xl" aria-label="favorite" data-testid="image-detail-favorite-toggle">
+              <h1 className="truncate text-ui-lg font-semibold text-ui-ink-title">
+                {detail.filename}
+              </h1>
+              <button
+                onClick={toggleFavorite}
+                className="text-ui-xl"
+                aria-label="favorite"
+                data-testid="image-detail-favorite-toggle"
+              >
                 {detail.favorite ? "★" : "☆"}
               </button>
             </div>
@@ -449,10 +480,16 @@ export default function ImageDetailPage() {
             </div>
 
             <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-ui-xs text-ui-ink-muted">
-              <dt>Model</dt><dd className="break-words text-ui-ink">{detail.model ?? "—"}</dd>
-              <dt>Family</dt><dd className="break-words text-ui-ink">{detail.modelFamily ?? "—"}</dd>
-              <dt>Source</dt><dd className="break-words text-ui-ink">{detail.sourceTool ?? "—"}</dd>
-              <dt>Size</dt><dd className="break-words text-ui-ink">{detail.width}×{detail.height}</dd>
+              <dt>Model</dt>
+              <dd className="break-words text-ui-ink">{detail.model ?? "—"}</dd>
+              <dt>Family</dt>
+              <dd className="break-words text-ui-ink">{detail.modelFamily ?? "—"}</dd>
+              <dt>Source</dt>
+              <dd className="break-words text-ui-ink">{detail.sourceTool ?? "—"}</dd>
+              <dt>Size</dt>
+              <dd className="break-words text-ui-ink">
+                {detail.width}×{detail.height}
+              </dd>
             </dl>
 
             {/* Originating filesystem path, captured at ingest. The image's id is
@@ -489,8 +526,8 @@ export default function ImageDetailPage() {
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="text-ui-2xs text-ui-ink-muted">
-                    Remove this image&rsquo;s catalog record, search vector and graph
-                    links? The original file on disk is not deleted.
+                    Remove this image&rsquo;s catalog record, search vector and graph links? The
+                    original file on disk is not deleted.
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -541,10 +578,14 @@ export default function ImageDetailPage() {
               )}
               {detail.negativePrompt && (
                 <>
-                  <h2 className={`mb-1 text-ui-sm font-semibold text-ui-ink-title ${detail.prompt ? "mt-3" : ""}`}>
+                  <h2
+                    className={`mb-1 text-ui-sm font-semibold text-ui-ink-title ${detail.prompt ? "mt-3" : ""}`}
+                  >
                     Negative prompt
                   </h2>
-                  <p className="whitespace-pre-wrap text-ui-xs text-ui-ink-muted">{detail.negativePrompt}</p>
+                  <p className="whitespace-pre-wrap text-ui-xs text-ui-ink-muted">
+                    {detail.negativePrompt}
+                  </p>
                 </>
               )}
             </div>
@@ -595,7 +636,9 @@ export default function ImageDetailPage() {
               <h2 className="mb-2 text-ui-sm font-semibold text-ui-ink-title">LoRAs</h2>
               <ul className="text-ui-xs text-ui-ink">
                 {detail.loras.map((l) => (
-                  <li key={l.name}>{l.name} {l.weight != null ? `(${l.weight})` : ""}</li>
+                  <li key={l.name}>
+                    {l.name} {l.weight != null ? `(${l.weight})` : ""}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -653,7 +696,12 @@ export default function ImageDetailPage() {
                   data-testid={`image-detail-similar-link-${s.imageId}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.thumbnailUrl} alt={s.summary} loading="lazy" className="aspect-square w-full object-cover" />
+                  <img
+                    src={s.thumbnailUrl}
+                    alt={s.summary}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
                   {s.score != null && (
                     <span className="absolute bottom-1 right-1 rounded bg-ui-bg/85 px-1.5 py-0.5 text-ui-2xs font-mono text-accent-cyan">
                       {s.score.toFixed(3)}
@@ -680,7 +728,10 @@ export default function ImageDetailPage() {
         ) : (
           <ul className="mb-3 flex flex-col gap-2">
             {notes.map((n) => (
-              <li key={n.id} className="rounded-lg border border-ui-border/40 bg-ui-bg/60 px-3 py-2">
+              <li
+                key={n.id}
+                className="rounded-lg border border-ui-border/40 bg-ui-bg/60 px-3 py-2"
+              >
                 <p className="text-ui-xs text-ui-ink">{n.title ?? "(empty)"}</p>
                 {n.created_at && (
                   <p className="mt-0.5 text-ui-2xs text-ui-ink-muted/60">
@@ -697,7 +748,9 @@ export default function ImageDetailPage() {
             placeholder="Add a note…"
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") addNote(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addNote();
+            }}
             disabled={noteSaving}
             data-testid="image-detail-note-input"
           />
@@ -730,21 +783,36 @@ export default function ImageDetailPage() {
                 <dt>Embedder</dt>
                 <dd className="text-ui-ink">{debug.embedding.provider}</dd>
                 <dt>Semantic (CLIP)</dt>
-                <dd className={debug.embedding.hasExternalImageEmbeddings ? "text-emerald-400" : "text-amber-400"}>
-                  {debug.embedding.hasExternalImageEmbeddings ? "yes" : "no — vision not configured"}
+                <dd
+                  className={
+                    debug.embedding.hasExternalImageEmbeddings
+                      ? "text-emerald-400"
+                      : "text-amber-400"
+                  }
+                >
+                  {debug.embedding.hasExternalImageEmbeddings
+                    ? "yes"
+                    : "no — vision not configured"}
                 </dd>
                 <dt>Embedder dims</dt>
                 <dd className="text-ui-ink">{debug.embedding.dimensions}</dd>
                 <dt>Collection dims</dt>
-                <dd className={
-                  debug.collection.vectorSize === debug.embedding.dimensions ? "text-ui-ink" : "text-rose-400"
-                }>
-                  {debug.collection.vectorSize ?? "—"} {debug.collection.distance ? `(${debug.collection.distance})` : ""}
+                <dd
+                  className={
+                    debug.collection.vectorSize === debug.embedding.dimensions
+                      ? "text-ui-ink"
+                      : "text-rose-400"
+                  }
+                >
+                  {debug.collection.vectorSize ?? "—"}{" "}
+                  {debug.collection.distance ? `(${debug.collection.distance})` : ""}
                 </dd>
                 <dt>Points</dt>
                 <dd className="text-ui-ink">{debug.collection.pointsCount ?? "—"}</dd>
                 <dt>hnsw_ef / exact</dt>
-                <dd className="text-ui-ink">{debug.params.hnswEf} / {String(debug.params.exact)}</dd>
+                <dd className="text-ui-ink">
+                  {debug.params.hnswEf} / {String(debug.params.exact)}
+                </dd>
                 <dt>minScore</dt>
                 <dd className="text-ui-ink">{debug.params.minScore}</dd>
                 <dt>Took</dt>
@@ -754,14 +822,22 @@ export default function ImageDetailPage() {
                 <dl className="grid grid-cols-2 gap-1 text-ui-ink-muted sm:grid-cols-4">
                   <dt>Vector norm</dt>
                   <dd className={debug.query.stats.isZero ? "text-rose-400" : "text-ui-ink"}>
-                    {debug.query.stats.norm.toFixed(4)} {debug.query.stats.isZero ? "(ZERO — reindex!)" : ""}
+                    {debug.query.stats.norm.toFixed(4)}{" "}
+                    {debug.query.stats.isZero ? "(ZERO — reindex!)" : ""}
                   </dd>
                   <dt>Non-zero</dt>
-                  <dd className="text-ui-ink">{debug.query.stats.nonZero}/{debug.query.stats.dims}</dd>
+                  <dd className="text-ui-ink">
+                    {debug.query.stats.nonZero}/{debug.query.stats.dims}
+                  </dd>
                   <dt>min / max</dt>
-                  <dd className="text-ui-ink">{debug.query.stats.min.toFixed(3)} / {debug.query.stats.max.toFixed(3)}</dd>
+                  <dd className="text-ui-ink">
+                    {debug.query.stats.min.toFixed(3)} / {debug.query.stats.max.toFixed(3)}
+                  </dd>
                   <dt>sample</dt>
-                  <dd className="truncate font-mono text-ui-ink" title={debug.query.stats.sample.join(", ")}>
+                  <dd
+                    className="truncate font-mono text-ui-ink"
+                    title={debug.query.stats.sample.join(", ")}
+                  >
                     [{debug.query.stats.sample.map((n) => n.toFixed(2)).join(", ")}]
                   </dd>
                 </dl>
@@ -788,8 +864,17 @@ export default function ImageDetailPage() {
                           <td className="py-1 pr-3 text-accent-cyan">{h.score.toFixed(4)}</td>
                           <td className="py-1 pr-3">{String(h.payload?.checkpoint ?? "—")}</td>
                           <td className="py-1 pr-3">{String(h.payload?.model_family ?? "—")}</td>
-                          <td className="max-w-[20rem] truncate py-1" title={Array.isArray(h.payload?.tags) ? (h.payload?.tags as string[]).join(", ") : ""}>
-                            {Array.isArray(h.payload?.tags) ? (h.payload?.tags as string[]).slice(0, 6).join(", ") : "—"}
+                          <td
+                            className="max-w-[20rem] truncate py-1"
+                            title={
+                              Array.isArray(h.payload?.tags)
+                                ? (h.payload?.tags as string[]).join(", ")
+                                : ""
+                            }
+                          >
+                            {Array.isArray(h.payload?.tags)
+                              ? (h.payload?.tags as string[]).slice(0, 6).join(", ")
+                              : "—"}
                           </td>
                         </tr>
                       ))}

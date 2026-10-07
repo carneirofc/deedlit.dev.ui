@@ -1,5 +1,5 @@
+import { GatewayError, getHealth, type ServiceHealth } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
-import { getHealth, GatewayError, type ServiceHealth } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ const DEP_LABELS: Record<string, string> = {
   neo4j_ready: "Neo4j",
   vision_ready: "CLIP model",
   text_ready: "Text encoder",
-  sparse_ready: "SPLADE model",
+  sparse_ready: "SPLADE model"
 };
 
 /** Pull the boolean `*_ready` flags out of a service's detail into dependency rows. */
@@ -65,8 +65,8 @@ export async function GET() {
         ...upstream.map((s) => ({
           name: s.name,
           status: s.status,
-          dependencies: dependencies(s.detail),
-        })),
+          dependencies: dependencies(s.detail)
+        }))
       ];
 
       const services: Record<string, boolean> = {};
@@ -74,8 +74,16 @@ export async function GET() {
 
       const healthy = health.status === "ok";
       return jsonOk(
-        { healthy, status: health.status, gatewayReachable: true, checkedAt, components, services, warnings: [] },
-        { status: healthy ? 200 : 503 },
+        {
+          healthy,
+          status: health.status,
+          gatewayReachable: true,
+          checkedAt,
+          components,
+          services,
+          warnings: []
+        },
+        { status: healthy ? 200 : 503 }
       );
     } catch (e) {
       const message = e instanceof GatewayError ? e.message : "gateway unreachable";
@@ -87,9 +95,9 @@ export async function GET() {
           checkedAt,
           components: [{ name: "gateway", status: "down" as const, dependencies: [] }],
           services: { gateway: false },
-          warnings: [message],
+          warnings: [message]
         },
-        { status: 503 },
+        { status: 503 }
       );
     }
   });

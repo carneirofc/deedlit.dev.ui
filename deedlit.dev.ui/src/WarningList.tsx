@@ -12,7 +12,7 @@ export type WarningListProps = HTMLAttributes<HTMLDivElement> & {
 
 const WarningList = forwardRef<HTMLDivElement, WarningListProps>(function WarningList(
   { warnings, testId, entryTestId, className, ...props },
-  ref,
+  ref
 ) {
   if (warnings.length === 0) {
     return null;
@@ -28,7 +28,7 @@ const WarningList = forwardRef<HTMLDivElement, WarningListProps>(function Warnin
       className={cn(
         "rounded-xl border border-warn-edge bg-warn text-ui-sm text-warn-ink",
         SPACING_PATTERNS.controlMd,
-        className,
+        className
       )}
     >
       {warnings.map((warning) => (
@@ -43,4 +43,3 @@ const WarningList = forwardRef<HTMLDivElement, WarningListProps>(function Warnin
 WarningList.displayName = "WarningList";
 
 export default WarningList;
-

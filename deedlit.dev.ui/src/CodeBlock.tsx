@@ -17,7 +17,7 @@ export type CodeBlockProps = {
  */
 const CodeBlock = forwardRef<HTMLPreElement, CodeBlockProps>(function CodeBlock(
   { children, maxHeight = "max-h-[65vh]", className, testId },
-  ref,
+  ref
 ) {
   return (
     <pre
@@ -26,7 +26,7 @@ const CodeBlock = forwardRef<HTMLPreElement, CodeBlockProps>(function CodeBlock(
       className={cn(
         "overflow-auto rounded-lg bg-ui-bg-deep p-2 text-ui-xs text-ui-ink-inverse",
         maxHeight,
-        className,
+        className
       )}
     >
       {children}

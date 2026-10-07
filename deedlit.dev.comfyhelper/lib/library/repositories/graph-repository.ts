@@ -50,21 +50,21 @@ export async function upsertImageNode(input: GraphImageInput): Promise<void> {
       loras: input.loras,
       model: input.model,
       checkpoint: input.checkpoint,
-      folder: input.folder,
-    },
+      folder: input.folder
+    }
   );
 }
 
 export async function upsertLineageEdge(
   sourceId: string,
   derivedId: string,
-  relationType: string,
+  relationType: string
 ): Promise<void> {
   const rel = relationType.toUpperCase();
   await runCypher(
     `MATCH (a:Image {id: $sourceId}) MATCH (b:Image {id: $derivedId})
      MERGE (b)-[:${rel}]->(a)`,
-    { sourceId, derivedId },
+    { sourceId, derivedId }
   );
 }
 
@@ -76,11 +76,12 @@ export async function clearGraph(): Promise<void> {
 export async function getImageSubgraph(
   imageId: string,
   depth: number,
-  relationshipTypes: string[] | undefined,
+  relationshipTypes: string[] | undefined
 ): Promise<Graph> {
-  const relFilter = relationshipTypes && relationshipTypes.length > 0
-    ? `:${relationshipTypes.map((r) => r.toUpperCase()).join("|")}`
-    : "";
+  const relFilter =
+    relationshipTypes && relationshipTypes.length > 0
+      ? `:${relationshipTypes.map((r) => r.toUpperCase()).join("|")}`
+      : "";
   const result = await runCypher(
     `MATCH path = (img:Image {id: $imageId})-[${relFilter}*1..${depth}]-(other)
      WITH nodes(path) AS ns, relationships(path) AS rs
@@ -90,7 +91,7 @@ export async function getImageSubgraph(
      WITH nodes, collect(DISTINCT r) AS rels
      RETURN nodes, rels`,
     { imageId },
-    "READ",
+    "READ"
   );
 
   const graph: Graph = { nodes: [], edges: [] };
@@ -100,8 +101,17 @@ export async function getImageSubgraph(
     return graph;
   }
 
-  const nodes = record.get("nodes") as Array<{ identity: number | string; labels: string[]; properties: Record<string, unknown> }>;
-  const rels = record.get("rels") as Array<{ type: string; start: number | string; end: number | string; properties: Record<string, unknown> }>;
+  const nodes = record.get("nodes") as Array<{
+    identity: number | string;
+    labels: string[];
+    properties: Record<string, unknown>;
+  }>;
+  const rels = record.get("rels") as Array<{
+    type: string;
+    start: number | string;
+    end: number | string;
+    properties: Record<string, unknown>;
+  }>;
 
   const idOf = (n: { identity: number | string; properties: Record<string, unknown> }) =>
     String(n.properties.id ?? n.properties.name ?? n.properties.path ?? n.identity);
@@ -131,16 +141,14 @@ const HUB_PROP: Record<GraphNodeRefType, string> = {
   Model: "name",
   Checkpoint: "name",
   LoRA: "name",
-  Folder: "path",
+  Folder: "path"
 };
 type GraphNodeRefType = "Tag" | "Model" | "Checkpoint" | "LoRA" | "Folder";
 
 /** Whitelist relationship types to safe Cypher identifiers (avoids injection). */
 function relTypeFilter(types: string[] | undefined): string {
   if (!types || types.length === 0) return "";
-  const safe = types
-    .map((t) => t.toUpperCase().replace(/[^A-Z_]/g, ""))
-    .filter(Boolean);
+  const safe = types.map((t) => t.toUpperCase().replace(/[^A-Z_]/g, "")).filter(Boolean);
   return safe.length ? `:${safe.join("|")}` : "";
 }
 
@@ -161,7 +169,7 @@ export async function getConnectedImageIds(scope: GraphScope, limit: number): Pr
         WHERE n.${prop} = $value
         RETURN DISTINCT img.id AS id LIMIT ${cap}`,
       { value: scope.node.value },
-      "READ",
+      "READ"
     );
     return result.records.map((r) => String(r.get("id")));
   }
@@ -172,7 +180,7 @@ export async function getConnectedImageIds(scope: GraphScope, limit: number): Pr
         WHERE img.id <> $imageId
         RETURN DISTINCT img.id AS id LIMIT ${cap}`,
       { imageId: scope.relatedToImageId },
-      "READ",
+      "READ"
     );
     return result.records.map((r) => String(r.get("id")));
   }
@@ -186,9 +194,7 @@ export async function getConnectedImageIds(scope: GraphScope, limit: number): Pr
  * flagged `seed:true`.  Powers the comparison relationship view.
  */
 export async function getCombinedSubgraph(imageIds: string[], depth: number): Promise<Graph> {
-  const subgraphs = await Promise.all(
-    imageIds.map((id) => getImageSubgraph(id, depth, undefined)),
-  );
+  const subgraphs = await Promise.all(imageIds.map((id) => getImageSubgraph(id, depth, undefined)));
 
   const nodes = new Map<string, GraphNode>();
   const edges = new Map<string, GraphEdge>();
@@ -216,8 +222,8 @@ export async function getCombinedSubgraph(imageIds: string[], depth: number): Pr
     properties: {
       ...n.properties,
       ...(inputSet.has(n.id) ? { seed: true } : {}),
-      ...((refs.get(n.id)?.size ?? 0) > 1 ? { shared: true } : {}),
-    },
+      ...((refs.get(n.id)?.size ?? 0) > 1 ? { shared: true } : {})
+    }
   }));
 
   return { nodes: outNodes, edges: Array.from(edges.values()) };

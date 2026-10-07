@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
 import { TagSelect } from "@carneirofc/ui";
+import { useEffect, useRef, useState } from "react";
 
 import type { ExportKind } from "@/lib/library/bulk-export";
 
@@ -11,11 +10,19 @@ const SAFETY_CLASSES: SafetyClass[] = ["sfw", "nsfw", "explicit"];
 const SAFETY_LABEL: Record<SafetyClass, string> = {
   sfw: "SFW",
   nsfw: "NSFW",
-  explicit: "Explicit",
+  explicit: "Explicit"
 };
 
 /** Which bulk action is mid-flight (drives the busy/disabled state). */
-export type BulkBusy = "favorite" | "rating" | "safety" | "tags" | "export" | "move" | "delete" | null;
+export type BulkBusy =
+  | "favorite"
+  | "rating"
+  | "safety"
+  | "tags"
+  | "export"
+  | "move"
+  | "delete"
+  | null;
 
 const btn =
   "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50";
@@ -67,7 +74,7 @@ export function BulkActionBar(props: BulkActionBarProps) {
     onRequestDelete,
     onConfirmDelete,
     onCancelDelete,
-    fetchTagSuggestions,
+    fetchTagSuggestions
   } = props;
 
   const [moveDraft, setMoveDraft] = useState("");
@@ -97,10 +104,20 @@ export function BulkActionBar(props: BulkActionBarProps) {
       className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-accent-cyan/40 bg-ui-bg-soft/90 px-3 py-2 backdrop-blur-sm"
     >
       <span className="text-ui-sm font-medium text-ui-ink">{selectedCount} selected</span>
-      <button className={btn} onClick={onSelectAll} disabled={selectedCount === totalCount} data-testid="bulk-action-select-all">
+      <button
+        className={btn}
+        onClick={onSelectAll}
+        disabled={selectedCount === totalCount}
+        data-testid="bulk-action-select-all"
+      >
         Select all
       </button>
-      <button className={btn} onClick={onClear} disabled={none} data-testid="bulk-action-clear-selection">
+      <button
+        className={btn}
+        onClick={onClear}
+        disabled={none}
+        data-testid="bulk-action-clear-selection"
+      >
         Clear
       </button>
 
@@ -130,27 +147,71 @@ export function BulkActionBar(props: BulkActionBarProps) {
       </button>
 
       {/* Rating */}
-      <Menu label="Rating" open={menu === "rating"} onToggle={() => toggle("rating")} disabled={none || anyBusy} busy={busy === "rating"} testId="bulk-action-rating-toggle">
+      <Menu
+        label="Rating"
+        open={menu === "rating"}
+        onToggle={() => toggle("rating")}
+        disabled={none || anyBusy}
+        busy={busy === "rating"}
+        testId="bulk-action-rating-toggle"
+      >
         {[5, 4, 3, 2, 1].map((n) => (
-          <MenuItem key={n} onClick={() => { onRating(n); setMenu(null); }} testId={`bulk-action-rating-set-${n}`}>
+          <MenuItem
+            key={n}
+            onClick={() => {
+              onRating(n);
+              setMenu(null);
+            }}
+            testId={`bulk-action-rating-set-${n}`}
+          >
             {"★".repeat(n)}
             <span className="text-ui-ink-muted">{"☆".repeat(5 - n)}</span>
           </MenuItem>
         ))}
-        <MenuItem onClick={() => { onRating(0); setMenu(null); }} testId="bulk-action-rating-clear">Clear rating</MenuItem>
+        <MenuItem
+          onClick={() => {
+            onRating(0);
+            setMenu(null);
+          }}
+          testId="bulk-action-rating-clear"
+        >
+          Clear rating
+        </MenuItem>
       </Menu>
 
       {/* Safety class */}
-      <Menu label="Safety" open={menu === "safety"} onToggle={() => toggle("safety")} disabled={none || anyBusy} busy={busy === "safety"} testId="bulk-action-safety-toggle">
+      <Menu
+        label="Safety"
+        open={menu === "safety"}
+        onToggle={() => toggle("safety")}
+        disabled={none || anyBusy}
+        busy={busy === "safety"}
+        testId="bulk-action-safety-toggle"
+      >
         {SAFETY_CLASSES.map((c) => (
-          <MenuItem key={c} onClick={() => { onSafety(c); setMenu(null); }} testId={`bulk-action-safety-set-${c}`}>
+          <MenuItem
+            key={c}
+            onClick={() => {
+              onSafety(c);
+              setMenu(null);
+            }}
+            testId={`bulk-action-safety-set-${c}`}
+          >
             {SAFETY_LABEL[c]}
           </MenuItem>
         ))}
       </Menu>
 
       {/* Tags add / remove */}
-      <Menu label="Tags" open={menu === "tags"} onToggle={() => toggle("tags")} disabled={none || anyBusy} busy={busy === "tags"} width="w-72" testId="bulk-action-tags-toggle">
+      <Menu
+        label="Tags"
+        open={menu === "tags"}
+        onToggle={() => toggle("tags")}
+        disabled={none || anyBusy}
+        busy={busy === "tags"}
+        width="w-72"
+        testId="bulk-action-tags-toggle"
+      >
         <div className="flex flex-col gap-2 p-2">
           <TagSelect
             value={tagDraft}
@@ -164,7 +225,11 @@ export function BulkActionBar(props: BulkActionBarProps) {
             <button
               className={`${btn} flex-1`}
               disabled={tagDraft.length === 0}
-              onClick={() => { onAddTags(tagDraft); setTagDraft([]); setMenu(null); }}
+              onClick={() => {
+                onAddTags(tagDraft);
+                setTagDraft([]);
+                setMenu(null);
+              }}
               data-testid="bulk-action-tags-add"
             >
               Add to selected
@@ -172,7 +237,11 @@ export function BulkActionBar(props: BulkActionBarProps) {
             <button
               className={`${btn} flex-1`}
               disabled={tagDraft.length === 0}
-              onClick={() => { onRemoveTags(tagDraft); setTagDraft([]); setMenu(null); }}
+              onClick={() => {
+                onRemoveTags(tagDraft);
+                setTagDraft([]);
+                setMenu(null);
+              }}
               data-testid="bulk-action-tags-remove"
             >
               Remove
@@ -182,20 +251,79 @@ export function BulkActionBar(props: BulkActionBarProps) {
       </Menu>
 
       {/* Export — complete canonical record vs. a simple basics-only subset. */}
-      <Menu label={busy === "export" ? "Exporting…" : "Export"} open={menu === "export"} onToggle={() => toggle("export")} disabled={none || anyBusy} busy={busy === "export"} width="w-60" testId="bulk-action-export-toggle">
+      <Menu
+        label={busy === "export" ? "Exporting…" : "Export"}
+        open={menu === "export"}
+        onToggle={() => toggle("export")}
+        disabled={none || anyBusy}
+        busy={busy === "export"}
+        width="w-60"
+        testId="bulk-action-export-toggle"
+      >
         <MenuLabel>Complete record</MenuLabel>
-        <MenuItem onClick={() => { onExport("complete-json"); setMenu(null); }} testId="bulk-action-export-complete-json">JSON (.json)</MenuItem>
-        <MenuItem onClick={() => { onExport("complete-jsonl"); setMenu(null); }} testId="bulk-action-export-complete-jsonl">JSON Lines (.jsonl)</MenuItem>
+        <MenuItem
+          onClick={() => {
+            onExport("complete-json");
+            setMenu(null);
+          }}
+          testId="bulk-action-export-complete-json"
+        >
+          JSON (.json)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onExport("complete-jsonl");
+            setMenu(null);
+          }}
+          testId="bulk-action-export-complete-jsonl"
+        >
+          JSON Lines (.jsonl)
+        </MenuItem>
         <MenuLabel>Simple · id · sha · path · basics</MenuLabel>
-        <MenuItem onClick={() => { onExport("simple-csv"); setMenu(null); }} testId="bulk-action-export-simple-csv">CSV (.csv)</MenuItem>
-        <MenuItem onClick={() => { onExport("simple-json"); setMenu(null); }} testId="bulk-action-export-simple-json">JSON (.json)</MenuItem>
-        <MenuItem onClick={() => { onExport("simple-jsonl"); setMenu(null); }} testId="bulk-action-export-simple-jsonl">JSON Lines (.jsonl)</MenuItem>
+        <MenuItem
+          onClick={() => {
+            onExport("simple-csv");
+            setMenu(null);
+          }}
+          testId="bulk-action-export-simple-csv"
+        >
+          CSV (.csv)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onExport("simple-json");
+            setMenu(null);
+          }}
+          testId="bulk-action-export-simple-json"
+        >
+          JSON (.json)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onExport("simple-jsonl");
+            setMenu(null);
+          }}
+          testId="bulk-action-export-simple-jsonl"
+        >
+          JSON Lines (.jsonl)
+        </MenuItem>
       </Menu>
 
       {/* Filesystem move */}
-      <Menu label={busy === "move" ? "Moving…" : "Move"} open={menu === "move"} onToggle={() => toggle("move")} disabled={none || anyBusy} busy={busy === "move"} width="w-72" testId="bulk-action-move-toggle">
+      <Menu
+        label={busy === "move" ? "Moving…" : "Move"}
+        open={menu === "move"}
+        onToggle={() => toggle("move")}
+        disabled={none || anyBusy}
+        busy={busy === "move"}
+        width="w-72"
+        testId="bulk-action-move-toggle"
+      >
         <div className="flex flex-col gap-2 p-2">
-          <p className="text-ui-2xs text-ui-ink-muted">Target folder (absolute path). Files are moved on disk; re-ingest the folder to update catalog paths.</p>
+          <p className="text-ui-2xs text-ui-ink-muted">
+            Target folder (absolute path). Files are moved on disk; re-ingest the folder to update
+            catalog paths.
+          </p>
           <input
             className="w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan"
             placeholder="/path/to/target/folder"
@@ -239,7 +367,8 @@ export function BulkActionBar(props: BulkActionBarProps) {
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ui-xs text-ui-ink-muted">
-            Remove {selectedCount} image{selectedCount === 1 ? "" : "s"} from the library? Originals on disk are kept.
+            Remove {selectedCount} image{selectedCount === 1 ? "" : "s"} from the library? Originals
+            on disk are kept.
           </span>
           <button
             onClick={onConfirmDelete}
@@ -249,7 +378,12 @@ export function BulkActionBar(props: BulkActionBarProps) {
           >
             {busy === "delete" ? "Removing…" : "Remove"}
           </button>
-          <button onClick={onCancelDelete} disabled={busy === "delete"} className={btn} data-testid="bulk-action-delete-cancel">
+          <button
+            onClick={onCancelDelete}
+            disabled={busy === "delete"}
+            className={btn}
+            data-testid="bulk-action-delete-cancel"
+          >
             Cancel
           </button>
         </div>
@@ -267,7 +401,7 @@ function Menu({
   busy,
   width = "w-44",
   children,
-  testId,
+  testId
 }: {
   label: string;
   open: boolean;
@@ -289,12 +423,24 @@ function Menu({
         data-testid={testId}
       >
         {label}
-        <svg viewBox="0 0 24 24" className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
       {open && !busy && (
-        <div className={`absolute right-0 z-30 mt-1 ${width} overflow-hidden rounded-lg border border-ui-border/70 bg-ui-bg-soft shadow-lg`} role="menu">
+        <div
+          className={`absolute right-0 z-30 mt-1 ${width} overflow-hidden rounded-lg border border-ui-border/70 bg-ui-bg-soft shadow-lg`}
+          role="menu"
+        >
           {children}
         </div>
       )}
@@ -311,7 +457,15 @@ function MenuLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MenuItem({ onClick, children, testId }: { onClick: () => void; children: React.ReactNode; testId?: string }) {
+function MenuItem({
+  onClick,
+  children,
+  testId
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  testId?: string;
+}) {
   return (
     <button
       role="menuitem"

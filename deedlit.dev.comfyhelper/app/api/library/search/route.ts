@@ -1,6 +1,6 @@
+import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { MetadataSearchRequestSchema } from "@/lib/library/schemas";
-import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       query: query ?? "",
       limit,
       offset,
-      filter: buildSearchFilter(filters),
+      filter: buildSearchFilter(filters)
     });
     const results = hitsToCompactResults(res.hits);
     return jsonOk({ results, count: results.length });

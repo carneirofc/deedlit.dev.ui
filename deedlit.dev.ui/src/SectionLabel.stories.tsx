@@ -7,8 +7,8 @@ const meta = {
   component: SectionLabel,
   tags: ["autodocs"],
   args: {
-    children: "Positive Prompt",
-  },
+    children: "Positive Prompt"
+  }
 } satisfies Meta<typeof SectionLabel>;
 
 export default meta;
@@ -21,12 +21,16 @@ export const InContext: Story = {
     <div className="w-80 space-y-3">
       <div>
         <SectionLabel>Details</SectionLabel>
-        <p className="mt-1 text-ui-sm text-[color:var(--ui-ink-secondary)]">SD 1.5 · 512×768 · 28 steps</p>
+        <p className="mt-1 text-ui-sm text-[color:var(--ui-ink-secondary)]">
+          SD 1.5 · 512×768 · 28 steps
+        </p>
       </div>
       <div>
         <SectionLabel>Negative Prompt</SectionLabel>
-        <p className="mt-1 text-ui-sm text-[color:var(--ui-ink-secondary)]">blurry, lowres, watermark</p>
+        <p className="mt-1 text-ui-sm text-[color:var(--ui-ink-secondary)]">
+          blurry, lowres, watermark
+        </p>
       </div>
     </div>
-  ),
+  )
 };

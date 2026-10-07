@@ -1,7 +1,6 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
-
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-qdrant" });
 
@@ -19,7 +18,7 @@ export function getQdrant(): QdrantClient {
     const { qdrantUrl, qdrantApiKey } = getLibraryConfig();
     globalThis.__comfyhelperQdrantClient = new QdrantClient({
       url: qdrantUrl,
-      apiKey: qdrantApiKey,
+      apiKey: qdrantApiKey
     });
   }
   return globalThis.__comfyhelperQdrantClient;

@@ -15,22 +15,23 @@ export type SectionLabelProps = HTMLAttributes<HTMLParagraphElement> & {
  * <SectionLabel>Positive Prompt</SectionLabel>
  * ```
  */
-const SectionLabel = forwardRef<HTMLParagraphElement, SectionLabelProps>(
-  function SectionLabel({ children, className, ...props }, ref) {
-    return (
-      <p
-        ref={ref}
-        className={cn(
-          "text-ui-xs font-semibold uppercase tracking-wide text-[color:var(--ui-ink-secondary)]",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </p>
-    );
-  },
-);
+const SectionLabel = forwardRef<HTMLParagraphElement, SectionLabelProps>(function SectionLabel(
+  { children, className, ...props },
+  ref
+) {
+  return (
+    <p
+      ref={ref}
+      className={cn(
+        "text-ui-xs font-semibold uppercase tracking-wide text-[color:var(--ui-ink-secondary)]",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </p>
+  );
+});
 
 SectionLabel.displayName = "SectionLabel";
 

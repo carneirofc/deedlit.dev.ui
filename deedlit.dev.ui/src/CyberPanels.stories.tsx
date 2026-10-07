@@ -11,7 +11,7 @@ const meta = {
   title: "Components/CyberPanels",
   component: CyberPanel,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 } satisfies Meta<typeof CyberPanel>;
 
 export default meta;
@@ -21,9 +21,11 @@ export const Panel: Story = {
   render: () => (
     <CyberPanel className="w-[28rem]">
       <p className="cyber-title text-ui-lg font-semibold">Image library</p>
-      <p className="cyber-muted mt-1 text-ui-sm">1,204 images indexed across 3 source directories.</p>
+      <p className="cyber-muted mt-1 text-ui-sm">
+        1,204 images indexed across 3 source directories.
+      </p>
     </CyberPanel>
-  ),
+  )
 };
 
 export const Nested: Story = {
@@ -39,5 +41,5 @@ export const Nested: Story = {
         <p className="cyber-muted mt-1 text-ui-xs">Auto-refresh every 15 minutes</p>
       </CyberSubpanel>
     </CyberPanel>
-  ),
+  )
 };

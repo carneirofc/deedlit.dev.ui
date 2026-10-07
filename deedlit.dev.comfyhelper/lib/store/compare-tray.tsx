@@ -2,12 +2,12 @@
 
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useState,
-  type ReactNode,
+  useState
 } from "react";
 
 const MAX = 4;
@@ -57,15 +57,15 @@ export function CompareTrayProvider({ children }: { children: ReactNode }) {
 
   const add = useCallback(
     (id: string) => setIds((p) => (p.includes(id) || p.length >= MAX ? p : [...p, id])),
-    [],
+    []
   );
   const remove = useCallback((id: string) => setIds((p) => p.filter((x) => x !== id)), []);
   const toggle = useCallback(
     (id: string) =>
       setIds((p) =>
-        p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX ? p : [...p, id],
+        p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX ? p : [...p, id]
       ),
-    [],
+    []
   );
   const clear = useCallback(() => setIds([]), []);
 
@@ -78,9 +78,9 @@ export function CompareTrayProvider({ children }: { children: ReactNode }) {
       toggle,
       clear,
       isFull: ids.length >= MAX,
-      max: MAX,
+      max: MAX
     }),
-    [ids, add, remove, toggle, clear],
+    [ids, add, remove, toggle, clear]
   );
 
   return <CompareTrayContext.Provider value={value}>{children}</CompareTrayContext.Provider>;

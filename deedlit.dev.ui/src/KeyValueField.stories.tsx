@@ -8,8 +8,8 @@ const meta = {
   tags: ["autodocs"],
   args: {
     label: "Model",
-    value: "SD 1.5",
-  },
+    value: "SD 1.5"
+  }
 } satisfies Meta<typeof KeyValueField>;
 
 export default meta;
@@ -27,5 +27,5 @@ export const Grid: Story = {
       <KeyValueField {...args} label="Seed" value="3268129004" />
       <KeyValueField {...args} label="Size" value="512 × 768" />
     </div>
-  ),
+  )
 };

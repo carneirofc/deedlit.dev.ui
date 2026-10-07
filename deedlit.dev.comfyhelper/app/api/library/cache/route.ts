@@ -28,7 +28,10 @@ export interface CacheStatsResponse {
   }>;
 }
 
-async function scanKeys(redis: ReturnType<typeof getRedisClient>, pattern: string): Promise<string[]> {
+async function scanKeys(
+  redis: ReturnType<typeof getRedisClient>,
+  pattern: string
+): Promise<string[]> {
   if (!redis) return [];
   const keys: string[] = [];
   let cursor = "0";
@@ -68,9 +71,9 @@ export async function GET() {
           maxMemoryHuman: null,
           keyspaceHits: null,
           keyspaceMisses: null,
-          hitRate: null,
+          hitRate: null
         },
-        sample: [],
+        sample: []
       };
       return Response.json(body);
     }
@@ -89,11 +92,17 @@ export async function GET() {
         connected: false,
         redisUrl: redisUrl.replace(/:[^:@]+@/, ":***@"),
         stats: {
-          thumbCount: 0, origCount: 0, totalDataKeys: 0,
-          usedMemoryHuman: null, usedMemoryBytes: null, maxMemoryHuman: null,
-          keyspaceHits: null, keyspaceMisses: null, hitRate: null,
+          thumbCount: 0,
+          origCount: 0,
+          totalDataKeys: 0,
+          usedMemoryHuman: null,
+          usedMemoryBytes: null,
+          maxMemoryHuman: null,
+          keyspaceHits: null,
+          keyspaceMisses: null,
+          hitRate: null
         },
-        sample: [],
+        sample: []
       };
       return Response.json(body);
     }
@@ -103,7 +112,7 @@ export async function GET() {
       scanKeys(redis, "img:*:thumb:data"),
       scanKeys(redis, "img:*:orig:data"),
       redis.info("memory").catch(() => ""),
-      redis.info("stats").catch(() => ""),
+      redis.info("stats").catch(() => "")
     ]);
 
     const usedMemoryHuman = parseMemoryInfo(memInfo, "used_memory_human");
@@ -120,11 +129,17 @@ export async function GET() {
     const sha256Set = new Map<string, { hasThumb: boolean; hasOrig: boolean }>();
     for (const k of thumbKeys) {
       const sha256 = k.replace(/^img:/, "").replace(/:thumb:data$/, "");
-      sha256Set.set(sha256, { ...(sha256Set.get(sha256) ?? { hasThumb: false, hasOrig: false }), hasThumb: true });
+      sha256Set.set(sha256, {
+        ...(sha256Set.get(sha256) ?? { hasThumb: false, hasOrig: false }),
+        hasThumb: true
+      });
     }
     for (const k of origKeys) {
       const sha256 = k.replace(/^img:/, "").replace(/:orig:data$/, "");
-      sha256Set.set(sha256, { ...(sha256Set.get(sha256) ?? { hasThumb: false, hasOrig: false }), hasOrig: true });
+      sha256Set.set(sha256, {
+        ...(sha256Set.get(sha256) ?? { hasThumb: false, hasOrig: false }),
+        hasOrig: true
+      });
     }
 
     // Take first 30 entries and fetch their TTLs in a pipeline
@@ -144,7 +159,7 @@ export async function GET() {
         hasThumb: flags.hasThumb,
         hasOrig: flags.hasOrig,
         thumbTtl: flags.hasThumb && ttlResults ? (ttlResults[i * 2][1] as number) : null,
-        origTtl: flags.hasOrig && ttlResults ? (ttlResults[i * 2 + 1][1] as number) : null,
+        origTtl: flags.hasOrig && ttlResults ? (ttlResults[i * 2 + 1][1] as number) : null
       }));
     }
 
@@ -161,9 +176,9 @@ export async function GET() {
         maxMemoryHuman,
         keyspaceHits,
         keyspaceMisses,
-        hitRate,
+        hitRate
       },
-      sample,
+      sample
     };
     return Response.json(body);
   });

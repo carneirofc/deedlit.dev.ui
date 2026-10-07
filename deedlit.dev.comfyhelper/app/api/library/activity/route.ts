@@ -1,5 +1,5 @@
+import { GatewayError, getActivity, type ServiceActivity } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
-import { getActivity, GatewayError, type ServiceActivity } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function GET() {
       const message = e instanceof GatewayError ? e.message : "gateway unreachable";
       return jsonOk(
         { services: [] as ServiceActivity[], gatewayReachable: false, warnings: [message] },
-        { status: 503 },
+        { status: 503 }
       );
     }
   });

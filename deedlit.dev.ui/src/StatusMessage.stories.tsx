@@ -9,12 +9,12 @@ const meta = {
   args: {
     role: "status",
     tone: "info",
-    children: "Indexing 1,204 images — this may take a moment.",
+    children: "Indexing 1,204 images — this may take a moment."
   },
   argTypes: {
     role: { control: "inline-radio", options: ["status", "alert"] },
-    tone: { control: "inline-radio", options: ["info", "success", "warn", "error"] },
-  },
+    tone: { control: "inline-radio", options: ["info", "success", "warn", "error"] }
+  }
 } satisfies Meta<typeof StatusMessage>;
 
 export default meta;
@@ -38,5 +38,5 @@ export const Tones: Story = {
         Scan failed — check the source path.
       </StatusMessage>
     </div>
-  ),
+  )
 };

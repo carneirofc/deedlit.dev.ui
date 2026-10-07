@@ -1,21 +1,19 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-
-import { getLogger } from "@/lib/logger";
-import { maybeRow, query } from "@/lib/library/db/postgres";
 import { ensureLibrarySchema } from "@/lib/library/db/migrate";
+import { maybeRow, query } from "@/lib/library/db/postgres";
+import { findById, findBySha256, persistImage } from "@/lib/library/repositories/image-repository";
+import type { IngestFolderRequest, ReindexRequest } from "@/lib/library/schemas";
+import { enrichImageMetadata } from "@/lib/library/services/enrichment-service";
+import { syncImageToGraph } from "@/lib/library/services/graph-service";
 import {
-  SUPPORTED_EXTENSIONS,
   computeSha256,
   extractImageMetadata,
+  SUPPORTED_EXTENSIONS
 } from "@/lib/library/services/metadata-service";
-import { findById, findBySha256, persistImage } from "@/lib/library/repositories/image-repository";
-import type { ReindexRequest } from "@/lib/library/schemas";
-import { generateThumbnail } from "@/lib/library/services/thumbnail-service";
 import { upsertImageVector } from "@/lib/library/services/qdrant-service";
-import { syncImageToGraph } from "@/lib/library/services/graph-service";
-import { enrichImageMetadata } from "@/lib/library/services/enrichment-service";
-import type { IngestFolderRequest } from "@/lib/library/schemas";
+import { generateThumbnail } from "@/lib/library/services/thumbnail-service";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-ingest" });
 
@@ -41,7 +39,7 @@ export async function createIngestionJob(req: IngestFolderRequest): Promise<stri
   const row = await maybeRow<{ id: string }>(
     `INSERT INTO ingestion_jobs (folder_path, status, config_json, started_at)
      VALUES ($1, 'running', $2, now()) RETURNING id`,
-    [req.folderPath, JSON.stringify(req)],
+    [req.folderPath, JSON.stringify(req)]
   );
   return row!.id;
 }
@@ -51,19 +49,19 @@ async function recordFile(
   filePath: string,
   status: string,
   error: string | null,
-  imageId: string | null,
+  imageId: string | null
 ): Promise<void> {
   await query(
     `INSERT INTO ingestion_job_files (job_id, file_path, status, error, image_id)
      VALUES ($1,$2,$3,$4,$5)`,
-    [jobId, filePath, status, error, imageId],
+    [jobId, filePath, status, error, imageId]
   );
 }
 
 /** Process a single image file through the full pipeline. */
 export async function ingestSingleFile(
   filePath: string,
-  req: IngestFolderRequest,
+  req: IngestFolderRequest
 ): Promise<{ imageId: string; skipped: boolean }> {
   const sha = await computeSha256(filePath);
   const existing = await findBySha256(sha);
@@ -85,13 +83,19 @@ export async function ingestSingleFile(
   const imageId = await persistImage(record, thumbnailPath);
 
   if (req.indexQdrant) {
-    await upsertImageVector(imageId).catch((error) => logger.warn({ err: error, imageId }, "qdrant index failed"));
+    await upsertImageVector(imageId).catch((error) =>
+      logger.warn({ err: error, imageId }, "qdrant index failed")
+    );
   }
   if (req.syncNeo4j) {
-    await syncImageToGraph(imageId).catch((error) => logger.warn({ err: error, imageId }, "neo4j sync failed"));
+    await syncImageToGraph(imageId).catch((error) =>
+      logger.warn({ err: error, imageId }, "neo4j sync failed")
+    );
   }
   if (req.runExternalEnrichment) {
-    await enrichImageMetadata(imageId).catch((error) => logger.warn({ err: error, imageId }, "enrichment failed"));
+    await enrichImageMetadata(imageId).catch((error) =>
+      logger.warn({ err: error, imageId }, "enrichment failed")
+    );
   }
 
   return { imageId, skipped: false };
@@ -124,7 +128,7 @@ export async function runIngestionJob(jobId: string, req: IngestFolderRequest): 
       if (total % 20 === 0) {
         await query(
           `UPDATE ingestion_jobs SET total_files=$2, processed_files=$3, failed_files=$4 WHERE id=$1`,
-          [jobId, total, processed, failed],
+          [jobId, total, processed, failed]
         );
       }
     }
@@ -133,14 +137,14 @@ export async function runIngestionJob(jobId: string, req: IngestFolderRequest): 
       `UPDATE ingestion_jobs
          SET status='completed', total_files=$2, processed_files=$3, failed_files=$4, finished_at=now()
        WHERE id=$1`,
-      [jobId, total, processed, failed],
+      [jobId, total, processed, failed]
     );
     logger.info({ jobId, total, processed, failed }, "ingestion job completed");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await query(
       `UPDATE ingestion_jobs SET status='failed', error_message=$2, finished_at=now() WHERE id=$1`,
-      [jobId, message],
+      [jobId, message]
     );
     logger.error({ err: error, jobId }, "ingestion job failed");
   }
@@ -165,13 +169,19 @@ export async function reindexImage(req: ReindexRequest): Promise<{ imageId: stri
     await persistImage(record, thumbnailPath);
   }
   if (req.refreshQdrant) {
-    await upsertImageVector(req.imageId).catch((error) => logger.warn({ err: error }, "reindex qdrant failed"));
+    await upsertImageVector(req.imageId).catch((error) =>
+      logger.warn({ err: error }, "reindex qdrant failed")
+    );
   }
   if (req.refreshGraph) {
-    await syncImageToGraph(req.imageId).catch((error) => logger.warn({ err: error }, "reindex graph failed"));
+    await syncImageToGraph(req.imageId).catch((error) =>
+      logger.warn({ err: error }, "reindex graph failed")
+    );
   }
   if (req.runExternalEnrichment) {
-    await enrichImageMetadata(req.imageId).catch((error) => logger.warn({ err: error }, "reindex enrichment failed"));
+    await enrichImageMetadata(req.imageId).catch((error) =>
+      logger.warn({ err: error }, "reindex enrichment failed")
+    );
   }
   return { imageId: req.imageId };
 }

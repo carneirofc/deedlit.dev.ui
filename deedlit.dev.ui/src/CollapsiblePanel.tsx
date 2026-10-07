@@ -34,7 +34,7 @@ export default function CollapsiblePanel({
   triggerClassName,
   contentClassName,
   chevronClassName,
-  testId,
+  testId
 }: CollapsiblePanelProps) {
   const isControlled = isOpenProp !== undefined;
 
@@ -50,7 +50,7 @@ export default function CollapsiblePanel({
         data-testid={testId ? `${testId}-trigger` : undefined}
         className={cn(
           "group/cp flex w-full items-center justify-between px-4 py-2.5 text-ui-sm font-medium text-ui-ink-secondary transition hover:bg-ui-bg-soft",
-          triggerClassName,
+          triggerClassName
         )}
       >
         <span>{label}</span>
@@ -58,7 +58,7 @@ export default function CollapsiblePanel({
           size="h-4 w-4"
           className={cn(
             "transition-transform duration-200 group-data-[state=open]/cp:rotate-180",
-            chevronClassName,
+            chevronClassName
           )}
         />
       </CollapsibleTrigger>

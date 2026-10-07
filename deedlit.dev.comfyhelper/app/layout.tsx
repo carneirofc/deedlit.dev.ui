@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import {
-  IBM_Plex_Mono,
-  Sora /*, Cinzel, Montserrat,*/,
-} from "next/font/google";
 import { ThemeToggleButton } from "@carneirofc/ui";
+import type { Metadata } from "next";
+import { IBM_Plex_Mono, Sora /*, Cinzel, Montserrat,*/ } from "next/font/google";
 import { AppSidebar } from "@/components/AppSidebar";
 import AppProviders from "@/lib/store/providers";
 import "./globals.css";
@@ -11,23 +8,22 @@ import "./globals.css";
 const displayFont = Sora({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"]
 });
 
 const monoFont = IBM_Plex_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500"]
 });
 
 export const metadata: Metadata = {
   title: "deedlit.dev // ComfyUI Archive",
-  description:
-    "Personal studio archive for browsing ComfyUI PNG outputs and generation metadata.",
+  description: "Personal studio archive for browsing ComfyUI PNG outputs and generation metadata."
 };
 
 export default function RootLayout({
-  children,
+  children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
@@ -53,16 +49,12 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: initialThemeScript }} />
       </head>
-      <body
-        className={`${displayFont.variable} ${monoFont.variable} antialiased`}
-      >
+      <body className={`${displayFont.variable} ${monoFont.variable} antialiased`}>
         <div className="min-h-screen px-1.5 py-3 pb-24 sm:px-6 sm:py-8 sm:pb-24 md:pl-24 md:pr-6 lg:px-8 lg:pl-24 2xl:px-12 2xl:pl-24">
           <ThemeToggleButton />
           <AppSidebar />
           <AppProviders>
-            <div className="mx-auto w-full min-w-0">
-              {children}
-            </div>
+            <div className="mx-auto w-full min-w-0">{children}</div>
           </AppProviders>
         </div>
       </body>

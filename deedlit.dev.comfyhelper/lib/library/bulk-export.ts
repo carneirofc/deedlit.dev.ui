@@ -37,16 +37,18 @@ export async function exportImages(ids: string[], signal?: AbortSignal): Promise
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ids }),
-    signal,
+    signal
   });
-  const body = (await res.json().catch(() => ({}))) as Partial<BulkExportResult> & { error?: string };
+  const body = (await res.json().catch(() => ({}))) as Partial<BulkExportResult> & {
+    error?: string;
+  };
   if (!res.ok) throw new Error(body.error ?? `Export failed (HTTP ${res.status})`);
   return {
     exportedAt: body.exportedAt ?? new Date().toISOString(),
     requested: body.requested ?? ids.length,
     count: body.count ?? body.images?.length ?? 0,
     images: body.images ?? [],
-    errors: body.errors ?? [],
+    errors: body.errors ?? []
   };
 }
 
@@ -83,7 +85,7 @@ export function toSimpleRecord(image: CatalogImage): SimpleExportRecord {
     id: image.sha256,
     sha256: image.sha256,
     filePath: filePath ?? null,
-    filename: filePath ? filePath.split(/[\\/]/).pop() ?? null : null,
+    filename: filePath ? (filePath.split(/[\\/]/).pop() ?? null) : null,
     width: image.width ?? null,
     height: image.height ?? null,
     rating: image.rating ?? null,
@@ -91,7 +93,7 @@ export function toSimpleRecord(image: CatalogImage): SimpleExportRecord {
     safety: (image.safety as string | null | undefined) ?? null,
     sourceTool: image.sourceTool ?? null,
     createdAt: image.created_at ?? null,
-    tags: image.tags ?? [],
+    tags: image.tags ?? []
   };
 }
 
@@ -141,7 +143,7 @@ export function downloadCsv(rows: readonly object[], filename: string): void {
   };
   const lines = [
     headers.join(","),
-    ...rows.map((r) => headers.map((h) => cell((r as Record<string, unknown>)[h])).join(",")),
+    ...rows.map((r) => headers.map((h) => cell((r as Record<string, unknown>)[h])).join(","))
   ];
   downloadText(lines.join("\n") + "\n", filename, "text/csv");
 }

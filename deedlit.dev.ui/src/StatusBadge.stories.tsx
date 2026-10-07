@@ -8,14 +8,14 @@ const meta = {
   tags: ["autodocs"],
   args: {
     tone: "neutral",
-    children: "Queued",
+    children: "Queued"
   },
   argTypes: {
     tone: {
       control: "inline-radio",
-      options: ["neutral", "success", "warn", "error"],
-    },
-  },
+      options: ["neutral", "success", "warn", "error"]
+    }
+  }
 } satisfies Meta<typeof StatusBadge>;
 
 export default meta;
@@ -39,5 +39,5 @@ export const Tones: Story = {
         Failed
       </StatusBadge>
     </div>
-  ),
+  )
 };

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { CompareTrayBar as UiCompareTrayBar } from "@carneirofc/ui";
+import Link from "next/link";
 
 import { useCompareTray } from "@/lib/store/compare-tray";
 

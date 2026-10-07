@@ -1,15 +1,14 @@
 import path from "node:path";
-
-import { getImageDetail, listAllForReindex } from "@/lib/library/repositories/image-repository";
+import { rows } from "@/lib/library/db/postgres";
 import {
   clearGraph,
   getCombinedSubgraph,
   getConnectedImageIds,
   getImageSubgraph,
-  upsertImageNode,
+  upsertImageNode
 } from "@/lib/library/repositories/graph-repository";
+import { getImageDetail, listAllForReindex } from "@/lib/library/repositories/image-repository";
 import { findRelatedTags as findRelatedTagsSql } from "@/lib/library/repositories/tag-repository";
-import { rows } from "@/lib/library/db/postgres";
 import type { Graph, GraphScope } from "@/lib/library/schemas";
 
 /** Project a single image (and its relationships) into Neo4j. */
@@ -26,7 +25,7 @@ export async function syncImageToGraph(imageId: string): Promise<void> {
     model: detail.model,
     checkpoint: detail.checkpoint,
     modelFamily: detail.modelFamily,
-    folder: path.dirname(detail.filePath),
+    folder: path.dirname(detail.filePath)
   });
 }
 
@@ -45,7 +44,7 @@ export async function rebuildGraph(): Promise<{ synced: number }> {
 export async function getImageGraph(
   imageId: string,
   depth: number,
-  relationshipTypes: string[] | undefined,
+  relationshipTypes: string[] | undefined
 ): Promise<Graph> {
   return getImageSubgraph(imageId, depth, relationshipTypes);
 }
@@ -57,7 +56,7 @@ export async function getImageGraph(
  */
 export async function resolveGraphScope(
   graphScope: GraphScope | undefined,
-  limit = 5000,
+  limit = 5000
 ): Promise<string[] | null> {
   if (!graphScope) return null;
   return getConnectedImageIds(graphScope, limit);
@@ -83,7 +82,7 @@ export async function findRelatedLoras(lora: string, limit: number) {
        JOIN loras l ON l.id = il.lora_id
       WHERE l.name <> $1
       GROUP BY l.name ORDER BY "coOccurrence" DESC LIMIT $2`,
-    [lora, limit],
+    [lora, limit]
   );
 }
 
@@ -94,14 +93,14 @@ export async function findImageLineage(imageId: string) {
       `SELECT i.id, i.filename, v.relation_type AS relation
          FROM image_variants v JOIN images i ON i.id = v.source_image_id
         WHERE v.derived_image_id = $1`,
-      [imageId],
+      [imageId]
     ),
     rows<{ id: string; filename: string; relation: string }>(
       `SELECT i.id, i.filename, v.relation_type AS relation
          FROM image_variants v JOIN images i ON i.id = v.derived_image_id
         WHERE v.source_image_id = $1`,
-      [imageId],
-    ),
+      [imageId]
+    )
   ]);
   return { imageId, ancestors, descendants };
 }

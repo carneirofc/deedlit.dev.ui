@@ -13,23 +13,22 @@ export type MetadataInfoBlockProps = {
 /**
  * A subtle info block for displaying metadata source details.
  */
-const MetadataInfoBlock = forwardRef<HTMLElement, MetadataInfoBlockProps>(function MetadataInfoBlock(
-  { children, className, testId },
-  ref,
-) {
-  return (
-    <section
-      ref={ref}
-      data-testid={testId}
-      className={cn(
-        "rounded-lg bg-ui-bg-code px-2 py-2 text-ui-xs text-ui-ink-secondary",
-        className,
-      )}
-    >
-      {children}
-    </section>
-  );
-});
+const MetadataInfoBlock = forwardRef<HTMLElement, MetadataInfoBlockProps>(
+  function MetadataInfoBlock({ children, className, testId }, ref) {
+    return (
+      <section
+        ref={ref}
+        data-testid={testId}
+        className={cn(
+          "rounded-lg bg-ui-bg-code px-2 py-2 text-ui-xs text-ui-ink-secondary",
+          className
+        )}
+      >
+        {children}
+      </section>
+    );
+  }
+);
 
 MetadataInfoBlock.displayName = "MetadataInfoBlock";
 

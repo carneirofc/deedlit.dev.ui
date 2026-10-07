@@ -8,11 +8,11 @@ const meta = {
   tags: ["autodocs"],
   args: {
     tone: "loading",
-    children: "Loading metadata…",
+    children: "Loading metadata…"
   },
   argTypes: {
-    tone: { control: "inline-radio", options: ["loading", "error"] },
-  },
+    tone: { control: "inline-radio", options: ["loading", "error"] }
+  }
 } satisfies Meta<typeof StatusBanner>;
 
 export default meta;
@@ -21,7 +21,7 @@ type Story = StoryObj<typeof meta>;
 export const Loading: Story = {};
 
 export const Error: Story = {
-  args: { tone: "error", children: "Could not read the source path." },
+  args: { tone: "error", children: "Could not read the source path." }
 };
 
 export const Both: Story = {
@@ -34,5 +34,5 @@ export const Both: Story = {
         Could not read the source path.
       </StatusBanner>
     </div>
-  ),
+  )
 };

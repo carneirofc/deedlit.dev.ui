@@ -53,7 +53,7 @@ export function PathInput({
   inputTestId,
   buttonTestId,
   browseEndpoint,
-  preview,
+  preview
 }: PathInputProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 

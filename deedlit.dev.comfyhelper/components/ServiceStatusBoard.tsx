@@ -58,7 +58,7 @@ const COMPONENT_BLURB: Record<string, string> = {
   ingest: "Ingest & maintenance worker",
   vision: "CLIP + SPLADE embedding service",
   metadata: "PNG metadata extraction",
-  labelagent: "AI image labeling / description",
+  labelagent: "AI image labeling / description"
 };
 
 function statusDot(status: ComponentStatus): string {
@@ -118,7 +118,7 @@ function relativeTime(iso: string): string {
  */
 export function ServiceStatusBoard({
   pollMs = 10000,
-  activityPollMs = 4000,
+  activityPollMs = 4000
 }: {
   pollMs?: number;
   activityPollMs?: number;
@@ -140,9 +140,13 @@ export function ServiceStatusBoard({
     // Pause the background poll while the tab is hidden; resume + catch up the
     // moment it's visible again. The manual Refresh button still calls `refresh`
     // unconditionally, so explicit user action is never gated.
-    const tick = () => { if (!document.hidden) refresh(); };
+    const tick = () => {
+      if (!document.hidden) refresh();
+    };
     const id = setInterval(tick, pollMs);
-    const onVisible = () => { if (!document.hidden) refresh(); };
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
@@ -166,9 +170,13 @@ export function ServiceStatusBoard({
     pollActivity();
     // Skip activity probes while the tab is hidden (this poll fans out to every
     // service); catch up immediately on return so the board is never stale on-screen.
-    const tick = () => { if (!document.hidden) pollActivity(); };
+    const tick = () => {
+      if (!document.hidden) pollActivity();
+    };
     const id = setInterval(tick, activityPollMs);
-    const onVisible = () => { if (!document.hidden) pollActivity(); };
+    const onVisible = () => {
+      if (!document.hidden) pollActivity();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
@@ -189,14 +197,18 @@ export function ServiceStatusBoard({
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-ui-sm font-semibold text-ui-ink-title">System status &amp; activity</h2>
+          <h2 className="text-ui-sm font-semibold text-ui-ink-title">
+            System status &amp; activity
+          </h2>
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-ui-2xs font-medium ${
               loaded ? statusChip(overall) : "bg-ui-bg text-ui-ink-muted"
             }`}
             data-testid="status-overall"
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${loaded ? statusDot(overall) : "bg-ui-ink-muted"}`} />
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${loaded ? statusDot(overall) : "bg-ui-ink-muted"}`}
+            />
             {!loaded
               ? "checking…"
               : overall === "ok"
@@ -251,7 +263,9 @@ export function ServiceStatusBoard({
                     {COMPONENT_BLURB[c.name] ?? "service"}
                   </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-ui-2xs font-medium ${statusChip(c.status)}`}>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-ui-2xs font-medium ${statusChip(c.status)}`}
+                >
                   {statusLabel(c.status)}
                 </span>
               </div>
@@ -262,11 +276,15 @@ export function ServiceStatusBoard({
                     <span
                       key={d.name}
                       className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-ui-2xs ${
-                        d.ready ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                        d.ready
+                          ? "bg-emerald-500/10 text-emerald-500"
+                          : "bg-rose-500/10 text-rose-500"
                       }`}
                       title={d.ready ? "ready" : "not ready"}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${d.ready ? "bg-emerald-500" : "bg-rose-500"}`} />
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${d.ready ? "bg-emerald-500" : "bg-rose-500"}`}
+                      />
                       {d.name}
                     </span>
                   ))}
@@ -320,5 +338,5 @@ const SKELETON: ComponentHealth[] = [
   "graph",
   "ingest",
   "vision",
-  "metadata",
+  "metadata"
 ].map((name) => ({ name, status: "down", dependencies: [] }));

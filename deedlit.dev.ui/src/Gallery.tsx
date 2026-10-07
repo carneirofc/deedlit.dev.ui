@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "./utils";
 
@@ -100,11 +93,19 @@ function SelectCheck({ checked }: { checked: boolean }) {
         "flex h-5 w-5 items-center justify-center rounded border transition",
         checked
           ? "border-accent-cyan bg-accent-cyan text-ui-bg-deep"
-          : "border-ui-border/80 bg-ui-bg/80 text-transparent backdrop-blur-sm",
+          : "border-ui-border/80 bg-ui-bg/80 text-transparent backdrop-blur-sm"
       )}
       aria-hidden="true"
     >
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M5 12l5 5 9-11" />
       </svg>
     </span>
@@ -139,7 +140,7 @@ export function Gallery<T>({
   selectedClassName = DEFAULT_SELECTED,
   mediaClassName,
   className,
-  windowing,
+  windowing
 }: GalleryProps<T>) {
   const list = viewMode === "list";
   const masonry = viewMode === "masonry";
@@ -180,7 +181,7 @@ export function Gallery<T>({
     if (!el) return;
     if (items.length <= windowCount) {
       setRange((prev) =>
-        prev.start === 0 && prev.end === items.length ? prev : { start: 0, end: items.length },
+        prev.start === 0 && prev.end === items.length ? prev : { start: 0, end: items.length }
       );
       return;
     }
@@ -233,7 +234,7 @@ export function Gallery<T>({
     () => () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     },
-    [],
+    []
   );
 
   // A new result set (or a head splice that changes the first item) re-anchors the
@@ -242,7 +243,7 @@ export function Gallery<T>({
   useLayoutEffect(() => {
     if (!enabled) {
       setRange((prev) =>
-        prev.start === 0 && prev.end === items.length ? prev : { start: 0, end: items.length },
+        prev.start === 0 && prev.end === items.length ? prev : { start: 0, end: items.length }
       );
       prevFirstKey.current = firstKey;
       return;
@@ -340,11 +341,7 @@ export function Gallery<T>({
     };
   }, [selectOnCtrlClick, selectMode]);
 
-  const containerClass = list
-    ? listClassName
-    : masonry
-      ? masonryClassName
-      : gridClassName;
+  const containerClass = list ? listClassName : masonry ? masonryClassName : gridClassName;
 
   return (
     <div ref={containerRef} className={cn(containerClass, className)}>
@@ -360,7 +357,7 @@ export function Gallery<T>({
           selected,
           selectMode,
           open: () => (selectMode ? onToggleSelect?.(item) : onOpen?.(index, item)),
-          toggleSelect: () => onToggleSelect?.(item),
+          toggleSelect: () => onToggleSelect?.(item)
         };
 
         // Ctrl/Cmd+click selects the item (the app enters select mode off this)
@@ -405,7 +402,12 @@ export function Gallery<T>({
             onClick={onMediaClick}
             title={armTitle}
             data-testid={`gallery-item-media-${itemKey}`}
-            className={cn("block text-left", list && "shrink-0", mediaClassName, armed && "cursor-pointer")}
+            className={cn(
+              "block text-left",
+              list && "shrink-0",
+              mediaClassName,
+              armed && "cursor-pointer"
+            )}
           >
             {mediaInner}
           </button>
@@ -416,7 +418,7 @@ export function Gallery<T>({
           <span
             className={cn(
               "pointer-events-none z-10 opacity-70 transition-opacity group-hover:opacity-100",
-              list ? "shrink-0" : "absolute left-1.5 top-1.5",
+              list ? "shrink-0" : "absolute left-1.5 top-1.5"
             )}
             aria-hidden="true"
           >
@@ -448,7 +450,7 @@ export function Gallery<T>({
                 "group flex items-center gap-3",
                 cardClassName,
                 selected && selectedClassName,
-                armed && "ring-1 ring-accent-cyan/30 hover:ring-2 hover:ring-accent-cyan/70",
+                armed && "ring-1 ring-accent-cyan/30 hover:ring-2 hover:ring-accent-cyan/70"
               )}
             >
               {check}
@@ -473,7 +475,7 @@ export function Gallery<T>({
               masonry && "mb-3 break-inside-avoid",
               cardClassName,
               selected && selectedClassName,
-              armed && "ring-1 ring-accent-cyan/30 hover:ring-2 hover:ring-accent-cyan/70",
+              armed && "ring-1 ring-accent-cyan/30 hover:ring-2 hover:ring-accent-cyan/70"
             )}
           >
             {media}

@@ -1,5 +1,5 @@
+import { callMcpTool, type GraphNeighbor, neighborsToGraph } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
-import { callMcpTool, neighborsToGraph, type GraphNeighbor } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
       .filter(Boolean);
     const tool = await callMcpTool("get_image_graph", {
       image_id: imageId,
-      relationship_types: relationshipTypes,
+      relationship_types: relationshipTypes
     });
     const structured = (tool.structuredContent ?? {}) as { neighbors?: GraphNeighbor[] };
     const graph = neighborsToGraph(imageId, structured.neighbors ?? []);

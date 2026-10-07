@@ -1,7 +1,7 @@
 "use client";
 
-import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "./utils";
 
@@ -12,12 +12,12 @@ export const statusBannerVariants = cva("rounded-lg border px-2 py-2 text-ui-xs"
     tone: {
       loading:
         "border-[color:var(--ui-border)] bg-[color:var(--ui-bg-soft)] text-[color:var(--ui-ink-secondary)]",
-      error: "border-error-edge bg-error text-error-ink",
-    },
+      error: "border-error-edge bg-error text-error-ink"
+    }
   },
   defaultVariants: {
-    tone: "loading",
-  },
+    tone: "loading"
+  }
 });
 
 export type StatusBannerProps = HTMLAttributes<HTMLParagraphElement> &
@@ -34,21 +34,22 @@ export type StatusBannerProps = HTMLAttributes<HTMLParagraphElement> &
  * {error     && <StatusBanner tone="error">{error}</StatusBanner>}
  * ```
  */
-const StatusBanner = forwardRef<HTMLParagraphElement, StatusBannerProps>(
-  function StatusBanner({ tone, children, className, ...props }, ref) {
-    return (
-      <p
-        ref={ref}
-        role={tone === "error" ? "alert" : "status"}
-        data-slot="status-banner"
-        className={cn(statusBannerVariants({ tone }), className)}
-        {...props}
-      >
-        {children}
-      </p>
-    );
-  },
-);
+const StatusBanner = forwardRef<HTMLParagraphElement, StatusBannerProps>(function StatusBanner(
+  { tone, children, className, ...props },
+  ref
+) {
+  return (
+    <p
+      ref={ref}
+      role={tone === "error" ? "alert" : "status"}
+      data-slot="status-banner"
+      className={cn(statusBannerVariants({ tone }), className)}
+      {...props}
+    >
+      {children}
+    </p>
+  );
+});
 
 StatusBanner.displayName = "StatusBanner";
 

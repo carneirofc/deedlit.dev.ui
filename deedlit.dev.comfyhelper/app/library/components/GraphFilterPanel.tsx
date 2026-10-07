@@ -9,7 +9,15 @@ import type { GraphScope } from "@/lib/library/schemas";
 // by GET /api/library/graph/entities, so every type offers options to pick from
 // instead of a blind free-text field. The label doubles as the asset `kind`
 // (lowercased) the suggestion endpoint queries.
-const NODE_TYPES = ["Tag", "Checkpoint", "LoRA", "Embedding", "VAE", "ControlNet", "Upscaler"] as const;
+const NODE_TYPES = [
+  "Tag",
+  "Checkpoint",
+  "LoRA",
+  "Embedding",
+  "VAE",
+  "ControlNet",
+  "Upscaler"
+] as const;
 type NodeType = (typeof NODE_TYPES)[number];
 
 const input =
@@ -29,7 +37,7 @@ function EntitySuggest({
   onChange,
   onSelect,
   placeholder,
-  disabled,
+  disabled
 }: {
   /** Lowercased graph type/kind to fetch options for (tag, checkpoint, lora, …). */
   type: string;
@@ -55,13 +63,21 @@ function EntitySuggest({
     const handle = setTimeout(() => {
       fetch(
         `/api/library/graph/entities?type=${encodeURIComponent(type)}&prefix=${encodeURIComponent(value.trim())}&limit=50`,
-        { signal: ac.signal },
+        { signal: ac.signal }
       )
         .then((r) => (r.ok ? r.json() : { entities: [] }))
-        .then((j) => { if (alive) setOptions(Array.isArray(j.entities) ? j.entities : []); })
-        .catch(() => { /* keep the previous list on a transient failure */ });
+        .then((j) => {
+          if (alive) setOptions(Array.isArray(j.entities) ? j.entities : []);
+        })
+        .catch(() => {
+          /* keep the previous list on a transient failure */
+        });
     }, 150);
-    return () => { alive = false; ac.abort(); clearTimeout(handle); };
+    return () => {
+      alive = false;
+      ac.abort();
+      clearTimeout(handle);
+    };
   }, [type, value, open, disabled]);
 
   const choose = (v: string) => {
@@ -76,7 +92,11 @@ function EntitySuggest({
         placeholder={placeholder}
         value={value}
         disabled={disabled}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); setActive(0); }}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          setActive(0);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={(e) => {
@@ -110,7 +130,10 @@ function EntitySuggest({
             <li key={o} role="option" aria-selected={i === active}>
               <button
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); choose(o); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  choose(o);
+                }}
                 onMouseEnter={() => setActive(i)}
                 className={`w-full truncate rounded-md px-2 py-1 text-left text-ui-xs transition ${
                   i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg"
@@ -137,7 +160,7 @@ function EntitySuggest({
 export function GraphFilterPanel({
   value,
   onChange,
-  relatedImageId,
+  relatedImageId
 }: {
   value: GraphScope | null;
   onChange: (scope: GraphScope | null) => void;
@@ -167,7 +190,7 @@ export function GraphFilterPanel({
       const r = await fetch("/api/library/graph/neighbors", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ graphScope: scope }),
+        body: JSON.stringify({ graphScope: scope })
       });
       const j = await r.json();
       // The scope-resolution endpoint is still a stub (returns unsupported); show
@@ -217,7 +240,10 @@ export function GraphFilterPanel({
         <select
           className={input}
           value={nodeType}
-          onChange={(e) => { setNodeType(e.target.value as NodeType); setText(""); }}
+          onChange={(e) => {
+            setNodeType(e.target.value as NodeType);
+            setText("");
+          }}
           disabled={useRelated}
           data-testid="graph-filter-node-type-select"
         >
@@ -231,14 +257,22 @@ export function GraphFilterPanel({
           type={nodeType.toLowerCase()}
           value={text}
           onChange={setText}
-          onSelect={(v) => { setText(v); void apply(v); }}
+          onSelect={(v) => {
+            setText(v);
+            void apply(v);
+          }}
           placeholder={`${nodeType.toLowerCase()} name — pick from the list, or type…`}
           disabled={useRelated}
         />
       </div>
 
       <div className="mt-2 flex gap-2">
-        <button className={btn} onClick={() => apply()} disabled={checking} data-testid="graph-filter-apply">
+        <button
+          className={btn}
+          onClick={() => apply()}
+          disabled={checking}
+          data-testid="graph-filter-apply"
+        >
           Apply filter
         </button>
         {active && (

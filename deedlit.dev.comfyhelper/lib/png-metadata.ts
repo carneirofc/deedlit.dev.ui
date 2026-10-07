@@ -28,7 +28,7 @@ function parseTextChunk(data: Buffer): TextChunk | null {
   return {
     keyword: data.subarray(0, separator).toString("latin1"),
     chunkType: "tEXt",
-    text: data.subarray(separator + 1).toString("latin1"),
+    text: data.subarray(separator + 1).toString("latin1")
   };
 }
 
@@ -46,7 +46,7 @@ function parseZtxtChunk(data: Buffer): TextChunk | null {
   return {
     keyword: data.subarray(0, separator).toString("latin1"),
     chunkType: "zTXt",
-    text: inflateSync(data.subarray(separator + 2)).toString("utf8"),
+    text: inflateSync(data.subarray(separator + 2)).toString("utf8")
   };
 }
 
@@ -88,7 +88,7 @@ function parseItxtChunk(data: Buffer): TextChunk | null {
   return {
     keyword: data.subarray(0, keywordEnd).toString("latin1"),
     chunkType: "iTXt",
-    text: textData.toString("utf8"),
+    text: textData.toString("utf8")
   };
 }
 
@@ -141,11 +141,13 @@ function toMetadataObject(chunks: TextChunk[]): unknown {
 
   return {
     source: "embedded-png",
-    fields,
+    fields
   };
 }
 
-export async function readEmbeddedMetadataFromPng(imagePath: string): Promise<EmbeddedMetadataResult> {
+export async function readEmbeddedMetadataFromPng(
+  imagePath: string
+): Promise<EmbeddedMetadataResult> {
   let handle;
   try {
     handle = await open(imagePath, "r");

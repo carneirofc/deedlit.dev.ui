@@ -10,7 +10,7 @@ export const TagSourceSchema = z.enum([
   "manual",
   "auto_tagger",
   "external_vision_llm",
-  "external_captioner",
+  "external_captioner"
 ]);
 export type TagSource = z.infer<typeof TagSourceSchema>;
 
@@ -20,7 +20,7 @@ export const RelationTypeSchema = z.enum([
   "inpaint_of",
   "edit_of",
   "same_prompt_as",
-  "same_seed_as",
+  "same_seed_as"
 ]);
 export type RelationType = z.infer<typeof RelationTypeSchema>;
 
@@ -29,7 +29,7 @@ export const ImageTagSchema = z.object({
   normalizedName: z.string(),
   category: z.string().nullable().optional(),
   confidence: z.number().nullable().optional(),
-  source: z.string().nullable().optional(),
+  source: z.string().nullable().optional()
 });
 export type ImageTag = z.infer<typeof ImageTagSchema>;
 
@@ -42,13 +42,13 @@ export const GenerationParamsSchema = z.object({
   denoise: z.number().nullable().optional(),
   width: z.number().nullable().optional(),
   height: z.number().nullable().optional(),
-  clipSkip: z.number().nullable().optional(),
+  clipSkip: z.number().nullable().optional()
 });
 export type GenerationParams = z.infer<typeof GenerationParamsSchema>;
 
 export const LoraRefSchema = z.object({
   name: z.string(),
-  weight: z.number().nullable().optional(),
+  weight: z.number().nullable().optional()
 });
 export type LoraRef = z.infer<typeof LoraRefSchema>;
 
@@ -84,9 +84,9 @@ export const ImageDetailSchema = z.object({
       description: z.string(),
       provider: z.string().nullable(),
       model: z.string().nullable(),
-      createdAt: z.string(),
-    }),
-  ),
+      createdAt: z.string()
+    })
+  )
 });
 export type ImageDetail = z.infer<typeof ImageDetailSchema>;
 
@@ -109,14 +109,14 @@ export const CompactResultSchema = z.object({
   safety: SafetySchema.nullable().optional(),
   /** Parent directory of the source file — the split-by-source-directory grouping
    * key. Present on the catalog browse path; null/absent on vector-search hits. */
-  directory: z.string().nullable().optional(),
+  directory: z.string().nullable().optional()
 });
 export type CompactResult = z.infer<typeof CompactResultSchema>;
 
 /** One source directory + its live-image total (gateway GET /images/directories). */
 export const DirectoryCountSchema = z.object({
   directory: z.string(),
-  image_count: z.number(),
+  image_count: z.number()
 });
 export type DirectoryCount = z.infer<typeof DirectoryCountSchema>;
 
@@ -134,7 +134,7 @@ export const SearchFiltersSchema = z.object({
   favorite: z.boolean().optional(),
   sourceTool: z.string().optional(),
   // Content-safety classes to include. Omit/empty = no filter (show all).
-  safety: z.array(SafetySchema).optional(),
+  safety: z.array(SafetySchema).optional()
 });
 export type SearchFilters = z.infer<typeof SearchFiltersSchema>;
 
@@ -149,7 +149,7 @@ export type SearchFilters = z.infer<typeof SearchFiltersSchema>;
 // neither is a graph node — folders live only in the catalog/path filter.)
 export const GraphNodeRefSchema = z.object({
   type: z.enum(["Tag", "Checkpoint", "LoRA", "Embedding", "VAE", "ControlNet", "Upscaler"]),
-  value: z.string().min(1),
+  value: z.string().min(1)
 });
 export type GraphNodeRef = z.infer<typeof GraphNodeRefSchema>;
 
@@ -157,7 +157,7 @@ export const GraphScopeSchema = z.object({
   relatedToImageId: z.string().optional(),
   node: GraphNodeRefSchema.optional(),
   relationshipTypes: z.array(z.string()).optional(),
-  hops: z.number().int().min(1).max(3).default(1),
+  hops: z.number().int().min(1).max(3).default(1)
 });
 export type GraphScope = z.infer<typeof GraphScopeSchema>;
 
@@ -166,7 +166,7 @@ export const MetadataSearchRequestSchema = z.object({
   ...SearchFiltersSchema.shape,
   graphScope: GraphScopeSchema.optional(),
   limit: z.number().int().min(1).max(200).default(30),
-  offset: z.number().int().min(0).default(0),
+  offset: z.number().int().min(0).default(0)
 });
 export type MetadataSearchRequest = z.infer<typeof MetadataSearchRequestSchema>;
 
@@ -180,7 +180,7 @@ export const CatalogSortSchema = z.enum([
   "rating_desc",
   "rating_asc",
   "name_asc",
-  "name_desc",
+  "name_desc"
 ]);
 export type CatalogSort = z.infer<typeof CatalogSortSchema>;
 
@@ -200,13 +200,13 @@ export const CatalogBrowseRequestSchema = z.object({
   path: z.string().optional(),
   sort: CatalogSortSchema.default("newest"),
   limit: z.number().int().min(1).max(200).default(40),
-  offset: z.number().int().min(0).default(0),
+  offset: z.number().int().min(0).default(0)
 });
 export type CatalogBrowseRequest = z.infer<typeof CatalogBrowseRequestSchema>;
 
 /** Bulk export — the selected images, by sha256. Capped to bound the server-side fan-out. */
 export const ExportRequestSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1).max(500),
+  ids: z.array(z.string().min(1)).min(1).max(500)
 });
 export type ExportRequest = z.infer<typeof ExportRequestSchema>;
 
@@ -215,7 +215,7 @@ export const SemanticSearchRequestSchema = z.object({
   filters: SearchFiltersSchema.optional(),
   limit: z.number().int().min(1).max(200).default(30),
   /** Drop vector hits scoring below this cosine threshold (0 = no cutoff). */
-  minScore: z.number().min(0).max(1).default(0),
+  minScore: z.number().min(0).max(1).default(0)
 });
 export type SemanticSearchRequest = z.infer<typeof SemanticSearchRequestSchema>;
 
@@ -230,7 +230,7 @@ export const SimilarSearchRequestSchema = z.object({
   /** HNSW search beam width — raise for recall on larger collections. */
   hnswEf: z.number().int().min(4).max(1024).optional(),
   /** Exact brute-force scan (slow) for ground-truth comparison. */
-  exact: z.boolean().optional(),
+  exact: z.boolean().optional()
 });
 export type SimilarSearchRequest = z.infer<typeof SimilarSearchRequestSchema>;
 
@@ -242,7 +242,7 @@ export const ImageSearchOptionsSchema = z.object({
   filters: SearchFiltersSchema.optional(),
   graphScope: GraphScopeSchema.optional(),
   limit: z.number().int().min(1).max(200).default(30),
-  minScore: z.number().min(0).max(1).default(0),
+  minScore: z.number().min(0).max(1).default(0)
 });
 export type ImageSearchOptions = z.infer<typeof ImageSearchOptionsSchema>;
 
@@ -253,13 +253,13 @@ export const IngestFolderRequestSchema = z.object({
   extractMetadata: z.boolean().default(true),
   runExternalEnrichment: z.boolean().default(false),
   indexQdrant: z.boolean().default(true),
-  syncNeo4j: z.boolean().default(true),
+  syncNeo4j: z.boolean().default(true)
 });
 export type IngestFolderRequest = z.infer<typeof IngestFolderRequestSchema>;
 
 export const GraphRequestSchema = z.object({
   depth: z.number().int().min(1).max(4).default(1),
-  relationshipTypes: z.array(z.string()).optional(),
+  relationshipTypes: z.array(z.string()).optional()
 });
 export type GraphRequest = z.infer<typeof GraphRequestSchema>;
 
@@ -268,13 +268,13 @@ export const ReindexRequestSchema = z.object({
   refreshMetadata: z.boolean().default(true),
   refreshGraph: z.boolean().default(true),
   refreshQdrant: z.boolean().default(true),
-  runExternalEnrichment: z.boolean().default(false),
+  runExternalEnrichment: z.boolean().default(false)
 });
 export type ReindexRequest = z.infer<typeof ReindexRequestSchema>;
 
 export const EnrichRequestSchema = z.object({
   imageId: z.string().min(1),
-  mode: z.enum(["short_caption", "full_description", "tags", "all"]).default("all"),
+  mode: z.enum(["short_caption", "full_description", "tags", "all"]).default("all")
 });
 export type EnrichRequest = z.infer<typeof EnrichRequestSchema>;
 
@@ -286,17 +286,17 @@ export const GraphNodeSchema = z.object({
   id: z.string(),
   label: z.string(),
   type: z.string(),
-  properties: z.record(z.string(), z.unknown()).optional(),
+  properties: z.record(z.string(), z.unknown()).optional()
 });
 export const GraphEdgeSchema = z.object({
   from: z.string(),
   to: z.string(),
   type: z.string(),
-  properties: z.record(z.string(), z.unknown()).optional(),
+  properties: z.record(z.string(), z.unknown()).optional()
 });
 export const GraphSchema = z.object({
   nodes: z.array(GraphNodeSchema),
-  edges: z.array(GraphEdgeSchema),
+  edges: z.array(GraphEdgeSchema)
 });
 export type Graph = z.infer<typeof GraphSchema>;
 
@@ -305,7 +305,7 @@ export type Graph = z.infer<typeof GraphSchema>;
 // ---------------------------------------------------------------------------
 
 export const CompareRequestSchema = z.object({
-  imageIds: z.array(z.string().min(1)).min(2).max(4),
+  imageIds: z.array(z.string().min(1)).min(2).max(4)
 });
 export type CompareRequest = z.infer<typeof CompareRequestSchema>;
 
@@ -328,14 +328,14 @@ export const CompareImageSchema = z.object({
   folder: z.string().nullable(),
   tags: z.array(z.string()),
   loras: z.array(LoraRefSchema),
-  generationParams: GenerationParamsSchema.nullable(),
+  generationParams: GenerationParamsSchema.nullable()
 });
 export type CompareImage = z.infer<typeof CompareImageSchema>;
 
 export const PairwiseSimilaritySchema = z.object({
   a: z.string(),
   b: z.string(),
-  score: z.number(),
+  score: z.number()
 });
 export type PairwiseSimilarity = z.infer<typeof PairwiseSimilaritySchema>;
 
@@ -344,7 +344,7 @@ export const CompareFieldSchema = z.object({
   key: z.string(),
   label: z.string(),
   values: z.array(z.string().nullable()),
-  allEqual: z.boolean(),
+  allEqual: z.boolean()
 });
 export type CompareField = z.infer<typeof CompareFieldSchema>;
 
@@ -355,7 +355,7 @@ export const CompareResultSchema = z.object({
   uniqueTags: z.array(z.array(z.string())),
   pairwiseSimilarity: z.array(PairwiseSimilaritySchema),
   similarityAvailable: z.boolean(),
-  graph: GraphSchema,
+  graph: GraphSchema
 });
 export type CompareResult = z.infer<typeof CompareResultSchema>;
 
@@ -373,7 +373,7 @@ export const ClusterRequestSchema = z.object({
   /** Minimum similarity for an edge to be kept. */
   threshold: z.number().min(0).max(1).default(0.6),
   /** Louvain resolution — higher yields more, smaller communities. */
-  resolution: z.number().min(0.1).max(5).default(1),
+  resolution: z.number().min(0.1).max(5).default(1)
 });
 export type ClusterRequest = z.infer<typeof ClusterRequestSchema>;
 
@@ -383,7 +383,7 @@ export const ClusterSummarySchema = z.object({
   size: z.number().int(),
   representativeImageId: z.string(),
   imageIds: z.array(z.string()),
-  topTags: z.array(z.string()),
+  topTags: z.array(z.string())
 });
 export type ClusterSummary = z.infer<typeof ClusterSummarySchema>;
 
@@ -391,6 +391,6 @@ export const ClusterResultSchema = z.object({
   clusters: z.array(ClusterSummarySchema),
   graph: GraphSchema,
   sampled: z.number().int(),
-  edges: z.number().int(),
+  edges: z.number().int()
 });
 export type ClusterResult = z.infer<typeof ClusterResultSchema>;

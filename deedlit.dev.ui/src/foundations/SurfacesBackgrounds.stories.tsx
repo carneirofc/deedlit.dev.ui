@@ -19,9 +19,9 @@ const meta: Meta = {
     layout: "fullscreen",
     a11y: {
       // Swatch labels are decorative documentation, not interactive contrast targets.
-      test: "off",
-    },
-  },
+      test: "off"
+    }
+  }
 };
 
 export default meta;
@@ -41,7 +41,15 @@ function Swatch({ name, note }: Token) {
   );
 }
 
-function Group({ title, description, tokens }: { title: string; description: string; tokens: Token[] }) {
+function Group({
+  title,
+  description,
+  tokens
+}: {
+  title: string;
+  description: string;
+  tokens: Token[];
+}) {
   return (
     <section className="space-y-3">
       <div>
@@ -60,13 +68,13 @@ function Group({ title, description, tokens }: { title: string; description: str
 const PAGE_BACKGROUNDS: Token[] = [
   { name: "--bg-0", note: "Top of the body gradient" },
   { name: "--bg-1", note: "Mid stop" },
-  { name: "--bg-2", note: "Bottom stop" },
+  { name: "--bg-2", note: "Bottom stop" }
 ];
 
 const SURFACES: Token[] = [
   { name: "--surface-0", note: "Panels, tooltips, sidebar" },
   { name: "--surface-1", note: "Raised / hovered surface" },
-  { name: "--surface-2", note: "Tinted surface" },
+  { name: "--surface-2", note: "Tinted surface" }
 ];
 
 const UI_BACKGROUNDS: Token[] = [
@@ -85,7 +93,7 @@ const UI_BACKGROUNDS: Token[] = [
   { name: "--ui-bg-deep", note: "CodeBlock (inverse)" },
   { name: "--ui-bg-prompt-positive", note: "PromptBlock positive" },
   { name: "--ui-bg-prompt-negative", note: "PromptBlock negative" },
-  { name: "--ui-bg-prompt-note", note: "PromptBlock note" },
+  { name: "--ui-bg-prompt-note", note: "PromptBlock note" }
 ];
 
 export const PageBackgrounds: Story = {
@@ -97,7 +105,7 @@ export const PageBackgrounds: Story = {
         tokens={PAGE_BACKGROUNDS}
       />
     </div>
-  ),
+  )
 };
 
 export const Surfaces: Story = {
@@ -109,7 +117,7 @@ export const Surfaces: Story = {
         tokens={SURFACES}
       />
     </div>
-  ),
+  )
 };
 
 export const UiBackgrounds: Story = {
@@ -121,16 +129,28 @@ export const UiBackgrounds: Story = {
         tokens={UI_BACKGROUNDS}
       />
     </div>
-  ),
+  )
 };
 
 export const Overview: Story = {
   name: "All background layers",
   render: () => (
     <div className="space-y-8 p-6">
-      <Group title="1 · Page backgrounds" description="Furthest back — the body gradient wash." tokens={PAGE_BACKGROUNDS} />
-      <Group title="2 · Surfaces" description="Translucent panels over the page wash." tokens={SURFACES} />
-      <Group title="3 · UI backgrounds" description="Opaque component fills, nearest the user." tokens={UI_BACKGROUNDS} />
+      <Group
+        title="1 · Page backgrounds"
+        description="Furthest back — the body gradient wash."
+        tokens={PAGE_BACKGROUNDS}
+      />
+      <Group
+        title="2 · Surfaces"
+        description="Translucent panels over the page wash."
+        tokens={SURFACES}
+      />
+      <Group
+        title="3 · UI backgrounds"
+        description="Opaque component fills, nearest the user."
+        tokens={UI_BACKGROUNDS}
+      />
     </div>
-  ),
+  )
 };

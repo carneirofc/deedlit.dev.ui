@@ -1,5 +1,5 @@
+import { GatewayError, getNote, type NoteUpsert, updateNote } from "@/lib/api-client";
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
-import { getNote, updateNote, GatewayError, type NoteUpsert } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

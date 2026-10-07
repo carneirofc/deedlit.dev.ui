@@ -1,14 +1,14 @@
 import { maybeRow, query, rows, withTransaction } from "@/lib/library/db/postgres";
-import type { ExtractedImageRecord } from "@/lib/library/services/metadata-service";
 import {
   inferModelFamily,
   linkImageLora,
   upsertCheckpoint,
   upsertLora,
-  upsertModel,
+  upsertModel
 } from "@/lib/library/repositories/model-repository";
 import { clearImageTags, linkImageTag, upsertTag } from "@/lib/library/repositories/tag-repository";
 import type { ImageDetail, SearchFilters } from "@/lib/library/schemas";
+import type { ExtractedImageRecord } from "@/lib/library/services/metadata-service";
 
 interface ImageRowLite {
   id: string;
@@ -23,7 +23,7 @@ export async function findBySha256(sha256: string): Promise<ImageRowLite | null>
   return maybeRow<ImageRowLite>(
     `SELECT id, sha256_hash, file_path, thumbnail_path, filename, ingestion_status
        FROM images WHERE sha256_hash = $1`,
-    [sha256],
+    [sha256]
   );
 }
 
@@ -31,7 +31,7 @@ export async function findById(id: string): Promise<ImageRowLite | null> {
   return maybeRow<ImageRowLite>(
     `SELECT id, sha256_hash, file_path, thumbnail_path, filename, ingestion_status
        FROM images WHERE id = $1`,
-    [id],
+    [id]
   );
 }
 
@@ -42,7 +42,7 @@ export async function findById(id: string): Promise<ImageRowLite | null> {
  */
 export async function persistImage(
   record: ExtractedImageRecord,
-  thumbnailPath: string | null,
+  thumbnailPath: string | null
 ): Promise<string> {
   return withTransaction(async (client) => {
     let modelId: string | null = null;
@@ -96,8 +96,8 @@ export async function persistImage(
         record.workflowJson ? JSON.stringify(record.workflowJson) : null,
         record.metadataJson ? JSON.stringify(record.metadataJson) : null,
         modelId,
-        checkpointId,
-      ],
+        checkpointId
+      ]
     );
     const imageId = upsert.rows[0].id;
 
@@ -110,7 +110,18 @@ export async function persistImage(
          seed = EXCLUDED.seed, steps = EXCLUDED.steps, cfg_scale = EXCLUDED.cfg_scale,
          sampler = EXCLUDED.sampler, scheduler = EXCLUDED.scheduler, denoise = EXCLUDED.denoise,
          width = EXCLUDED.width, height = EXCLUDED.height, clip_skip = EXCLUDED.clip_skip`,
-      [imageId, gp.seed, gp.steps, gp.cfgScale, gp.sampler, gp.scheduler, gp.denoise, gp.width, gp.height, gp.clipSkip],
+      [
+        imageId,
+        gp.seed,
+        gp.steps,
+        gp.cfgScale,
+        gp.sampler,
+        gp.scheduler,
+        gp.denoise,
+        gp.width,
+        gp.height,
+        gp.clipSkip
+      ]
     );
 
     // Tags (prompt source) — replace the prompt-sourced set on re-ingest.
@@ -121,7 +132,9 @@ export async function persistImage(
     }
 
     // LoRAs.
-    await client.query(`DELETE FROM image_loras WHERE image_id = $1 AND source = 'prompt'`, [imageId]);
+    await client.query(`DELETE FROM image_loras WHERE image_id = $1 AND source = 'prompt'`, [
+      imageId
+    ]);
     for (const lora of record.loras) {
       const loraId = await upsertLora(client, lora.name);
       await linkImageLora(client, imageId, loraId, lora.weight, "prompt");
@@ -179,28 +192,47 @@ export async function getImageDetail(id: string): Promise<ImageDetail | null> {
        LEFT JOIN models m ON m.id = i.model_id
        LEFT JOIN checkpoints c ON c.id = i.checkpoint_id
       WHERE i.id = $1`,
-    [id],
+    [id]
   );
   if (!row) return null;
 
   const [tagRows, loraRows, gpRow, descRows] = await Promise.all([
-    rows<{ name: string; normalized_name: string; category: string | null; confidence: number | null; source: string | null }>(
+    rows<{
+      name: string;
+      normalized_name: string;
+      category: string | null;
+      confidence: number | null;
+      source: string | null;
+    }>(
       `SELECT t.name, t.normalized_name, t.category, it.confidence, it.source
          FROM image_tags it JOIN tags t ON t.id = it.tag_id WHERE it.image_id = $1`,
-      [id],
+      [id]
     ),
     rows<{ name: string; weight: number | null }>(
       `SELECT l.name, il.weight FROM image_loras il JOIN loras l ON l.id = il.lora_id WHERE il.image_id = $1`,
-      [id],
+      [id]
     ),
-    maybeRow<{ seed: string | null; steps: number | null; cfg_scale: number | null; sampler: string | null; scheduler: string | null; denoise: number | null; width: number | null; height: number | null; clip_skip: number | null }>(
-      `SELECT * FROM generation_params WHERE image_id = $1`,
-      [id],
-    ),
-    rows<{ id: string; description: string; provider: string | null; model: string | null; created_at: Date }>(
+    maybeRow<{
+      seed: string | null;
+      steps: number | null;
+      cfg_scale: number | null;
+      sampler: string | null;
+      scheduler: string | null;
+      denoise: number | null;
+      width: number | null;
+      height: number | null;
+      clip_skip: number | null;
+    }>(`SELECT * FROM generation_params WHERE image_id = $1`, [id]),
+    rows<{
+      id: string;
+      description: string;
+      provider: string | null;
+      model: string | null;
+      created_at: Date;
+    }>(
       `SELECT id, description, provider, model, created_at FROM image_descriptions WHERE image_id = $1 ORDER BY created_at DESC`,
-      [id],
-    ),
+      [id]
+    )
   ]);
 
   return {
@@ -231,7 +263,7 @@ export async function getImageDetail(id: string): Promise<ImageDetail | null> {
       normalizedName: t.normalized_name,
       category: t.category,
       confidence: t.confidence,
-      source: t.source,
+      source: t.source
     })),
     loras: loraRows.map((l) => ({ name: l.name, weight: l.weight })),
     generationParams: gpRow
@@ -244,7 +276,7 @@ export async function getImageDetail(id: string): Promise<ImageDetail | null> {
           denoise: gpRow.denoise,
           width: gpRow.width,
           height: gpRow.height,
-          clipSkip: gpRow.clip_skip,
+          clipSkip: gpRow.clip_skip
         }
       : null,
     descriptions: descRows.map((d) => ({
@@ -252,8 +284,8 @@ export async function getImageDetail(id: string): Promise<ImageDetail | null> {
       description: d.description,
       provider: d.provider,
       model: d.model,
-      createdAt: d.created_at.toISOString(),
-    })),
+      createdAt: d.created_at.toISOString()
+    }))
   };
 }
 
@@ -276,7 +308,7 @@ export interface ImageListItem {
 /** Build a WHERE clause from search filters; returns sql fragment + params. */
 function buildFilterClause(
   filters: SearchFilters & { query?: string; ids?: string[] },
-  startIndex: number,
+  startIndex: number
 ): { where: string; params: unknown[] } {
   const conditions: string[] = ["i.deleted = false"];
   const params: unknown[] = [];
@@ -318,7 +350,7 @@ function buildFilterClause(
   if (filters.tags && filters.tags.length > 0) {
     conditions.push(
       `i.id IN (SELECT it.image_id FROM image_tags it JOIN tags t ON t.id = it.tag_id
-                WHERE t.normalized_name = ANY($${idx}) GROUP BY it.image_id HAVING COUNT(DISTINCT t.normalized_name) = $${idx + 1})`,
+                WHERE t.normalized_name = ANY($${idx}) GROUP BY it.image_id HAVING COUNT(DISTINCT t.normalized_name) = $${idx + 1})`
     );
     params.push(filters.tags.map((t) => t.toLowerCase().replace(/\s+/g, "_")));
     params.push(filters.tags.length);
@@ -326,14 +358,14 @@ function buildFilterClause(
   }
   if (filters.excludeTags && filters.excludeTags.length > 0) {
     conditions.push(
-      `i.id NOT IN (SELECT it.image_id FROM image_tags it JOIN tags t ON t.id = it.tag_id WHERE t.normalized_name = ANY($${idx}))`,
+      `i.id NOT IN (SELECT it.image_id FROM image_tags it JOIN tags t ON t.id = it.tag_id WHERE t.normalized_name = ANY($${idx}))`
     );
     params.push(filters.excludeTags.map((t) => t.toLowerCase().replace(/\s+/g, "_")));
     idx++;
   }
   if (filters.loras && filters.loras.length > 0) {
     conditions.push(
-      `i.id IN (SELECT il.image_id FROM image_loras il JOIN loras l ON l.id = il.lora_id WHERE l.name = ANY($${idx}))`,
+      `i.id IN (SELECT il.image_id FROM image_loras il JOIN loras l ON l.id = il.lora_id WHERE l.name = ANY($${idx}))`
     );
     params.push(filters.loras);
     idx++;
@@ -345,7 +377,7 @@ function buildFilterClause(
 export async function listImages(
   filters: SearchFilters & { query?: string; ids?: string[] },
   limit: number,
-  offset: number,
+  offset: number
 ): Promise<ImageListItem[]> {
   const { where, params } = buildFilterClause(filters, 1);
   const limitIdx = params.length + 1;
@@ -384,7 +416,7 @@ export async function listImages(
     favorite: r.favorite,
     model: r.model,
     checkpoint: r.checkpoint,
-    tags: r.tags ?? [],
+    tags: r.tags ?? []
   }));
 }
 
@@ -412,7 +444,7 @@ export async function getListItemsByIds(ids: string[]): Promise<Map<string, Imag
        LEFT JOIN tags t ON t.id = it.tag_id
       WHERE i.id = ANY($1)
       GROUP BY i.id, m.name, c.name`,
-    [ids],
+    [ids]
   );
   const map = new Map<string, ImageListItem>();
   for (const r of result) {
@@ -425,15 +457,17 @@ export async function getListItemsByIds(ids: string[]): Promise<Map<string, Imag
       favorite: r.favorite,
       model: r.model,
       checkpoint: r.checkpoint,
-      tags: r.tags ?? [],
+      tags: r.tags ?? []
     });
   }
   return map;
 }
 
 /** All image ids + file paths for rebuild/reindex jobs. */
-export async function listAllForReindex(): Promise<Array<{ id: string; filePath: string; sha256: string }>> {
+export async function listAllForReindex(): Promise<
+  Array<{ id: string; filePath: string; sha256: string }>
+> {
   return rows<{ id: string; filePath: string; sha256: string }>(
-    `SELECT id, file_path AS "filePath", sha256_hash AS sha256 FROM images WHERE deleted = false`,
+    `SELECT id, file_path AS "filePath", sha256_hash AS sha256 FROM images WHERE deleted = false`
   );
 }

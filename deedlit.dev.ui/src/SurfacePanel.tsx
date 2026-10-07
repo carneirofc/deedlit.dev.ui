@@ -1,7 +1,7 @@
 "use client";
 
-import { forwardRef, type HTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { forwardRef, type HTMLAttributes } from "react";
 
 import { cn } from "./utils";
 
@@ -14,19 +14,19 @@ export const surfacePanelVariants = cva("rounded-xl border", {
       default: "border-ui bg-[color:var(--ui-bg)]",
       soft: "border-ui bg-panel/90",
       subtle: "border-ui-subtle bg-[color:var(--ui-bg-alt)]",
-      strong: "border-ui bg-[color:var(--ui-bg-strong)]",
+      strong: "border-ui bg-[color:var(--ui-bg-strong)]"
     },
     padding: {
       none: "",
       sm: "p-2",
       md: "p-3",
-      lg: "p-4",
-    },
+      lg: "p-4"
+    }
   },
   defaultVariants: {
     tone: "default",
-    padding: "md",
-  },
+    padding: "md"
+  }
 });
 
 export type SurfacePanelProps = HTMLAttributes<HTMLDivElement> &
@@ -34,7 +34,7 @@ export type SurfacePanelProps = HTMLAttributes<HTMLDivElement> &
 
 const SurfacePanel = forwardRef<HTMLDivElement, SurfacePanelProps>(function SurfacePanel(
   { className, tone, padding, ...props },
-  ref,
+  ref
 ) {
   return (
     <div

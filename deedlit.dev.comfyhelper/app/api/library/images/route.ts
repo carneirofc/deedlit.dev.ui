@@ -1,6 +1,6 @@
+import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { SearchFiltersSchema } from "@/lib/library/schemas";
-import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,16 +15,22 @@ export async function GET(request: Request) {
   return handleRoute(async () => {
     const { searchParams } = new URL(request.url);
     const csv = (key: string) =>
-      searchParams.get(key)?.split(",").map((s) => s.trim()).filter(Boolean);
+      searchParams
+        .get(key)
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     const filters = SearchFiltersSchema.parse({
       tags: csv("tags"),
       excludeTags: csv("exclude_tags"),
       modelFamily: searchParams.get("model_family") ?? undefined,
       checkpoint: searchParams.get("checkpoint") ?? undefined,
       loras: csv("loras"),
-      ratingGte: searchParams.get("rating_gte") ? Number(searchParams.get("rating_gte")) : undefined,
+      ratingGte: searchParams.get("rating_gte")
+        ? Number(searchParams.get("rating_gte"))
+        : undefined,
       favorite: searchParams.get("favorite") === "true" ? true : undefined,
-      sourceTool: searchParams.get("source_tool") ?? undefined,
+      sourceTool: searchParams.get("source_tool") ?? undefined
     });
     const limit = Math.min(200, Number(searchParams.get("limit") ?? 50));
     const offset = Math.max(0, Number(searchParams.get("offset") ?? 0));
@@ -33,7 +39,7 @@ export async function GET(request: Request) {
     const res = await search({
       query,
       limit: limit + offset,
-      filter: buildSearchFilter(filters),
+      filter: buildSearchFilter(filters)
     });
     const all = hitsToCompactResults(res.hits);
     const results = offset > 0 ? all.slice(offset, offset + limit) : all.slice(0, limit);

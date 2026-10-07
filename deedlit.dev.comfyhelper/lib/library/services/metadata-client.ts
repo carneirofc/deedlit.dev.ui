@@ -58,7 +58,7 @@ export class MetadataServiceNotConfiguredError extends Error {
   constructor() {
     super(
       "METADATA_API_URL is not set — the deedlit.metadata service is required for ingest. " +
-        "Start deedlit.metadata and set METADATA_API_URL (e.g. http://localhost:8005).",
+        "Start deedlit.metadata and set METADATA_API_URL (e.g. http://localhost:8005)."
     );
     this.name = "MetadataServiceNotConfiguredError";
   }
@@ -92,10 +92,10 @@ function emptyExtractResult(): ExtractResult {
       embeddings: [],
       vae: [],
       controlnets: [],
-      upscalers: [],
+      upscalers: []
     },
     workflow_json: null,
-    api_prompt_json: null,
+    api_prompt_json: null
   };
 }
 
@@ -111,7 +111,7 @@ function emptyExtractResult(): ExtractResult {
 export async function extractMetadataFromBuffer(
   buffer: Buffer,
   mime: string,
-  filename: string,
+  filename: string
 ): Promise<ExtractResult> {
   const { metadataApiUrl } = getLibraryConfig();
   if (!metadataApiUrl) {

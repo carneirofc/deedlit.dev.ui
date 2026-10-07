@@ -6,7 +6,7 @@ import MetadataTabBar, { type MetadataTabValue } from "./MetadataTabBar";
 const meta = {
   title: "Components/MetadataTabBar",
   component: MetadataTabBar,
-  tags: ["autodocs"],
+  tags: ["autodocs"]
 } satisfies Meta<typeof MetadataTabBar>;
 
 export default meta;
@@ -23,5 +23,5 @@ export const Default: Story = {
         </div>
       </div>
     );
-  },
+  }
 };

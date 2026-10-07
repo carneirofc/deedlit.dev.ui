@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 /**
  * Encapsulates the controlled / uncontrolled component pattern.
@@ -26,15 +26,13 @@ export function useControllableState<T>(options: {
       if (isControlled) {
         // In controlled mode, resolve the updater and notify the owner.
         const resolved =
-          typeof next === "function"
-            ? (next as (prev: T) => T)(controlledValue as T)
-            : next;
+          typeof next === "function" ? (next as (prev: T) => T)(controlledValue as T) : next;
         onChange?.(resolved);
       } else {
         setInternal(next);
       }
     },
-    [isControlled, controlledValue, onChange],
+    [isControlled, controlledValue, onChange]
   );
 
   return [isControlled ? (controlledValue as T) : internal, setValue];

@@ -1,17 +1,17 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   buildSearchFilter,
-  getGatewayBaseUrl,
+  type CatalogImage,
   getDetail,
-  hitToCompactResult,
+  getGatewayBaseUrl,
   hitsToCompactResults,
+  hitToCompactResult,
   imageToUiDetail,
   neighborsToGraph,
-  search,
-  thumbnailUrl,
-  type CatalogImage,
   type SearchHit,
+  search,
+  thumbnailUrl
 } from "../../lib/api-client";
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ function restoreFetch() {
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json" }
   });
 }
 
@@ -91,11 +91,11 @@ test("search() POSTs to the gateway /search and maps hits to CompactResult", asy
               prompt: "a   castle   at dusk",
               tags: ["castle", "dusk"],
               checkpoint: "sdxl_base",
-              thumbnail_url: "http://cdn/thumb.webp",
-            },
+              thumbnail_url: "http://cdn/thumb.webp"
+            }
           },
-          { sha256: "b".repeat(64), score: 0.42, payload: null },
-        ],
+          { sha256: "b".repeat(64), score: 0.42, payload: null }
+        ]
       });
     });
     try {
@@ -114,7 +114,7 @@ test("search() POSTs to the gateway /search and maps hits to CompactResult", asy
         summary: "a castle at dusk",
         tags: ["castle", "dusk"],
         checkpoint: "sdxl_base",
-        model: "sdxl_base",
+        model: "sdxl_base"
       });
       // no payload -> local thumbnail proxy + sha as summary fallback.
       expect(results[1].thumbnailUrl).toBe(thumbnailUrl("b".repeat(64)));
@@ -156,11 +156,19 @@ test("getDetail() GETs /detail/{sha} and image maps to the UI detail shape", asy
       favorite: true,
       description: "A studio portrait of a woman in soft light.",
       tags: ["portrait", "studio"],
-      params: { seed: 7, steps: 30, cfg: 6.5, sampler: "euler", clipskip: 2, width: 1024, height: 1536 },
+      params: {
+        seed: 7,
+        steps: 30,
+        cfg: 6.5,
+        sampler: "euler",
+        clipskip: 2,
+        width: 1024,
+        height: 1536
+      },
       references: [
         { kind: "checkpoint", name: "sdxl_base.safetensors", hash: null },
-        { kind: "lora", name: "detail.safetensors", hash: null },
-      ],
+        { kind: "lora", name: "detail.safetensors", hash: null }
+      ]
     };
     let calledUrl: string | undefined;
     stubFetch(async (input) => {
@@ -182,14 +190,14 @@ test("getDetail() GETs /detail/{sha} and image maps to the UI detail shape", asy
         checkpoint: "sdxl_base.safetensors",
         model: "sdxl_base.safetensors", // falls back to checkpoint
         width: 1024,
-        height: 1536,
+        height: 1536
       });
       // params: cfg -> cfgScale, clipskip -> clipSkip
       expect(ui.generationParams).toMatchObject({ cfgScale: 6.5, clipSkip: 2, seed: 7, steps: 30 });
       // tags: string[] -> {name, normalizedName}
       expect(ui.tags).toEqual([
         { name: "portrait", normalizedName: "portrait", source: null },
-        { name: "studio", normalizedName: "studio", source: null },
+        { name: "studio", normalizedName: "studio", source: null }
       ]);
       // loras pulled from references
       expect(ui.loras).toEqual([{ name: "detail.safetensors", weight: null }]);
@@ -198,8 +206,8 @@ test("getDetail() GETs /detail/{sha} and image maps to the UI detail shape", asy
         {
           id: `${sha}:deedlit.labelagent`,
           description: "A studio portrait of a woman in soft light.",
-          provider: "deedlit.labelagent",
-        },
+          provider: "deedlit.labelagent"
+        }
       ]);
     } finally {
       restoreFetch();
@@ -220,7 +228,11 @@ test("hitToCompactResult prefers tags summary when no prompt, else filename", ()
 });
 
 test("hitToCompactResult maps the content-safety class (null when absent/invalid)", () => {
-  const explicit: SearchHit = { sha256: "a".repeat(64), score: 0.1, payload: { safety: "explicit" } };
+  const explicit: SearchHit = {
+    sha256: "a".repeat(64),
+    score: 0.1,
+    payload: { safety: "explicit" }
+  };
   expect(hitToCompactResult(explicit).safety).toBe("explicit");
   const bogus: SearchHit = { sha256: "b".repeat(64), score: 0.1, payload: { safety: "weird" } };
   expect(hitToCompactResult(bogus).safety).toBeNull();
@@ -238,7 +250,7 @@ test("buildSearchFilter drops empty/undefined values and returns null when empty
   expect(buildSearchFilter({ tags: [], modelFamily: "", checkpoint: undefined })).toBeNull();
   expect(buildSearchFilter({ tags: ["a"], favorite: true, checkpoint: "" })).toEqual({
     tags: ["a"],
-    favorite: true,
+    favorite: true
   });
 });
 
@@ -246,14 +258,14 @@ test("neighborsToGraph centres the focus image with one edge per neighbor", () =
   const focus = "f".repeat(64);
   const graph = neighborsToGraph(focus, [
     { sha256: "0".repeat(64), relation: "shared_asset", weight: 2 },
-    { sha256: "1".repeat(64), relation: "tag_cooccurrence" },
+    { sha256: "1".repeat(64), relation: "tag_cooccurrence" }
   ]);
   expect(graph.nodes).toHaveLength(3);
   expect(graph.nodes[0]).toMatchObject({ id: focus, type: "Image" });
   expect(graph.nodes[0].properties?.seed).toBe(true);
   expect(graph.edges).toEqual([
     { from: focus, to: "0".repeat(64), type: "shared_asset" },
-    { from: focus, to: "1".repeat(64), type: "tag_cooccurrence" },
+    { from: focus, to: "1".repeat(64), type: "tag_cooccurrence" }
   ]);
 });
 

@@ -6,11 +6,10 @@ import {
   HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
-  S3Client,
+  S3Client
 } from "@aws-sdk/client-s3";
-
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-object-store" });
 
@@ -30,7 +29,7 @@ export function getClient(): S3Client {
       endpoint: objectStore.endpoint,
       region: objectStore.region,
       forcePathStyle: objectStore.forcePathStyle,
-      credentials: { accessKeyId: objectStore.accessKey, secretAccessKey: objectStore.secretKey },
+      credentials: { accessKeyId: objectStore.accessKey, secretAccessKey: objectStore.secretKey }
     });
   }
   return globalThis.__comfyhelperS3Client;
@@ -65,11 +64,20 @@ export function parseObjectUri(uri: string): { bucket: string; key: string } | n
   return { bucket: match[1], key: match[2] };
 }
 
-export async function putObject(key: string, body: Buffer | string, contentType: string): Promise<string> {
+export async function putObject(
+  key: string,
+  body: Buffer | string,
+  contentType: string
+): Promise<string> {
   await ensureBucket();
   const { objectStore } = getLibraryConfig();
   await getClient().send(
-    new PutObjectCommand({ Bucket: objectStore.bucket, Key: key, Body: body, ContentType: contentType }),
+    new PutObjectCommand({
+      Bucket: objectStore.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType
+    })
   );
   return objectUri(key);
 }
@@ -94,7 +102,9 @@ export async function getObjectBuffer(key: string): Promise<Buffer | null> {
   try {
     const body = await getBody(objectStore.bucket, key);
     if (!body) return null;
-    const bytes = await (body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+    const bytes = await (
+      body as { transformToByteArray: () => Promise<Uint8Array> }
+    ).transformToByteArray();
     return Buffer.from(bytes);
   } catch {
     return null;

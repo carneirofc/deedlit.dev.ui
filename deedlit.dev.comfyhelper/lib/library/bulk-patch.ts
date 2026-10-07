@@ -29,7 +29,7 @@ export interface BulkPatchOptions {
 
 export async function patchImages(
   patches: { id: string; body: ImagePatchBody }[],
-  opts: BulkPatchOptions = {},
+  opts: BulkPatchOptions = {}
 ): Promise<BulkPatchOutcome> {
   const updated: string[] = [];
   const failed: { id: string; error: string }[] = [];
@@ -41,7 +41,7 @@ export async function patchImages(
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(p.body),
-        signal: opts.signal,
+        signal: opts.signal
       });
       if (res.ok) {
         updated.push(p.id);

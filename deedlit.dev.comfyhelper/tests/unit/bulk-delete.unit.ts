@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { deleteImages } from "../../lib/library/bulk-delete";
 
@@ -21,7 +21,7 @@ function stubFetch(reply: Reply) {
     if (reply.throws) throw new Error("network down");
     return new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
       status: reply.status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json" }
     });
   }) as typeof globalThis.fetch;
   return { calls };
@@ -79,7 +79,7 @@ test("deleteImages maps a non-2xx response to every id failing", async () => {
     expect(out.deleted).toEqual([]);
     expect(out.failed).toEqual([
       { id: "a", error: "catalog unavailable" },
-      { id: "b", error: "catalog unavailable" },
+      { id: "b", error: "catalog unavailable" }
     ]);
   } finally {
     restore();

@@ -1,32 +1,32 @@
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
 import { getImageDetail } from "@/lib/library/repositories/image-repository";
 import {
+  type CollectionInfo,
+  DEFAULT_HNSW_EF,
+  deletePoint,
   ensureCollection,
   getCollectionInfo,
-  recreateCollection,
-  retrieveVector,
-  searchByVector,
-  searchByVectorDetailed,
-  upsertPoint,
-  deletePoint,
-  DEFAULT_HNSW_EF,
-  type CollectionInfo,
   type ImageVectorPayload,
   type QdrantFilter,
+  recreateCollection,
+  retrieveVector,
   type ScoredHit,
+  searchByVector,
+  searchByVectorDetailed,
+  upsertPoint
 } from "@/lib/library/repositories/vector-repository";
+import type { SearchFilters } from "@/lib/library/schemas";
 import {
-  getEmbeddingDiagnostics,
-  getOrComputeImageEmbedding,
+  type EmbeddingDiagnostics,
   generateImageEmbeddingFromBuffer,
   generateTextEmbedding,
+  getEmbeddingDiagnostics,
+  getOrComputeImageEmbedding,
   isZeroVector,
-  vectorStats,
-  type EmbeddingDiagnostics,
   type VectorStats,
+  vectorStats
 } from "@/lib/library/services/embedding-service";
-import type { SearchFilters } from "@/lib/library/schemas";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-qdrant-service" });
 
@@ -41,20 +41,24 @@ export async function ensureImagesCollection(): Promise<void> {
  */
 export function buildQdrantFilter(
   filters: SearchFilters | undefined,
-  allowedIds?: string[],
+  allowedIds?: string[]
 ): QdrantFilter | undefined {
   const must: unknown[] = [];
   const mustNot: unknown[] = [];
 
   if (filters) {
-    if (filters.modelFamily) must.push({ key: "model_family", match: { value: filters.modelFamily } });
+    if (filters.modelFamily)
+      must.push({ key: "model_family", match: { value: filters.modelFamily } });
     if (filters.checkpoint) must.push({ key: "checkpoint", match: { value: filters.checkpoint } });
     if (filters.sourceTool) must.push({ key: "source_tool", match: { value: filters.sourceTool } });
     if (filters.favorite) must.push({ key: "favorite", match: { value: true } });
-    if (typeof filters.ratingGte === "number") must.push({ key: "rating", range: { gte: filters.ratingGte } });
+    if (typeof filters.ratingGte === "number")
+      must.push({ key: "rating", range: { gte: filters.ratingGte } });
     if (filters.tags) for (const t of filters.tags) must.push({ key: "tags", match: { value: t } });
-    if (filters.loras) for (const l of filters.loras) must.push({ key: "loras", match: { value: l } });
-    if (filters.excludeTags) for (const t of filters.excludeTags) mustNot.push({ key: "tags", match: { value: t } });
+    if (filters.loras)
+      for (const l of filters.loras) must.push({ key: "loras", match: { value: l } });
+    if (filters.excludeTags)
+      for (const t of filters.excludeTags) mustNot.push({ key: "tags", match: { value: t } });
   }
   if (allowedIds && allowedIds.length > 0) must.push({ has_id: allowedIds });
 
@@ -108,7 +112,7 @@ export async function upsertImageVector(imageId: string): Promise<boolean> {
     height: detail.height,
     created_at: detail.createdAt,
     source_tool: detail.sourceTool,
-    favorite: detail.favorite,
+    favorite: detail.favorite
   };
   await upsertPoint(detail.id, vector, payload);
   return true;
@@ -130,7 +134,7 @@ export async function findSimilarImages(
   filters: SearchFilters | undefined,
   limit: number,
   allowedIds?: string[],
-  options: SimilarityOptions = {},
+  options: SimilarityOptions = {}
 ): Promise<Array<{ id: string; score: number }>> {
   await ensureCollection();
   const vector = await retrieveVector(imageId);
@@ -139,7 +143,7 @@ export async function findSimilarImages(
   const results = await searchByVector(vector, buildQdrantFilter(filters, allowedIds), limit + 1, {
     scoreThreshold: options.minScore,
     hnswEf: options.hnswEf,
-    exact: options.exact,
+    exact: options.exact
   });
   return results.filter((r) => r.id !== imageId).slice(0, limit);
 }
@@ -149,14 +153,14 @@ export async function semanticImageSearch(
   filters: SearchFilters | undefined,
   limit: number,
   allowedIds?: string[],
-  options: SimilarityOptions = {},
+  options: SimilarityOptions = {}
 ): Promise<Array<{ id: string; score: number }>> {
   await ensureCollection();
   const vector = await generateTextEmbedding(query);
   return searchByVector(vector, buildQdrantFilter(filters, allowedIds), limit, {
     scoreThreshold: options.minScore,
     hnswEf: options.hnswEf,
-    exact: options.exact,
+    exact: options.exact
   });
 }
 
@@ -170,21 +174,21 @@ export async function searchByImageBuffer(
   filters: SearchFilters | undefined,
   limit: number,
   allowedIds?: string[],
-  options: SimilarityOptions = {},
+  options: SimilarityOptions = {}
 ): Promise<Array<{ id: string; score: number }>> {
   await ensureCollection();
   const vector = await generateImageEmbeddingFromBuffer(buffer, mime);
   return searchByVector(vector, buildQdrantFilter(filters, allowedIds), limit, {
     scoreThreshold: options.minScore,
     hnswEf: options.hnswEf,
-    exact: options.exact,
+    exact: options.exact
   });
 }
 
 export async function findNearDuplicates(
   imageId: string,
   threshold: number,
-  limit: number,
+  limit: number
 ): Promise<Array<{ id: string; score: number }>> {
   // Push the threshold into Qdrant instead of filtering after truncation, so a
   // strict cutoff still returns up to `limit` genuine duplicates.
@@ -202,7 +206,12 @@ export interface SimilarExplain {
   collection: CollectionInfo;
   embedding: EmbeddingDiagnostics;
   params: { limit: number; minScore: number; hnswEf: number; exact: boolean };
-  hits: Array<{ id: string; score: number; isSelf: boolean; payload: Record<string, unknown> | null }>;
+  hits: Array<{
+    id: string;
+    score: number;
+    isSelf: boolean;
+    payload: Record<string, unknown> | null;
+  }>;
   warnings: string[];
   tookMs: number;
 }
@@ -217,7 +226,7 @@ export async function explainSimilarImages(
   imageId: string,
   filters: SearchFilters | undefined,
   limit: number,
-  options: SimilarityOptions = {},
+  options: SimilarityOptions = {}
 ): Promise<SimilarExplain> {
   const started = Date.now();
   await ensureCollection();
@@ -228,34 +237,43 @@ export async function explainSimilarImages(
   const [vector, collection, embedding] = await Promise.all([
     retrieveVector(imageId),
     getCollectionInfo(),
-    Promise.resolve(getEmbeddingDiagnostics()),
+    Promise.resolve(getEmbeddingDiagnostics())
   ]);
 
   const warnings: string[] = [];
   if (!embedding.hasExternalImageEmbeddings) {
     warnings.push(
-      "CLIP_VISION_API_URL is not set — deedlit.vision is required for embeddings (no local fallback). Similarity search will error until it is configured.",
+      "CLIP_VISION_API_URL is not set — deedlit.vision is required for embeddings (no local fallback). Similarity search will error until it is configured."
     );
   }
-  if (collection.exists && collection.vectorSize !== null && collection.vectorSize !== embedding.dimensions) {
+  if (
+    collection.exists &&
+    collection.vectorSize !== null &&
+    collection.vectorSize !== embedding.dimensions
+  ) {
     warnings.push(
-      `Collection is ${collection.vectorSize}-dim but the embedder produces ${embedding.dimensions}-dim — rebuild Qdrant (/api/library/maintenance/rebuild-qdrant).`,
+      `Collection is ${collection.vectorSize}-dim but the embedder produces ${embedding.dimensions}-dim — rebuild Qdrant (/api/library/maintenance/rebuild-qdrant).`
     );
   }
   if (collection.distance && collection.distance.toLowerCase() !== "cosine") {
-    warnings.push(`Collection distance is ${collection.distance}; embeddings are L2-normalized for Cosine.`);
+    warnings.push(
+      `Collection distance is ${collection.distance}; embeddings are L2-normalized for Cosine.`
+    );
   }
 
   let hits: ScoredHit[] = [];
   let stats: VectorStats | null = null;
   if (vector) {
     stats = vectorStats(vector);
-    if (stats.isZero) warnings.push("Stored query vector is all zeros — this image was indexed from a failed embedding; reindex it.");
+    if (stats.isZero)
+      warnings.push(
+        "Stored query vector is all zeros — this image was indexed from a failed embedding; reindex it."
+      );
     const detailed = await searchByVectorDetailed(vector, buildQdrantFilter(filters), limit + 1, {
       scoreThreshold: minScore,
       hnswEf,
       exact,
-      withPayload: true,
+      withPayload: true
     });
     hits = detailed.filter((h) => h.id !== imageId).slice(0, limit);
   } else {
@@ -267,14 +285,19 @@ export async function explainSimilarImages(
     collection,
     embedding,
     params: { limit, minScore, hnswEf, exact },
-    hits: hits.map((h) => ({ id: h.id, score: h.score, isSelf: h.id === imageId, payload: h.payload ?? null })),
+    hits: hits.map((h) => ({
+      id: h.id,
+      score: h.score,
+      isSelf: h.id === imageId,
+      payload: h.payload ?? null
+    })),
     warnings,
-    tookMs: Date.now() - started,
+    tookMs: Date.now() - started
   };
 }
 
 export async function rebuildQdrant(
-  allImages: Array<{ id: string }>,
+  allImages: Array<{ id: string }>
 ): Promise<{ indexed: number; skipped: number; failed: number }> {
   await recreateCollection();
   let indexed = 0;

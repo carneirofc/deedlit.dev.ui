@@ -1,6 +1,6 @@
+import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { SemanticSearchRequestSchema } from "@/lib/library/schemas";
-import { buildSearchFilter, hitsToCompactResults, search } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const res = await search({
       query: body.query,
       limit: body.limit,
-      filter: buildSearchFilter(body.filters),
+      filter: buildSearchFilter(body.filters)
     });
     let results = hitsToCompactResults(res.hits);
     if (body.minScore > 0) {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       results,
       count: results.length,
       provider: "deedlit.search",
-      semantic: true,
+      semantic: true
     });
   });
 }

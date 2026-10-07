@@ -1,8 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { ActivityDock, ActivityToasts } from "@carneirofc/ui";
+import type { ReactNode } from "react";
 
 import { ActivityProvider, useActivity } from "@/lib/store/activity";
 import { CompareTrayProvider } from "@/lib/store/compare-tray";

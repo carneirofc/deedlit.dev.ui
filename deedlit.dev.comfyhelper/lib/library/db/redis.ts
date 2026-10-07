@@ -19,8 +19,10 @@ export function getRedisClient(): Redis | null {
     // callers fall through to the live data source. Without this, every
     // concurrent request blocks until the connection is established (can be
     // minutes on Windows Docker networking).
-    enableOfflineQueue: false,
+    enableOfflineQueue: false
   });
-  _client.on("error", () => {/* best-effort cache — ignore connection errors */});
+  _client.on("error", () => {
+    /* best-effort cache — ignore connection errors */
+  });
   return _client;
 }

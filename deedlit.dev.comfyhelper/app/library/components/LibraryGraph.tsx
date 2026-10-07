@@ -1,15 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import type { Core, ElementDefinition, EventObject, StylesheetStyle } from "cytoscape";
+import { useEffect, useRef } from "react";
 
 import type { Graph } from "@/lib/library/schemas";
 
 /** Distinct cluster hues that read well on both light and dark themes. */
 export const CLUSTER_PALETTE = [
-  "#6366f1", "#ec4899", "#10b981", "#f59e0b", "#06b6d4",
-  "#8b5cf6", "#ef4444", "#84cc16", "#f97316", "#14b8a6",
-  "#a855f7", "#eab308",
+  "#6366f1",
+  "#ec4899",
+  "#10b981",
+  "#f59e0b",
+  "#06b6d4",
+  "#8b5cf6",
+  "#ef4444",
+  "#84cc16",
+  "#f97316",
+  "#14b8a6",
+  "#a855f7",
+  "#eab308"
 ];
 
 export function clusterColor(cluster: number): string {
@@ -42,7 +51,7 @@ export function LibraryGraph({
   onNodeClick,
   height = "560px",
   colorByCluster = false,
-  className,
+  className
 }: LibraryGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const clickRef = useRef(onNodeClick);
@@ -62,7 +71,7 @@ export function LibraryGraph({
         muted: cssVar(el, "--ui-ink-muted", "#9ca3af"),
         border: cssVar(el, "--ui-border", "#374151"),
         card: cssVar(el, "--ui-bg-card", "#111827"),
-        accent: cssVar(el, "--ui-ink-accent", "#6366f1"),
+        accent: cssVar(el, "--ui-ink-accent", "#6366f1")
       };
 
       const elements: ElementDefinition[] = [
@@ -77,13 +86,13 @@ export function LibraryGraph({
               thumb: typeof props.thumbnailUrl === "string" ? props.thumbnailUrl : "",
               color: colorByCluster && cluster >= 0 ? clusterColor(cluster) : undefined,
               shared: props.shared === true ? 1 : 0,
-              seed: props.seed === true ? 1 : 0,
-            },
+              seed: props.seed === true ? 1 : 0
+            }
           };
         }),
         ...graph.edges.map((e, i) => ({
-          data: { id: `e${i}_${e.from}_${e.to}`, source: e.from, target: e.to, etype: e.type },
-        })),
+          data: { id: `e${i}_${e.from}_${e.to}`, source: e.from, target: e.to, etype: e.type }
+        }))
       ];
 
       const style: StylesheetStyle[] = [
@@ -101,8 +110,8 @@ export function LibraryGraph({
             "text-max-width": "84px",
             "text-wrap": "ellipsis",
             width: 26,
-            height: 26,
-          },
+            height: 26
+          }
         },
         {
           selector: "node[ntype = 'Image']",
@@ -112,23 +121,27 @@ export function LibraryGraph({
             height: 46,
             "background-image": "data(thumb)",
             "background-fit": "cover",
-            label: "",
-          },
+            label: ""
+          }
         },
         { selector: "node[color]", style: { "border-color": "data(color)", "border-width": 4 } },
         { selector: "node[seed = 1]", style: { "border-color": theme.accent, "border-width": 4 } },
         {
           selector: "node[shared = 1]",
-          style: { "background-color": theme.accent, color: theme.ink, "border-color": theme.accent },
+          style: {
+            "background-color": theme.accent,
+            color: theme.ink,
+            "border-color": theme.accent
+          }
         },
         {
           selector: "edge",
-          style: { width: 1, "line-color": theme.border, "curve-style": "haystack", opacity: 0.5 },
+          style: { width: 1, "line-color": theme.border, "curve-style": "haystack", opacity: 0.5 }
         },
         {
           selector: "node:selected",
-          style: { "border-color": theme.accent, "border-width": 5 },
-        },
+          style: { "border-color": theme.accent, "border-width": 5 }
+        }
       ];
 
       cy = cytoscape({
@@ -140,11 +153,11 @@ export function LibraryGraph({
           animate: false,
           padding: 30,
           nodeRepulsion: () => 9000,
-          idealEdgeLength: () => 90,
+          idealEdgeLength: () => 90
         },
         wheelSensitivity: 0.25,
         minZoom: 0.2,
-        maxZoom: 3,
+        maxZoom: 3
       });
 
       cy.on("tap", "node", (evt: EventObject) => {

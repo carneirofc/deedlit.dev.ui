@@ -26,8 +26,18 @@ export type PageHeaderProps = {
 };
 
 const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function PageHeader(
-  { subtitle, title, titleTag = "h1", description, testId, className, pills, pillsClassName, children },
-  ref,
+  {
+    subtitle,
+    title,
+    titleTag = "h1",
+    description,
+    testId,
+    className,
+    pills,
+    pillsClassName,
+    children
+  },
+  ref
 ) {
   const TitleTag = titleTag;
 
@@ -36,7 +46,10 @@ const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function PageHeader(
       ref={ref}
       id={testId}
       data-testid={testId}
-      className={cn("flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4", className)}
+      className={cn(
+        "flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4",
+        className
+      )}
     >
       <div>
         <p className="text-ui-xs uppercase tracking-[0.24em] text-[color:color-mix(in_oklab,var(--accent-cyan)_55%,var(--accent-pink)_45%)]">
@@ -46,7 +59,9 @@ const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function PageHeader(
         <p className="cyber-muted mt-2 max-w-3xl text-ui-md">{description}</p>
       </div>
       {pills && (
-        <div className={cn("cyber-muted flex flex-wrap items-center gap-2 text-ui-sm", pillsClassName)}>
+        <div
+          className={cn("cyber-muted flex flex-wrap items-center gap-2 text-ui-sm", pillsClassName)}
+        >
           {pills}
         </div>
       )}
@@ -58,5 +73,3 @@ const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function PageHeader(
 PageHeader.displayName = "PageHeader";
 
 export default PageHeader;
-
-

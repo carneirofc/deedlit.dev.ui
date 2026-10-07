@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   hasMixedSeparators,
@@ -6,7 +6,7 @@ import {
   isImageFile,
   normalizePath,
   pathKey,
-  splitPaths,
+  splitPaths
 } from "../../lib/library/paths";
 
 // ---------------------------------------------------------------------------

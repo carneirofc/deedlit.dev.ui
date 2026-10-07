@@ -128,7 +128,10 @@ export function findFirstValueByKeys(root: unknown, keys: string[]): unknown {
   return result;
 }
 
-export function extractPromptTextFromMetadata(metadata: unknown, keys: string[]): string | undefined {
+export function extractPromptTextFromMetadata(
+  metadata: unknown,
+  keys: string[]
+): string | undefined {
   return toDisplayValue(findFirstValueByKeys(metadata, keys));
 }
 
@@ -149,7 +152,7 @@ function resolveNodeReference(value: unknown): string | null {
 
 function extractTextFromPromptNode(
   nodeId: string | null,
-  nodes: Record<string, { classType?: string; inputs?: Record<string, unknown> }>,
+  nodes: Record<string, { classType?: string; inputs?: Record<string, unknown> }>
 ): string | undefined {
   if (!nodeId) {
     return undefined;
@@ -163,7 +166,7 @@ function extractTextFromPromptNode(
   const parts = [
     toDisplayValue(node.inputs.text),
     toDisplayValue(node.inputs.text_g),
-    toDisplayValue(node.inputs.text_l),
+    toDisplayValue(node.inputs.text_l)
   ].filter((value): value is string => Boolean(value));
 
   if (parts.length === 0) {
@@ -205,7 +208,10 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
       kSamplerEntry = [nodeId, node];
     }
 
-    if (!loaderNode && (classType.includes("checkpointloader") || classType.includes("unetloader"))) {
+    if (
+      !loaderNode &&
+      (classType.includes("checkpointloader") || classType.includes("unetloader"))
+    ) {
       loaderNode = node;
     }
 
@@ -255,7 +261,7 @@ export function extractFromComfyPromptGraph(promptValue: unknown): Partial<Promp
     cfgScale: toDisplayValue(inputs.cfg),
     steps: toDisplayValue(inputs.steps),
     seed: toDisplayValue(inputs.seed),
-    scheduler: toDisplayValue(inputs.scheduler),
+    scheduler: toDisplayValue(inputs.scheduler)
   };
 }
 
@@ -265,7 +271,7 @@ type ParseAutomatic1111ParametersOptions = {
 
 export function parseAutomatic1111Parameters(
   parameters: string,
-  options: ParseAutomatic1111ParametersOptions = {},
+  options: ParseAutomatic1111ParametersOptions = {}
 ): Partial<PromptMetadataInsights> {
   const result: Partial<PromptMetadataInsights> = {};
   const text = parameters.trim();
@@ -284,7 +290,8 @@ export function parseAutomatic1111Parameters(
 
     const afterNegative = text.slice(negativeIndex + negativeLabel.length);
     const settingsStart = afterNegative.search(/\n(?:Steps|Sampler|CFG scale|Seed|Size|Model):/i);
-    const negativePart = settingsStart >= 0 ? afterNegative.slice(0, settingsStart).trim() : afterNegative.trim();
+    const negativePart =
+      settingsStart >= 0 ? afterNegative.slice(0, settingsStart).trim() : afterNegative.trim();
     if (negativePart) {
       result.negativePrompt = negativePart;
     }

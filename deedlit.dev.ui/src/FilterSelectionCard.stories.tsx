@@ -9,8 +9,8 @@ const meta = {
   tags: ["autodocs"],
   args: {
     title: "ACTIVE TAGS",
-    items: ["masterpiece", "cinematic lighting", "depth of field"],
-  },
+    items: ["masterpiece", "cinematic lighting", "depth of field"]
+  }
 } satisfies Meta<typeof FilterSelectionCard>;
 
 export default meta;
@@ -28,7 +28,7 @@ export const Default: Story = {
         />
       </div>
     );
-  },
+  }
 };
 
 export const Empty: Story = {
@@ -37,5 +37,5 @@ export const Empty: Story = {
     <div className="w-72">
       <FilterSelectionCard {...args} onRemoveItem={() => {}} />
     </div>
-  ),
+  )
 };

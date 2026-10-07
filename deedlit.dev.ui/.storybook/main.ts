@@ -11,9 +11,9 @@ const config: StorybookConfig = {
     // `.storybook/preview.css`, so the same utilities the apps generate are
     // available to the rendered stories.
     return mergeConfig(viteConfig, {
-      plugins: [tailwindcss()],
+      plugins: [tailwindcss()]
     });
-  },
+  }
 };
 
 export default config;

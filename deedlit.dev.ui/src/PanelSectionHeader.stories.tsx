@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-
-import PanelSectionHeader from "./PanelSectionHeader";
 import OutlineButton from "./OutlineButton";
+import PanelSectionHeader from "./PanelSectionHeader";
 
 const meta = {
   title: "Components/PanelSectionHeader",
@@ -9,8 +8,8 @@ const meta = {
   tags: ["autodocs"],
   args: {
     title: "Source directories",
-    description: "Folders scanned when building the image index.",
-  },
+    description: "Folders scanned when building the image index."
+  }
 } satisfies Meta<typeof PanelSectionHeader>;
 
 export default meta;
@@ -21,7 +20,7 @@ export const Default: Story = {
     <div className="w-[34rem]">
       <PanelSectionHeader {...args} />
     </div>
-  ),
+  )
 };
 
 export const WithActions: Story = {
@@ -39,7 +38,7 @@ export const WithActions: Story = {
         }
       />
     </div>
-  ),
+  )
 };
 
 export const TitleOnly: Story = {
@@ -48,5 +47,5 @@ export const TitleOnly: Story = {
     <div className="w-[34rem]">
       <PanelSectionHeader {...args} />
     </div>
-  ),
+  )
 };

@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  forwardRef,
-  type ComponentPropsWithoutRef,
-  type ElementRef,
-} from "react";
 import { DropdownMenu as RadixDropdownMenu } from "radix-ui";
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
 
 import { cn } from "./utils";
 
@@ -47,7 +43,7 @@ export const DropdownMenuContent = forwardRef<
         sideOffset={sideOffset}
         className={cn(
           "ui-anim-popover z-130 min-w-40 overflow-hidden rounded-xl border border-ui-border bg-ui-bg-card py-1 shadow-lg",
-          className,
+          className
         )}
         {...props}
       />
@@ -69,7 +65,11 @@ export const DropdownMenuCheckboxItem = forwardRef<
   ComponentPropsWithoutRef<typeof RadixDropdownMenu.CheckboxItem>
 >(function DropdownMenuCheckboxItem({ className, ...props }, ref) {
   return (
-    <RadixDropdownMenu.CheckboxItem ref={ref} className={cn(ITEM_CLASS_NAME, className)} {...props} />
+    <RadixDropdownMenu.CheckboxItem
+      ref={ref}
+      className={cn(ITEM_CLASS_NAME, className)}
+      {...props}
+    />
   );
 });
 DropdownMenuCheckboxItem.displayName = "DropdownMenuCheckboxItem";
@@ -78,7 +78,9 @@ export const DropdownMenuRadioItem = forwardRef<
   ElementRef<typeof RadixDropdownMenu.RadioItem>,
   ComponentPropsWithoutRef<typeof RadixDropdownMenu.RadioItem>
 >(function DropdownMenuRadioItem({ className, ...props }, ref) {
-  return <RadixDropdownMenu.RadioItem ref={ref} className={cn(ITEM_CLASS_NAME, className)} {...props} />;
+  return (
+    <RadixDropdownMenu.RadioItem ref={ref} className={cn(ITEM_CLASS_NAME, className)} {...props} />
+  );
 });
 DropdownMenuRadioItem.displayName = "DropdownMenuRadioItem";
 
@@ -91,7 +93,7 @@ export const DropdownMenuLabel = forwardRef<
       ref={ref}
       className={cn(
         "px-3 py-1.5 text-ui-2xs font-semibold uppercase tracking-[0.08em] text-ui-ink-subtle",
-        className,
+        className
       )}
       {...props}
     />

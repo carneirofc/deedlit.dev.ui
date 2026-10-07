@@ -1,18 +1,17 @@
 "use client";
 
 import { forwardRef, type ReactNode, useEffect, useId, useMemo } from "react";
-
+import { XIcon } from "./Icons";
 import InfoChip from "./InfoChip";
 import OutlineButton from "./OutlineButton";
-import { XIcon } from "./Icons";
-import { cn, SPACING_PATTERNS, LAYOUT_PATTERNS } from "./utils";
+import { cn, LAYOUT_PATTERNS, SPACING_PATTERNS } from "./utils";
 
 /* ── Size presets for the desktop panel width ─────────────────────── */
 const SIZE_CLASSES = {
   sm: "md:w-[min(36rem,calc(100vw-1.5rem))] md:min-w-[28rem]",
   md: "md:w-[min(42rem,calc(100vw-1.5rem))] md:min-w-[32rem]",
   lg: "md:w-[min(48rem,calc(100vw-1.5rem))] md:min-w-[32rem]",
-  xl: "md:w-[min(64rem,calc(100vw-1.5rem))] md:min-w-[42rem]",
+  xl: "md:w-[min(64rem,calc(100vw-1.5rem))] md:min-w-[42rem]"
 } as const;
 
 export type DockPanelSize = keyof typeof SIZE_CLASSES;
@@ -74,24 +73,27 @@ export type DockPanelProps = {
   closeOnEscape?: boolean;
 };
 
-const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
-  isOpen,
-  onOpenChange,
-  title,
-  badgeCount,
-  openLabel,
-  closeLabel,
-  children,
-  headerExtras,
-  size = "md",
-  toggleSlot,
-  stackOrder = 0,
-  toggleClassName,
-  panelClassName,
-  contentClassName,
-  testIdPrefix,
-  closeOnEscape = true,
-}, ref) {
+const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel(
+  {
+    isOpen,
+    onOpenChange,
+    title,
+    badgeCount,
+    openLabel,
+    closeLabel,
+    children,
+    headerExtras,
+    size = "md",
+    toggleSlot,
+    stackOrder = 0,
+    toggleClassName,
+    panelClassName,
+    contentClassName,
+    testIdPrefix,
+    closeOnEscape = true
+  },
+  ref
+) {
   const generatedId = useId();
   const baseId = testIdPrefix ?? `dock-panel-${generatedId}`;
 
@@ -118,8 +120,8 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
    *  Within each group, higher stackOrder wins.
    */
   const zBackdrop = 40 + stackOrder;
-  const zToggle   = 50 + stackOrder;
-  const zPanel    = 60 + stackOrder;
+  const zToggle = 50 + stackOrder;
+  const zPanel = 60 + stackOrder;
 
   /* ── Toggle position from slot or legacy className ───────────────
    *  When `toggleSlot` is provided, position is auto-calculated.
@@ -127,7 +129,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
    */
   const toggleStyle = useMemo(() => {
     if (typeof toggleSlot !== "number") return { zIndex: zToggle };
-    const bottomRem = TOGGLE_SLOT_BOTTOM_REM[toggleSlot] ?? (1 + toggleSlot * 4);
+    const bottomRem = TOGGLE_SLOT_BOTTOM_REM[toggleSlot] ?? 1 + toggleSlot * 4;
     return { zIndex: zToggle, right: "1rem", bottom: `${bottomRem}rem` };
   }, [toggleSlot, zToggle]);
 
@@ -160,8 +162,10 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
     // Open / close state (never goes through twMerge)
     panelStateClasses,
     // Consumer overrides
-    panelClassName,
-  ].filter(Boolean).join(" ");
+    panelClassName
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <>
@@ -175,7 +179,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
         style={toggleStyle}
         className={cn(
           "fixed inline-flex min-h-11 items-center gap-2 rounded-full border-ui-active bg-[color:var(--ui-bg-active)] px-4 py-2 text-ui-sm text-[color:var(--ui-ink-highlight)] shadow-lg",
-          toggleClassName,
+          toggleClassName
         )}
       >
         <span>{isOpen ? resolvedCloseLabel : resolvedOpenLabel}</span>
@@ -225,7 +229,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel({
           <div
             className={cn(
               "mt-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-1",
-              contentClassName,
+              contentClassName
             )}
           >
             {children}

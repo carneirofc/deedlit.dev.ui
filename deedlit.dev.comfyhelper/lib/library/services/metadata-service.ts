@@ -5,7 +5,10 @@ import path from "node:path";
 
 import sharp from "sharp";
 
-import { extractMetadataFromBuffer, type ExtractResult } from "@/lib/library/services/metadata-client";
+import {
+  type ExtractResult,
+  extractMetadataFromBuffer
+} from "@/lib/library/services/metadata-client";
 import { normalizeTag } from "@/lib/prompt-tags";
 
 export const SUPPORTED_EXTENSIONS = new Set([".png", ".webp", ".jpg", ".jpeg"]);
@@ -109,7 +112,10 @@ export function parseLorasFromPrompt(prompt: string | null | undefined): Extract
  * - unescape `\(` / `\)` and collapse whitespace
  */
 function cleanPromptTag(raw: string): string {
-  let t = raw.replace(/\\/g, "").replace(/:\s*\d+(?:\.\d+)?/g, "").trim();
+  let t = raw
+    .replace(/\\/g, "")
+    .replace(/:\s*\d+(?:\.\d+)?/g, "")
+    .trim();
   while (/^[([{<]/.test(t) && /[)\]}>]$/.test(t)) {
     t = t.slice(1, -1).trim();
   }
@@ -119,7 +125,10 @@ function cleanPromptTag(raw: string): string {
   const opens = (t.match(/[([{]/g) ?? []).length;
   const closes = (t.match(/[)\]}]/g) ?? []).length;
   if (opens !== closes) {
-    t = t.replace(/^[([{<]+/, "").replace(/[)\]}>]+$/, "").trim();
+    t = t
+      .replace(/^[([{<]+/, "")
+      .replace(/[)\]}>]+$/, "")
+      .trim();
   }
   return t.replace(/\s+/g, " ").trim();
 }
@@ -196,8 +205,8 @@ export function mapExtractResult(extract: ExtractResult): InterpretedMetadata {
       denoise: extract.params.denoise ?? null,
       width: extract.params.width ?? null,
       height: extract.params.height ?? null,
-      clipSkip: extract.params.clipskip ?? null,
-    },
+      clipSkip: extract.params.clipskip ?? null
+    }
   };
 }
 
@@ -235,7 +244,7 @@ export async function extractImageMetadata(filePath: string): Promise<ExtractedI
       .metadata()
       .then((m) => ({ width: m.width ?? null, height: m.height ?? null }))
       .catch(() => ({ width: null, height: null })),
-    extractMetadataFromBuffer(fileBuffer, mimeForExtension(extension), filename),
+    extractMetadataFromBuffer(fileBuffer, mimeForExtension(extension), filename)
   ]);
 
   const interpreted = mapExtractResult(extract);
@@ -255,7 +264,7 @@ export async function extractImageMetadata(filePath: string): Promise<ExtractedI
     denoise: interpreted.params.denoise ?? null,
     width: interpreted.params.width ?? dims.width,
     height: interpreted.params.height ?? dims.height,
-    clipSkip: interpreted.params.clipSkip ?? null,
+    clipSkip: interpreted.params.clipSkip ?? null
   };
 
   return {
@@ -279,6 +288,6 @@ export async function extractImageMetadata(filePath: string): Promise<ExtractedI
     metadataJson: extract,
     tags,
     loras,
-    generationParams,
+    generationParams
   };
 }

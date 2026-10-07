@@ -31,7 +31,7 @@ export function thumbnailPathFor(sha256: string, size: "small" | "medium" = "med
 export async function generateThumbnail(
   sourcePath: string,
   sha256: string,
-  size: "small" | "medium" = "medium",
+  size: "small" | "medium" = "medium"
 ): Promise<string> {
   const { thumbnailSizes } = getLibraryConfig();
   const dimension = thumbnailSizes[size];

@@ -1,5 +1,5 @@
+import { type CollectionUpsert, createCollection, listCollections } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
-import { createCollection, listCollections, type CollectionUpsert } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

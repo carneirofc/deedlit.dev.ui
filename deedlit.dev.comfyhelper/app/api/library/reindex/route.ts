@@ -1,6 +1,6 @@
+import { callMcpTool } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { ReindexRequestSchema } from "@/lib/library/schemas";
-import { callMcpTool } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       refresh_metadata: body.refreshMetadata,
       refresh_graph: body.refreshGraph,
       refresh_qdrant: body.refreshQdrant,
-      run_external_enrichment: body.runExternalEnrichment,
+      run_external_enrichment: body.runExternalEnrichment
     });
     return jsonOk(tool.structuredContent ?? { status: "started" });
   });

@@ -7,7 +7,7 @@ const requireFromModule = createRequire(import.meta.url);
 const nextCliPath = requireFromModule.resolve("next/dist/bin/next");
 
 const result = spawnSync(process.execPath, [nextCliPath, "start", ...process.argv.slice(2)], {
-  stdio: "inherit",
+  stdio: "inherit"
 });
 
 if (result.error) {

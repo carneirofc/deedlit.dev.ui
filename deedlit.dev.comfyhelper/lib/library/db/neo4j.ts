@@ -1,8 +1,7 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import neo4j, { type Driver, type Session, type QueryResult } from "neo4j-driver";
-
-import { getLogger } from "@/lib/logger";
+import neo4j, { type Driver, type QueryResult, type Session } from "neo4j-driver";
 import { getLibraryConfig } from "@/lib/library/config";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-neo4j" });
 
@@ -31,7 +30,7 @@ export function getDriver(): Driver {
     globalThis.__comfyhelperNeo4jDriver = neo4j.driver(
       cfg.uri,
       neo4j.auth.basic(cfg.user, cfg.password),
-      { maxConnectionPoolSize: 20, disableLosslessIntegers: true },
+      { maxConnectionPoolSize: 20, disableLosslessIntegers: true }
     );
   }
   return globalThis.__comfyhelperNeo4jDriver;
@@ -41,7 +40,7 @@ export function getDriver(): Driver {
 export async function runCypher(
   cypher: string,
   params: Record<string, unknown> = {},
-  mode: "READ" | "WRITE" = "WRITE",
+  mode: "READ" | "WRITE" = "WRITE"
 ): Promise<QueryResult> {
   const operation = cypherOperation(cypher);
   return tracer.startActiveSpan(
@@ -52,12 +51,12 @@ export async function runCypher(
         "db.system": "neo4j",
         "db.operation": operation,
         "db.statement": cypher,
-        "db.neo4j.access_mode": mode,
-      },
+        "db.neo4j.access_mode": mode
+      }
     },
     async (span) => {
       const session: Session = getDriver().session({
-        defaultAccessMode: mode === "READ" ? neo4j.session.READ : neo4j.session.WRITE,
+        defaultAccessMode: mode === "READ" ? neo4j.session.READ : neo4j.session.WRITE
       });
       try {
         const result = await session.run(cypher, params);
@@ -71,7 +70,7 @@ export async function runCypher(
         await session.close();
         span.end();
       }
-    },
+    }
   );
 }
 

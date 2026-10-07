@@ -1,8 +1,7 @@
 import { rename } from "node:fs/promises";
 import path from "node:path";
-
-import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { getImage, imageToUiDetail } from "@/lib/api-client";
+import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +44,7 @@ export async function POST(request: Request) {
       } catch (e) {
         failed.push({
           id: imageId,
-          error: e instanceof Error ? e.message : "Unknown error.",
+          error: e instanceof Error ? e.message : "Unknown error."
         });
       }
     }

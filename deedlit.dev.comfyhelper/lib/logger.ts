@@ -34,7 +34,7 @@ function createBaseLogger(): Logger {
     timestamp: pino.stdTimeFunctions.isoTime,
     mixin: otelTraceContext,
     formatters: {
-      level: (label) => ({ level: label }),
+      level: (label) => ({ level: label })
     },
     ...(isPrettyEnabled
       ? {
@@ -43,11 +43,11 @@ function createBaseLogger(): Logger {
             options: {
               colorize: true,
               translateTime: "SYS:standard",
-              ignore: "pid,hostname",
-            },
-          },
+              ignore: "pid,hostname"
+            }
+          }
         }
-      : {}),
+      : {})
   });
 }
 

@@ -18,8 +18,8 @@ const meta = {
   component: CodeBlock,
   tags: ["autodocs"],
   args: {
-    children: SAMPLE,
-  },
+    children: SAMPLE
+  }
 } satisfies Meta<typeof CodeBlock>;
 
 export default meta;
@@ -30,7 +30,7 @@ export const Default: Story = {
     <div className="w-[32rem]">
       <CodeBlock {...args} />
     </div>
-  ),
+  )
 };
 
 export const Constrained: Story = {
@@ -39,5 +39,5 @@ export const Constrained: Story = {
     <div className="w-[32rem]">
       <CodeBlock {...args} />
     </div>
-  ),
+  )
 };

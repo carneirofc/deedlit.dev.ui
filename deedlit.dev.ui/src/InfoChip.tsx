@@ -12,7 +12,7 @@ export type InfoChipProps = HTMLAttributes<HTMLSpanElement> & {
 
 const InfoChip = forwardRef<HTMLSpanElement, InfoChipProps>(function InfoChip(
   { children, testId, className, "data-testid": dataTestId, ...props },
-  ref,
+  ref
 ) {
   const resolvedTestId = testId ?? dataTestId;
 

@@ -14,17 +14,17 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 // task ledger table with timestamps.
 // ---------------------------------------------------------------------------
 
-const RABBITMQ_MGMT_URL =
-  process.env.NEXT_PUBLIC_RABBITMQ_MGMT_URL ?? "http://localhost:15672";
+const RABBITMQ_MGMT_URL = process.env.NEXT_PUBLIC_RABBITMQ_MGMT_URL ?? "http://localhost:15672";
 
 const cls = {
   card: "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4",
   input:
     "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
-  btnSm: "rounded-md border border-ui-border/70 bg-ui-bg-soft px-2 py-1 text-ui-2xs font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
+  btnSm:
+    "rounded-md border border-ui-border/70 bg-ui-bg-soft px-2 py-1 text-ui-2xs font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
   danger:
-    "rounded-md border border-rose-500/40 px-2 py-1 text-ui-2xs text-rose-500 transition hover:bg-rose-500/10",
+    "rounded-md border border-rose-500/40 px-2 py-1 text-ui-2xs text-rose-500 transition hover:bg-rose-500/10"
 };
 
 interface QueueStat {
@@ -78,7 +78,7 @@ const DLQ_BASES = [
   "index.search",
   "index.graph",
   "label",
-  "index",
+  "index"
 ] as const;
 
 function statusColor(status: string): string {
@@ -146,7 +146,7 @@ function taskEnvelope(payload: string | null): {
       type: str("type"),
       path: str("path"),
       parent_op_id: str("parent_op_id"),
-      source_folder_id: str("source_folder_id"),
+      source_folder_id: str("source_folder_id")
     };
   } catch {
     return null;
@@ -178,7 +178,9 @@ function MessageCard({ m, index }: { m: QueueMessage; index: number }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-ui-ink-muted">#{index + 1}</span>
         {env?.type && (
-          <span className={`${pillCls} bg-accent-cyan/10 font-medium text-accent-cyan`}>{env.type}</span>
+          <span className={`${pillCls} bg-accent-cyan/10 font-medium text-accent-cyan`}>
+            {env.type}
+          </span>
         )}
         {sha ? (
           <span className="font-mono text-ui-ink" title={sha}>
@@ -189,9 +191,13 @@ function MessageCard({ m, index }: { m: QueueMessage; index: number }) {
             {env.path}
           </span>
         ) : null}
-        {m.redelivered && <span className={`${pillCls} bg-amber-500/10 text-amber-500`}>redelivered</span>}
+        {m.redelivered && (
+          <span className={`${pillCls} bg-amber-500/10 text-amber-500`}>redelivered</span>
+        )}
         {attempt != null && (
-          <span className={`${pillCls} bg-rose-500/10 text-rose-500`}>attempt {String(attempt)}</span>
+          <span className={`${pillCls} bg-rose-500/10 text-rose-500`}>
+            attempt {String(attempt)}
+          </span>
         )}
         {typeof m.payload_bytes === "number" && (
           <span className="text-ui-ink-muted" title="payload size">
@@ -243,7 +249,7 @@ function MessageCard({ m, index }: { m: QueueMessage; index: number }) {
 function Kpi({
   label,
   value,
-  tone = "default",
+  tone = "default"
 }: {
   label: string;
   value: string;
@@ -259,7 +265,9 @@ function Kpi({
           : "text-ui-ink-title";
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-ui-border/50 bg-ui-bg px-3 py-2">
-      <span className="truncate text-ui-2xs uppercase tracking-wide text-ui-ink-muted">{label}</span>
+      <span className="truncate text-ui-2xs uppercase tracking-wide text-ui-ink-muted">
+        {label}
+      </span>
       <span className={`text-ui-xl font-semibold tabular-nums ${toneCls}`}>{value}</span>
     </div>
   );
@@ -301,11 +309,11 @@ export default function QueuesPage() {
     setError(null);
     try {
       const j = (await fetch(
-        `/api/library/queues/${encodeURIComponent(name)}/messages?limit=${limit}`,
+        `/api/library/queues/${encodeURIComponent(name)}/messages?limit=${limit}`
       ).then((r) => r.json())) as { messages?: QueueMessage[]; remaining?: number };
       setPeeked((prev) => ({
         ...prev,
-        [name]: { messages: j.messages ?? [], remaining: j.remaining ?? 0 },
+        [name]: { messages: j.messages ?? [], remaining: j.remaining ?? 0 }
       }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Peek failed");
@@ -328,7 +336,7 @@ export default function QueuesPage() {
     setError(null);
     try {
       const j = await fetch(`/api/library/dlq/${encodeURIComponent(base)}/requeue`, {
-        method: "POST",
+        method: "POST"
       }).then((r) => r.json());
       setNotice(`Requeued ${j.count ?? 0} message(s) to ${base}.`);
       setPeeked((prev) => ({ ...prev, [`${base}.dlq`]: { messages: [], remaining: 0 } }));
@@ -391,10 +399,7 @@ export default function QueuesPage() {
   }, [queues]);
 
   // Scale the in-row depth bars against the busiest queue.
-  const maxMessages = useMemo(
-    () => Math.max(1, ...queues.map((q) => q.messages)),
-    [queues],
-  );
+  const maxMessages = useMemo(() => Math.max(1, ...queues.map((q) => q.messages)), [queues]);
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6" data-testid="queues-page">
@@ -402,9 +407,9 @@ export default function QueuesPage() {
         <div>
           <h1 className="text-ui-2xl font-semibold text-ui-ink-title">Queues</h1>
           <p className="max-w-3xl text-ui-sm text-ui-ink-muted">
-            Per-stage ingest DAG queues (embed.dense/embed.sparse → index.search,
-            index.graph, label) — live depth, peek any queue&apos;s contents,
-            dead-letters, and per-image history.
+            Per-stage ingest DAG queues (embed.dense/embed.sparse → index.search, index.graph,
+            label) — live depth, peek any queue&apos;s contents, dead-letters, and per-image
+            history.
           </p>
         </div>
         <a
@@ -418,18 +423,38 @@ export default function QueuesPage() {
         </a>
       </header>
 
-      {error && <p className="text-ui-sm text-rose-500" data-testid="queues-error">{error}</p>}
-      {notice && <p className="text-ui-sm text-emerald-500" data-testid="queues-notice">{notice}</p>}
+      {error && (
+        <p className="text-ui-sm text-rose-500" data-testid="queues-error">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="text-ui-sm text-emerald-500" data-testid="queues-notice">
+          {notice}
+        </p>
+      )}
 
       {/* At-a-glance KPIs */}
       <section
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
         data-testid="queue-kpis"
       >
-        <Kpi label="Ready backlog" value={kpis.ready.toLocaleString()} tone={kpis.ready > 0 ? "warn" : "good"} />
+        <Kpi
+          label="Ready backlog"
+          value={kpis.ready.toLocaleString()}
+          tone={kpis.ready > 0 ? "warn" : "good"}
+        />
         <Kpi label="In-flight" value={kpis.unacked.toLocaleString()} />
-        <Kpi label="Dead-letters" value={kpis.dlqTotal.toLocaleString()} tone={kpis.dlqTotal > 0 ? "bad" : "good"} />
-        <Kpi label="Consumers" value={kpis.consumers.toLocaleString()} tone={kpis.consumers > 0 ? "default" : "warn"} />
+        <Kpi
+          label="Dead-letters"
+          value={kpis.dlqTotal.toLocaleString()}
+          tone={kpis.dlqTotal > 0 ? "bad" : "good"}
+        />
+        <Kpi
+          label="Consumers"
+          value={kpis.consumers.toLocaleString()}
+          tone={kpis.consumers > 0 ? "default" : "warn"}
+        />
         <Kpi label="Publish /s" value={kpis.inRate.toFixed(1)} />
         <Kpi label="Deliver /s" value={kpis.outRate.toFixed(1)} />
       </section>
@@ -478,95 +503,111 @@ export default function QueuesPage() {
                 const peek_ = peeked[q.name];
                 return (
                   <Fragment key={q.name}>
-                  <tr
-                    className={`border-t border-ui-border/40 align-middle hover:bg-ui-bg-soft/40 ${q.reachable ? "" : "opacity-40"}`}
-                    data-testid={`queue-row-${q.name}`}
-                  >
-                    <td className="px-2 py-1.5 font-medium text-ui-ink">
-                      <span className={isDlq ? "text-rose-500" : ""}>{q.name}</span>
-                      {!q.reachable && <span className="ml-1 text-ui-2xs text-ui-ink-muted">(down)</span>}
-                    </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{q.messages_ready}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">
-                      {q.messages_unacknowledged > 0 ? (
-                        <span className="text-sky-500">{q.messages_unacknowledged}</span>
-                      ) : (
-                        q.messages_unacknowledged
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-medium tabular-nums">{q.messages}</td>
-                    <td className="px-2 py-1.5">
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-ui-bg">
-                        <div
-                          className={`h-full rounded-full ${barColor}`}
-                          style={{ width: `${q.messages > 0 ? Math.max(barPct, 4) : 0}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">
-                      {q.consumers === 0 && q.messages_ready > 0 ? (
-                        <span className="text-amber-500" title="messages ready but no consumers">
-                          {q.consumers}
-                        </span>
-                      ) : (
-                        q.consumers
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{q.publish_rate.toFixed(1)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{q.deliver_rate.toFixed(1)}</td>
-                    <td
-                      className={`px-2 py-1.5 text-right tabular-nums ${
-                        net > 0.05 ? "text-amber-500" : net < -0.05 ? "text-emerald-500" : "text-ui-ink-muted"
-                      }`}
-                    >
-                      {net > 0 ? "+" : ""}
-                      {net.toFixed(1)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {/* DLQs are inspected in the dead-letter panel below. */}
-                      {!isDlq && (
-                        <button
-                          className={cls.btnSm}
-                          onClick={() => toggleInspect(q.name)}
-                          disabled={!q.reachable}
-                          data-testid={`queue-peek-${q.name}`}
-                        >
-                          {isOpen ? "Hide" : "Peek"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {isOpen && (
                     <tr
-                      className="border-t border-ui-border/40 bg-ui-bg-soft/20"
-                      data-testid={`queue-inspect-${q.name}`}
+                      className={`border-t border-ui-border/40 align-middle hover:bg-ui-bg-soft/40 ${q.reachable ? "" : "opacity-40"}`}
+                      data-testid={`queue-row-${q.name}`}
                     >
-                      <td colSpan={10} className="px-2 py-2">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-ui-2xs text-ui-ink-muted">
-                            {peek_
-                              ? `${peek_.messages.length} ready message(s) sampled · ${peek_.remaining} remaining · non-destructive (requeued)`
-                              : "loading…"}
-                          </span>
-                          <button className={cls.btnSm} onClick={() => peek(q.name)} data-testid={`queue-repeek-${q.name}`}>
-                            Re-peek
-                          </button>
+                      <td className="px-2 py-1.5 font-medium text-ui-ink">
+                        <span className={isDlq ? "text-rose-500" : ""}>{q.name}</span>
+                        {!q.reachable && (
+                          <span className="ml-1 text-ui-2xs text-ui-ink-muted">(down)</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{q.messages_ready}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {q.messages_unacknowledged > 0 ? (
+                          <span className="text-sky-500">{q.messages_unacknowledged}</span>
+                        ) : (
+                          q.messages_unacknowledged
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-medium tabular-nums">
+                        {q.messages}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ui-bg">
+                          <div
+                            className={`h-full rounded-full ${barColor}`}
+                            style={{ width: `${q.messages > 0 ? Math.max(barPct, 4) : 0}%` }}
+                          />
                         </div>
-                        {peek_ && (
-                          <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                            {peek_.messages.length === 0 && (
-                              <li className="text-ui-2xs text-ui-ink-muted">
-                                no ready messages (queue empty, or all in-flight on a consumer)
-                              </li>
-                            )}
-                            {peek_.messages.map((m, i) => (
-                              <MessageCard key={i} m={m} index={i} />
-                            ))}
-                          </ul>
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {q.consumers === 0 && q.messages_ready > 0 ? (
+                          <span className="text-amber-500" title="messages ready but no consumers">
+                            {q.consumers}
+                          </span>
+                        ) : (
+                          q.consumers
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {q.publish_rate.toFixed(1)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {q.deliver_rate.toFixed(1)}
+                      </td>
+                      <td
+                        className={`px-2 py-1.5 text-right tabular-nums ${
+                          net > 0.05
+                            ? "text-amber-500"
+                            : net < -0.05
+                              ? "text-emerald-500"
+                              : "text-ui-ink-muted"
+                        }`}
+                      >
+                        {net > 0 ? "+" : ""}
+                        {net.toFixed(1)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {/* DLQs are inspected in the dead-letter panel below. */}
+                        {!isDlq && (
+                          <button
+                            className={cls.btnSm}
+                            onClick={() => toggleInspect(q.name)}
+                            disabled={!q.reachable}
+                            data-testid={`queue-peek-${q.name}`}
+                          >
+                            {isOpen ? "Hide" : "Peek"}
+                          </button>
                         )}
                       </td>
                     </tr>
-                  )}
+                    {isOpen && (
+                      <tr
+                        className="border-t border-ui-border/40 bg-ui-bg-soft/20"
+                        data-testid={`queue-inspect-${q.name}`}
+                      >
+                        <td colSpan={10} className="px-2 py-2">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-ui-2xs text-ui-ink-muted">
+                              {peek_
+                                ? `${peek_.messages.length} ready message(s) sampled · ${peek_.remaining} remaining · non-destructive (requeued)`
+                                : "loading…"}
+                            </span>
+                            <button
+                              className={cls.btnSm}
+                              onClick={() => peek(q.name)}
+                              data-testid={`queue-repeek-${q.name}`}
+                            >
+                              Re-peek
+                            </button>
+                          </div>
+                          {peek_ && (
+                            <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                              {peek_.messages.length === 0 && (
+                                <li className="text-ui-2xs text-ui-ink-muted">
+                                  no ready messages (queue empty, or all in-flight on a consumer)
+                                </li>
+                              )}
+                              {peek_.messages.map((m, i) => (
+                                <MessageCard key={i} m={m} index={i} />
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}
@@ -616,7 +657,11 @@ export default function QueuesPage() {
                     </span>
                   </p>
                   <div className="flex shrink-0 gap-1">
-                    <button className={cls.btnSm} onClick={() => peek(name)} data-testid={`dlq-peek-${base}`}>
+                    <button
+                      className={cls.btnSm}
+                      onClick={() => peek(name)}
+                      data-testid={`dlq-peek-${base}`}
+                    >
                       Peek
                     </button>
                     <button
@@ -627,7 +672,11 @@ export default function QueuesPage() {
                     >
                       Requeue
                     </button>
-                    <button className={cls.danger} onClick={() => purge(name)} data-testid={`dlq-purge-${base}`}>
+                    <button
+                      className={cls.danger}
+                      onClick={() => purge(name)}
+                      data-testid={`dlq-purge-${base}`}
+                    >
                       Purge
                     </button>
                   </div>
@@ -679,9 +728,14 @@ export default function QueuesPage() {
               </thead>
               <tbody>
                 {tasks.map((t) => (
-                  <tr key={t.id} className="border-t border-ui-border/40 align-middle hover:bg-ui-bg-soft/40">
+                  <tr
+                    key={t.id}
+                    className="border-t border-ui-border/40 align-middle hover:bg-ui-bg-soft/40"
+                  >
                     <td className="px-2 py-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-ui-2xs font-medium ${statusColor(t.status)}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-ui-2xs font-medium ${statusColor(t.status)}`}
+                      >
                         {t.status}
                       </span>
                     </td>
@@ -696,10 +750,16 @@ export default function QueuesPage() {
                     <td className="px-2 py-1.5 text-ui-ink-muted" title={t.updated_at ?? ""}>
                       {ago(t.updated_at)}
                     </td>
-                    <td className="px-2 py-1.5 font-mono text-ui-2xs text-ui-ink-muted" title={t.parent_op_id ?? ""}>
+                    <td
+                      className="px-2 py-1.5 font-mono text-ui-2xs text-ui-ink-muted"
+                      title={t.parent_op_id ?? ""}
+                    >
                       {t.parent_op_id ? t.parent_op_id.slice(0, 8) : "—"}
                     </td>
-                    <td className="max-w-[24rem] truncate px-2 py-1.5 text-rose-500" title={t.error ?? ""}>
+                    <td
+                      className="max-w-[24rem] truncate px-2 py-1.5 text-rose-500"
+                      title={t.error ?? ""}
+                    >
                       {t.error ?? ""}
                     </td>
                   </tr>
@@ -708,7 +768,9 @@ export default function QueuesPage() {
             </table>
           </div>
         ) : (
-          <p className="mt-3 text-ui-2xs text-ui-ink-muted">No tasks loaded — look up a sha256 or list recent.</p>
+          <p className="mt-3 text-ui-2xs text-ui-ink-muted">
+            No tasks loaded — look up a sha256 or list recent.
+          </p>
         )}
       </section>
     </div>

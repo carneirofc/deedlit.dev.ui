@@ -11,12 +11,12 @@ const meta = {
   args: {
     canNavigate: true,
     onNavigate: fn(),
-    navigationVisibility: "hover",
+    navigationVisibility: "hover"
   },
   argTypes: {
     navigationVisibility: { control: "inline-radio", options: ["hover", "always"] },
-    canNavigate: { control: "boolean" },
-  },
+    canNavigate: { control: "boolean" }
+  }
 } satisfies Meta<typeof MediaStage>;
 
 export default meta;
@@ -33,7 +33,7 @@ export const Default: Story = {
     <MediaStage {...args}>
       <Placeholder />
     </MediaStage>
-  ),
+  )
 };
 
 export const NavigationAlwaysVisible: Story = {
@@ -42,7 +42,7 @@ export const NavigationAlwaysVisible: Story = {
     <MediaStage {...args}>
       <Placeholder />
     </MediaStage>
-  ),
+  )
 };
 
 export const SingleItem: Story = {
@@ -51,5 +51,5 @@ export const SingleItem: Story = {
     <MediaStage {...args}>
       <Placeholder />
     </MediaStage>
-  ),
+  )
 };

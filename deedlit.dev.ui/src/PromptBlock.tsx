@@ -1,7 +1,7 @@
 "use client";
 
-import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva } from "class-variance-authority";
+import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 
 import CopyButton from "./CopyButton";
 import SectionLabel from "./SectionLabel";
@@ -16,13 +16,13 @@ export const promptBlockTextVariants = cva(
       tone: {
         positive: "bg-success",
         negative: "bg-error",
-        neutral: "bg-[color:var(--ui-bg-soft)]",
-      },
+        neutral: "bg-[color:var(--ui-bg-soft)]"
+      }
     },
     defaultVariants: {
-      tone: "neutral",
-    },
-  },
+      tone: "neutral"
+    }
+  }
 );
 
 export type PromptBlockProps = Omit<HTMLAttributes<HTMLElement>, "children"> & {
@@ -48,27 +48,26 @@ export type PromptBlockProps = Omit<HTMLAttributes<HTMLElement>, "children"> & {
  * </PromptBlock>
  * ```
  */
-const PromptBlock = forwardRef<HTMLElement, PromptBlockProps>(
-  function PromptBlock({ label, children, tone = "neutral", copied, onCopy, className, testId, ...props }, ref) {
-    return (
-      <section ref={ref} data-testid={testId} className={className} {...props}>
-        <div className="flex items-center justify-between gap-3">
-          <SectionLabel>{label}</SectionLabel>
-          {onCopy && (
-            <CopyButton
-              copied={copied}
-              onClick={onCopy}
-              data-testid={testId ? `${testId}-copy` : undefined}
-            />
-          )}
-        </div>
-        <pre className={promptBlockTextVariants({ tone })}>
-          {children}
-        </pre>
-      </section>
-    );
-  },
-);
+const PromptBlock = forwardRef<HTMLElement, PromptBlockProps>(function PromptBlock(
+  { label, children, tone = "neutral", copied, onCopy, className, testId, ...props },
+  ref
+) {
+  return (
+    <section ref={ref} data-testid={testId} className={className} {...props}>
+      <div className="flex items-center justify-between gap-3">
+        <SectionLabel>{label}</SectionLabel>
+        {onCopy && (
+          <CopyButton
+            copied={copied}
+            onClick={onCopy}
+            data-testid={testId ? `${testId}-copy` : undefined}
+          />
+        )}
+      </div>
+      <pre className={promptBlockTextVariants({ tone })}>{children}</pre>
+    </section>
+  );
+});
 
 PromptBlock.displayName = "PromptBlock";
 

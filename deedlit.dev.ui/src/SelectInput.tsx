@@ -14,14 +14,20 @@ const BASE_CLASS_NAME = "cyber-input outline-none";
 
 const SIZE_CLASS_NAMES: Record<SelectInputSize, string> = {
   sm: cn("rounded-lg", SPACING_PATTERNS.controlSm, "text-ui-xs"),
-  md: cn("rounded-xl", SPACING_PATTERNS.controlMd, "text-ui-sm"),
+  md: cn("rounded-xl", SPACING_PATTERNS.controlMd, "text-ui-sm")
 };
 
 const SelectInput = forwardRef<HTMLSelectElement, SelectInputProps>(function SelectInput(
   { className, controlSize = "md", ...props },
-  ref,
+  ref
 ) {
-  return <select ref={ref} className={cn(BASE_CLASS_NAME, SIZE_CLASS_NAMES[controlSize], className)} {...props} />;
+  return (
+    <select
+      ref={ref}
+      className={cn(BASE_CLASS_NAME, SIZE_CLASS_NAMES[controlSize], className)}
+      {...props}
+    />
+  );
 });
 
 export default SelectInput;

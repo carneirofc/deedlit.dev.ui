@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ForwardedRef, type ReactElement, type ReactNode } from "react";
+import { type ForwardedRef, forwardRef, type ReactElement, type ReactNode } from "react";
 
 import OutlineButton from "./OutlineButton";
 import { cn } from "./utils";
@@ -40,16 +40,16 @@ function SegmentedControlFn<TValue extends string = string>(
     className,
     optionClassName,
     activeOptionClassName = DEFAULT_ACTIVE_OPTION_CLASS,
-    inactiveOptionClassName = DEFAULT_INACTIVE_OPTION_CLASS,
+    inactiveOptionClassName = DEFAULT_INACTIVE_OPTION_CLASS
   }: SegmentedControlProps<TValue>,
-  ref: ForwardedRef<HTMLDivElement>,
+  ref: ForwardedRef<HTMLDivElement>
 ) {
   return (
     <div
       ref={ref}
       className={cn(
         "inline-flex gap-1 rounded-lg border border-(--ui-border-soft) bg-panel/90 p-0.5",
-        className,
+        className
       )}
     >
       {options.map((option) => {
@@ -71,7 +71,7 @@ function SegmentedControlFn<TValue extends string = string>(
               "rounded-md px-2 py-0.5 text-ui-2xs",
               optionClassName,
               isActive ? activeOptionClassName : inactiveOptionClassName,
-              option.className,
+              option.className
             )}
           >
             {option.label}
@@ -83,7 +83,7 @@ function SegmentedControlFn<TValue extends string = string>(
 }
 
 const SegmentedControl = forwardRef(SegmentedControlFn) as <TValue extends string = string>(
-  props: SegmentedControlProps<TValue> & { ref?: ForwardedRef<HTMLDivElement> },
+  props: SegmentedControlProps<TValue> & { ref?: ForwardedRef<HTMLDivElement> }
 ) => ReactElement;
 
 (SegmentedControl as { displayName?: string }).displayName = "SegmentedControl";

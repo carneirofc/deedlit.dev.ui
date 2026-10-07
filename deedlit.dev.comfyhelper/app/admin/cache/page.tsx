@@ -14,7 +14,7 @@ const cls = {
   statValue: "text-ui-sm font-semibold tabular-nums text-ui-ink-title",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
   btnDanger:
-    "rounded-lg border border-rose-500/40 px-3 py-2 text-ui-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:opacity-50",
+    "rounded-lg border border-rose-500/40 px-3 py-2 text-ui-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:opacity-50"
 };
 
 function fmtTtl(ttl: number | null): string {
@@ -76,10 +76,20 @@ export default function CacheDebugPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className={cls.btn} onClick={refresh} disabled={loading} data-testid="cache-refresh">
+          <button
+            className={cls.btn}
+            onClick={refresh}
+            disabled={loading}
+            data-testid="cache-refresh"
+          >
             {loading ? "Loading…" : "Refresh"}
           </button>
-          <button className={cls.btnDanger} onClick={flush} disabled={flushing || loading} data-testid="cache-flush">
+          <button
+            className={cls.btnDanger}
+            onClick={flush}
+            disabled={flushing || loading}
+            data-testid="cache-flush"
+          >
             {flushing ? "Flushing…" : "Flush cache"}
           </button>
         </div>
@@ -163,7 +173,8 @@ export default function CacheDebugPage() {
                 <h2 className="mb-3 text-ui-sm font-semibold text-ui-ink-title">
                   Cached entries
                   <span className="ml-2 text-ui-2xs font-normal text-ui-ink-muted">
-                    first {data.sample.length} of {Math.max(data.stats.thumbCount, data.stats.origCount)}
+                    first {data.sample.length} of{" "}
+                    {Math.max(data.stats.thumbCount, data.stats.origCount)}
                   </span>
                 </h2>
                 {data.sample.length === 0 ? (
@@ -221,9 +232,7 @@ export default function CacheDebugPage() {
         </>
       )}
 
-      {!data && !loading && !error && (
-        <p className="text-ui-sm text-ui-ink-muted">No data.</p>
-      )}
+      {!data && !loading && !error && <p className="text-ui-sm text-ui-ink-muted">No data.</p>}
     </div>
   );
 }

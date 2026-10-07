@@ -1,6 +1,6 @@
+import { catalogImageToCompactResult, listCatalogImages } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { CatalogBrowseRequestSchema } from "@/lib/library/schemas";
-import { catalogImageToCompactResult, listCatalogImages } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       path: body.path?.trim() || undefined,
       sort: body.sort,
       limit: body.limit,
-      offset: body.offset,
+      offset: body.offset
     });
     const results = images.map(catalogImageToCompactResult);
     return jsonOk({ results, count: results.length, hasMore: results.length === body.limit });

@@ -1,6 +1,6 @@
-import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { expect, test } from "@playwright/test";
 import { NAMESPACE, pointIdForSha256 } from "../../lib/library/id-scheme";
 
 type Vectors = {

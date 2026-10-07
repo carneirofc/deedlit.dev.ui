@@ -1,6 +1,6 @@
+import { dispatchJob } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { IngestFolderRequestSchema } from "@/lib/library/schemas";
-import { dispatchJob } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const res = await dispatchJob({ ...body });
     return jsonOk({
       job_id: res.id ?? res.job_id ?? null,
-      status: res.status ?? "started",
+      status: res.status ?? "started"
     });
   });
 }

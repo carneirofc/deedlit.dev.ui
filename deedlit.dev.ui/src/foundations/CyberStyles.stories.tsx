@@ -8,7 +8,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
  */
 const meta: Meta = {
   title: "Foundations/Cyber Styles",
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 };
 
 export default meta;
@@ -24,11 +24,13 @@ export const Panels: Story = {
         </p>
         <div className="cyber-subpanel mt-4 rounded-2xl p-4">
           <p className="text-ui-sm font-medium">.cyber-subpanel</p>
-          <p className="cyber-muted mt-1 text-ui-xs">A nested, lighter panel for grouping content inside a panel.</p>
+          <p className="cyber-muted mt-1 text-ui-xs">
+            A nested, lighter panel for grouping content inside a panel.
+          </p>
         </div>
       </section>
     </div>
-  ),
+  )
 };
 
 export const Chips: Story = {
@@ -38,7 +40,7 @@ export const Chips: Story = {
       <span className="cyber-chip rounded-full px-3 py-1 text-ui-xs">masterpiece</span>
       <span className="cyber-chip rounded-full px-3 py-1 text-ui-xs">cinematic</span>
     </div>
-  ),
+  )
 };
 
 export const Buttons: Story = {
@@ -51,27 +53,32 @@ export const Buttons: Story = {
         .cyber-button-ghost
       </button>
     </div>
-  ),
+  )
 };
 
 export const Inputs: Story = {
   render: () => (
     <div className="flex w-72 flex-col gap-3">
-      <input className="cyber-input rounded-xl px-3 py-2 text-ui-sm outline-none" placeholder=".cyber-input" />
+      <input
+        className="cyber-input rounded-xl px-3 py-2 text-ui-sm outline-none"
+        placeholder=".cyber-input"
+      />
       <textarea
         className="cyber-input resize-y rounded-xl px-3 py-2 text-ui-sm outline-none"
         rows={3}
         placeholder=".cyber-input (textarea)"
       />
     </div>
-  ),
+  )
 };
 
 export const Text: Story = {
   render: () => (
     <div className="cyber-panel w-[24rem] rounded-[28px] px-5 py-6">
       <p className="cyber-title text-ui-xl font-semibold">.cyber-title</p>
-      <p className="cyber-muted mt-2 text-ui-sm">.cyber-muted — the de-emphasised body tone used on panels.</p>
+      <p className="cyber-muted mt-2 text-ui-sm">
+        .cyber-muted — the de-emphasised body tone used on panels.
+      </p>
     </div>
-  ),
+  )
 };

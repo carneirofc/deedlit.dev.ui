@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DIST_DIR = fileURLToPath(new URL("../dist", import.meta.url));
 

@@ -26,7 +26,7 @@ const TONE_CLASS_NAMES: Record<ToastTone, string> = {
   info: "border-ui-strong text-[color:var(--ui-ink-accent)]",
   success: "border-success-edge bg-success text-success-ink",
   warn: "border-warn-edge bg-warn text-warn-ink",
-  error: "border-error-edge bg-error text-error-ink",
+  error: "border-error-edge bg-error text-error-ink"
 };
 
 const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
@@ -41,9 +41,9 @@ const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
     onClose,
     closeLabel = "Dismiss toast",
     className,
-    contentClassName,
+    contentClassName
   },
-  ref,
+  ref
 ) {
   if (!open) return null;
   if (typeof document === "undefined") return null;
@@ -54,7 +54,7 @@ const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
     <div
       className={cn(
         "fixed bottom-2 left-2 z-[95] w-[calc(100%-1rem)] max-w-sm px-0 sm:bottom-4 sm:left-4 sm:w-full md:bottom-6 md:left-6",
-        className,
+        className
       )}
     >
       <div
@@ -66,7 +66,7 @@ const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
         className={cn(
           "relative rounded-xl border bg-[color:var(--ui-bg-card)] p-3 shadow-[var(--ui-shadow-strong)]",
           TONE_CLASS_NAMES[tone],
-          contentClassName,
+          contentClassName
         )}
       >
         {onClose ? (
@@ -92,11 +92,10 @@ const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 });
 
 Toast.displayName = "Toast";
 
 export default Toast;
-

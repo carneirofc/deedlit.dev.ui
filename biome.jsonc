@@ -37,9 +37,8 @@
     ]
   },
 
-  // Configured and usable (`pnpm format`), but deliberately NOT applied to
-  // the tree: it rewrites ~230 of 318 files. That belongs in its own commit,
-  // not smuggled in alongside a behaviour change. Values match .editorconfig.
+  // Applied to the whole tree; the pre-commit hook keeps staged files
+  // formatted. Values match .editorconfig.
   "formatter": {
     "enabled": true,
     "useEditorconfig": true,

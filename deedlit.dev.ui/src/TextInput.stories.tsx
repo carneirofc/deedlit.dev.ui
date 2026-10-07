@@ -8,12 +8,12 @@ const meta = {
   tags: ["autodocs"],
   args: {
     placeholder: "cinematic portrait, rim lighting",
-    controlSize: "md",
+    controlSize: "md"
   },
   argTypes: {
     controlSize: { control: "inline-radio", options: ["sm", "md"] },
-    disabled: { control: "boolean" },
-  },
+    disabled: { control: "boolean" }
+  }
 } satisfies Meta<typeof TextInput>;
 
 export default meta;

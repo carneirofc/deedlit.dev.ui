@@ -7,8 +7,8 @@ const meta = {
   component: MetadataInfoBlock,
   tags: ["autodocs"],
   args: {
-    children: "Parsed from embedded PNG tEXt chunk · parameters",
-  },
+    children: "Parsed from embedded PNG tEXt chunk · parameters"
+  }
 } satisfies Meta<typeof MetadataInfoBlock>;
 
 export default meta;
@@ -22,5 +22,5 @@ export const MultiLine: Story = {
       <p>Source: embedded PNG metadata</p>
       <p className="mt-1 text-[color:var(--ui-ink-subtle)]">Field: parameters · 1.4 KB</p>
     </MetadataInfoBlock>
-  ),
+  )
 };

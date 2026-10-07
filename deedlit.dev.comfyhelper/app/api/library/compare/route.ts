@@ -1,6 +1,6 @@
+import { callMcpTool } from "@/lib/api-client";
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { CompareRequestSchema } from "@/lib/library/schemas";
-import { callMcpTool } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     if (structured.stubbed) {
       return jsonError(
         "Image comparison is not available yet: no compare service is wired behind the gateway.",
-        501,
+        501
       );
     }
     return jsonOk(structured);

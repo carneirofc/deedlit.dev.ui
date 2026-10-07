@@ -13,7 +13,7 @@ function makeTiles(count: number): Tile[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `tile-${index}`,
     index,
-    hue: (index * 37) % 360,
+    hue: (index * 37) % 360
   }));
 }
 
@@ -26,8 +26,8 @@ const meta = {
   args: {
     items: [] as Tile[],
     getKey: (t: Tile) => t.id,
-    renderMedia: () => null,
-  },
+    renderMedia: () => null
+  }
 } satisfies Meta<typeof Gallery<Tile>>;
 
 export default meta;
@@ -79,7 +79,7 @@ export const Windowed: Story = {
               style={{
                 backgroundColor: `hsl(${t.hue} 70% 60%)`,
                 // Vary masonry heights so the column layout is real.
-                height: ctx.viewMode === "masonry" ? 120 + (t.index % 5) * 40 : undefined,
+                height: ctx.viewMode === "masonry" ? 120 + (t.index % 5) * 40 : undefined
               }}
             >
               {t.index}
@@ -88,5 +88,5 @@ export const Windowed: Story = {
         />
       </div>
     );
-  },
+  }
 };

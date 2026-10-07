@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { browseFs, GatewayError } from "../../lib/api-client";
 
@@ -18,7 +18,7 @@ function captureFetch(reply: unknown, status = 200): Captured {
     cap.method = init?.method ?? "GET";
     return new Response(JSON.stringify(reply), {
       status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json" }
     });
   }) as typeof globalThis.fetch;
   return cap;
@@ -47,7 +47,7 @@ test("browseFs GETs /fs/browse with the path query param", async () => {
       parent: "K:/comfyui",
       separator: "\\",
       entries: [{ name: "sub", path: "K:/comfyui/output/sub", isDirectory: true }],
-      roots: [{ label: "K:\\", path: "K:\\" }],
+      roots: [{ label: "K:\\", path: "K:\\" }]
     });
     try {
       const res = await browseFs("K:/comfyui/output");
@@ -68,7 +68,7 @@ test("browseFs omits the path param for the roots view", async () => {
       parent: null,
       separator: "/",
       entries: [],
-      roots: [{ label: "/", path: "/" }],
+      roots: [{ label: "/", path: "/" }]
     });
     try {
       const res = await browseFs(null);
@@ -87,7 +87,7 @@ test("browseFs surfaces a 400 as a GatewayError the picker can show inline", asy
     try {
       const err = await browseFs("/nope").then(
         () => null,
-        (e) => e,
+        (e) => e
       );
       expect(err).toBeInstanceOf(GatewayError);
       expect((err as GatewayError).status).toBe(400);

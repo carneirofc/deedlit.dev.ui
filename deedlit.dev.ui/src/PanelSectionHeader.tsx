@@ -16,22 +16,28 @@ export type PanelSectionHeaderProps = {
 
 const PanelSectionHeader = forwardRef<HTMLDivElement, PanelSectionHeaderProps>(
   function PanelSectionHeader(
-    { title, description, actions, className, titleClassName, descriptionClassName, actionsClassName },
-    ref,
+    {
+      title,
+      description,
+      actions,
+      className,
+      titleClassName,
+      descriptionClassName,
+      actionsClassName
+    },
+    ref
   ) {
     return (
       <div ref={ref} className={cn("flex flex-wrap items-center justify-between gap-2", className)}>
         <div>
-          <p
-            className={cn(
-              "ui-text-label-sm text-(--ui-ink-accent)",
-              titleClassName,
-            )}
-          >
-            {title}
-          </p>
+          <p className={cn("ui-text-label-sm text-(--ui-ink-accent)", titleClassName)}>{title}</p>
           {description && (
-            <p className={cn("mt-1 text-ui-xs text-[color:var(--ui-ink-subtle)]", descriptionClassName)}>
+            <p
+              className={cn(
+                "mt-1 text-ui-xs text-[color:var(--ui-ink-subtle)]",
+                descriptionClassName
+              )}
+            >
               {description}
             </p>
           )}
@@ -41,9 +47,7 @@ const PanelSectionHeader = forwardRef<HTMLDivElement, PanelSectionHeaderProps>(
         )}
       </div>
     );
-  },
+  }
 );
 
 export default PanelSectionHeader;
-
-

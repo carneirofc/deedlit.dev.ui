@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import type { Decorator, Preview } from "@storybook/react-vite";
+import { useEffect } from "react";
 
 import "./preview.css";
 
@@ -27,16 +27,16 @@ const preview: Preview = {
     controls: {
       matchers: {
         color: /(background|color)$/i,
-        date: /Date$/i,
-      },
+        date: /Date$/i
+      }
     },
     a11y: {
       // 'todo' surfaces a11y violations in the panel without failing the build.
-      test: "todo",
-    },
+      test: "todo"
+    }
   },
   initialGlobals: {
-    theme: "light",
+    theme: "light"
   },
   globalTypes: {
     theme: {
@@ -46,13 +46,13 @@ const preview: Preview = {
         icon: "contrast",
         items: [
           { value: "light", title: "Light", icon: "sun" },
-          { value: "dark", title: "Dark", icon: "moon" },
+          { value: "dark", title: "Dark", icon: "moon" }
         ],
-        dynamicTitle: true,
-      },
-    },
+        dynamicTitle: true
+      }
+    }
   },
-  decorators: [withTheme],
+  decorators: [withTheme]
 };
 
 export default preview;

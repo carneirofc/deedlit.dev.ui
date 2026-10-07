@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-
 import { CopyButton } from "@carneirofc/ui";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { deleteImages } from "@/lib/library/bulk-delete";
 
@@ -21,7 +20,7 @@ const cls = {
     "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
   danger:
-    "rounded-md border border-rose-500/40 px-2 py-1 text-ui-xs text-rose-500 transition hover:bg-rose-500/10",
+    "rounded-md border border-rose-500/40 px-2 py-1 text-ui-xs text-rose-500 transition hover:bg-rose-500/10"
 };
 
 const SAFETY = ["", "sfw", "nsfw", "explicit"] as const;
@@ -69,7 +68,7 @@ function editFrom(img: CatalogImage): EditState {
     tags: (img.tags ?? []).join(", "),
     safety: img.safety ?? "",
     rating: img.rating != null ? String(img.rating) : "",
-    favorite: Boolean(img.favorite),
+    favorite: Boolean(img.favorite)
   };
 }
 
@@ -141,7 +140,9 @@ export default function DbPage() {
     fetchAbortRef.current = ac;
     setLoadingMore(true);
     try {
-      const j = await fetch(`/api/library/admin/images?${sp.toString()}`, { signal: ac.signal }).then((r) => r.json());
+      const j = await fetch(`/api/library/admin/images?${sp.toString()}`, {
+        signal: ac.signal
+      }).then((r) => r.json());
       const batch: CatalogImage[] = Array.isArray(j.images) ? (j.images as CatalogImage[]) : [];
       setHasMore(batch.length === PAGE_SIZE);
       if (reset) {
@@ -182,7 +183,7 @@ export default function DbPage() {
       (entries) => {
         if (entries[0].isIntersecting && !loadingMore) loadMore();
       },
-      { root: listScrollRef.current, rootMargin: "400px" },
+      { root: listScrollRef.current, rootMargin: "400px" }
     );
     ob.observe(el);
     return () => ob.disconnect();
@@ -226,15 +227,18 @@ export default function DbPage() {
       const body = {
         prompt: edit.prompt,
         negative: edit.negative,
-        tags: edit.tags.split(",").map((s) => s.trim()).filter(Boolean),
+        tags: edit.tags
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
         safety: edit.safety ? edit.safety : null,
         rating: edit.rating ? Number(edit.rating) : null,
-        favorite: edit.favorite,
+        favorite: edit.favorite
       };
       const updated = (await fetch(`/api/library/images/${selected.sha256}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
       }).then((r) => {
         if (!r.ok) throw new Error(`save failed (${r.status})`);
         return r.json();
@@ -254,9 +258,11 @@ export default function DbPage() {
     if (!selected) return;
     setError(null);
     try {
-      await fetch(`/api/library/images/${selected.sha256}/${kind}`, { method: "POST" }).then((r) => {
-        if (!r.ok) throw new Error(`${kind} failed (${r.status})`);
-      });
+      await fetch(`/api/library/images/${selected.sha256}/${kind}`, { method: "POST" }).then(
+        (r) => {
+          if (!r.ok) throw new Error(`${kind} failed (${r.status})`);
+        }
+      );
       setNotice(`${kind === "reindex" ? "Re-index" : "Re-label"} task enqueued.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : `${kind} failed`);
@@ -266,7 +272,7 @@ export default function DbPage() {
   const deleteEverywhere = async () => {
     if (!selected) return;
     const typed = window.prompt(
-      `Type the sha256 to DELETE this image's index (catalog + search + graph; not the file on disk):\n${selected.sha256}`,
+      `Type the sha256 to DELETE this image's index (catalog + search + graph; not the file on disk):\n${selected.sha256}`
     );
     if (typed !== selected.sha256) return;
     setError(null);
@@ -324,11 +330,13 @@ export default function DbPage() {
       }
       if (failed.length > 0) {
         setError(
-          `Excluded ${deleted.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`,
+          `Excluded ${deleted.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`
         );
         setConfirmingBulk(false);
       } else {
-        setNotice(`Excluded ${deleted.length} image${deleted.length === 1 ? "" : "s"} (un-indexed).`);
+        setNotice(
+          `Excluded ${deleted.length} image${deleted.length === 1 ? "" : "s"} (un-indexed).`
+        );
         clearPicked();
       }
     } finally {
@@ -345,8 +353,16 @@ export default function DbPage() {
         </p>
       </header>
 
-      {error && <p className="text-ui-sm text-rose-500" data-testid="db-error">{error}</p>}
-      {notice && <p className="text-ui-sm text-emerald-500" data-testid="db-notice">{notice}</p>}
+      {error && (
+        <p className="text-ui-sm text-rose-500" data-testid="db-error">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="text-ui-sm text-emerald-500" data-testid="db-notice">
+          {notice}
+        </p>
+      )}
 
       {/* Filters */}
       <section className={cls.card} data-testid="db-filters">
@@ -425,7 +441,9 @@ export default function DbPage() {
               <div className="ml-auto flex items-center gap-2">
                 {confirmingBulk ? (
                   <>
-                    <span className="text-rose-500">Un-index {picked.size}? (files stay on disk)</span>
+                    <span className="text-rose-500">
+                      Un-index {picked.size}? (files stay on disk)
+                    </span>
                     <button
                       className={cls.danger}
                       onClick={excludeSelected}
@@ -534,12 +552,22 @@ export default function DbPage() {
                 className="max-h-72 w-full rounded-lg border border-ui-border/50 bg-ui-bg-soft object-contain"
               />
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-ui-2xs text-ui-ink-muted">{selected.sha256}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-ui-2xs text-ui-ink-muted">
+                  {selected.sha256}
+                </span>
                 <div className="flex shrink-0 flex-wrap gap-1">
-                  <button className={cls.btn} onClick={() => act("reindex")} data-testid="db-reindex">
+                  <button
+                    className={cls.btn}
+                    onClick={() => act("reindex")}
+                    data-testid="db-reindex"
+                  >
                     Re-index
                   </button>
-                  <button className={cls.btn} onClick={() => act("relabel")} data-testid="db-relabel">
+                  <button
+                    className={cls.btn}
+                    onClick={() => act("relabel")}
+                    data-testid="db-relabel"
+                  >
                     Re-label
                   </button>
                   <button className={cls.danger} onClick={deleteEverywhere} data-testid="db-delete">
@@ -645,7 +673,12 @@ export default function DbPage() {
                   />
                   favorite
                 </label>
-                <button className={`${cls.btn} mt-4`} onClick={save} disabled={busy} data-testid="db-save">
+                <button
+                  className={`${cls.btn} mt-4`}
+                  onClick={save}
+                  disabled={busy}
+                  data-testid="db-save"
+                >
                   {busy ? "Saving…" : "Save"}
                 </button>
               </div>

@@ -7,8 +7,8 @@ const meta = {
   component: InfoChip,
   tags: ["autodocs"],
   args: {
-    children: "masterpiece",
-  },
+    children: "masterpiece"
+  }
 } satisfies Meta<typeof InfoChip>;
 
 export default meta;
@@ -24,5 +24,5 @@ export const Group: Story = {
       <InfoChip {...args}>depth of field</InfoChip>
       <InfoChip {...args}>ponyXL</InfoChip>
     </div>
-  ),
+  )
 };

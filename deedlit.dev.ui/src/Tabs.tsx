@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  forwardRef,
-  type ComponentPropsWithoutRef,
-  type ElementRef,
-} from "react";
 import { Tabs as RadixTabs } from "radix-ui";
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
 
 import { cn } from "./utils";
 
@@ -36,7 +32,7 @@ export const TabsList = forwardRef<
       ref={ref}
       className={cn(
         "inline-flex gap-1 rounded-lg border border-(--ui-border-soft) bg-panel/90 p-0.5",
-        className,
+        className
       )}
       {...props}
     />
@@ -57,7 +53,7 @@ export const TabsTrigger = forwardRef<
         "focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklab,var(--accent-cyan)_45%,transparent)]",
         "data-[state=active]:border-ui-active data-[state=active]:bg-[color:var(--ui-bg-active)] data-[state=active]:text-[color:var(--ui-ink-highlight)]",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        className,
+        className
       )}
       {...props}
     />
@@ -74,7 +70,7 @@ export const TabsContent = forwardRef<
       ref={ref}
       className={cn(
         "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklab,var(--accent-cyan)_45%,transparent)]",
-        className,
+        className
       )}
       {...props}
     />

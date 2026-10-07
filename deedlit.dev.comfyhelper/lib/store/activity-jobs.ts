@@ -57,12 +57,7 @@ export interface JobSnapshot {
 /** Job statuses past which an activity is settled and no longer driven.
  * `interrupted` = the ingest service restarted mid-job (its in-memory worker is
  * gone), so the activity must settle rather than poll a job that can't finish. */
-export const TERMINAL_JOB_STATUSES = new Set([
-  "completed",
-  "failed",
-  "cancelled",
-  "interrupted",
-]);
+export const TERMINAL_JOB_STATUSES = new Set(["completed", "failed", "cancelled", "interrupted"]);
 
 /** True once an activity has settled (succeeded or failed). */
 export function isTerminal(status: ActivityStatus): boolean {
@@ -77,14 +72,14 @@ export function isTerminal(status: ActivityStatus): boolean {
 export function applyJobToActivity(
   activity: Activity,
   job: JobSnapshot | undefined,
-  now: number,
+  now: number
 ): Activity {
   if (!activity.jobId || isTerminal(activity.status) || !job) return activity;
 
   const progress: ActivityProgress = {
     processed: job.processedFiles,
     total: job.totalFiles,
-    failed: job.failedFiles,
+    failed: job.failedFiles
   };
 
   if (TERMINAL_JOB_STATUSES.has(job.status)) {
@@ -95,16 +90,16 @@ export function applyJobToActivity(
       status: ok ? "success" : "error",
       message: ok
         ? undefined
-        : job.errorMessage ??
+        : (job.errorMessage ??
           (job.status === "cancelled"
             ? "cancelled"
             : job.status === "interrupted"
               ? "interrupted (service restarted)"
-              : "failed"),
+              : "failed")),
       // Clear the live stage once settled — there is no service still working.
       stage: null,
       stageCounts: job.stageCounts,
-      endedAt: now,
+      endedAt: now
     };
   }
 
@@ -119,7 +114,13 @@ export function applyJobToActivity(
     activity.progress?.failed === progress.failed &&
     (activity.stage ?? null) === (job.stage ?? null);
   if (same) return activity;
-  return { ...activity, status: "running", progress, stage: job.stage, stageCounts: job.stageCounts };
+  return {
+    ...activity,
+    status: "running",
+    progress,
+    stage: job.stage,
+    stageCounts: job.stageCounts
+  };
 }
 
 /**
@@ -129,7 +130,7 @@ export function applyJobToActivity(
 export function applyJobsToActivities(
   activities: Activity[],
   jobs: JobSnapshot[],
-  now: number,
+  now: number
 ): Activity[] {
   const byId = new Map(jobs.map((j) => [j.id, j]));
   let changed = false;
@@ -171,7 +172,7 @@ export function normalizeJob(raw: unknown): JobSnapshot {
     failedFiles: num(o.failedFiles),
     errorMessage: typeof o.errorMessage === "string" ? o.errorMessage : null,
     stage: typeof stage === "string" ? stage : null,
-    stageCounts: stageCountMap(o.stageCounts ?? o.stage_counts),
+    stageCounts: stageCountMap(o.stageCounts ?? o.stage_counts)
   };
 }
 

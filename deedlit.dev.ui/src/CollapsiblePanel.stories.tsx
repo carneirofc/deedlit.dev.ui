@@ -8,8 +8,8 @@ const meta = {
   tags: ["autodocs"],
   args: {
     label: "Raw metadata",
-    defaultOpen: false,
-  },
+    defaultOpen: false
+  }
 } satisfies Meta<typeof CollapsiblePanel>;
 
 export default meta;
@@ -28,7 +28,7 @@ export const Closed: Story = {
         <Body />
       </CollapsiblePanel>
     </div>
-  ),
+  )
 };
 
 export const OpenByDefault: Story = {
@@ -39,5 +39,5 @@ export const OpenByDefault: Story = {
         <Body />
       </CollapsiblePanel>
     </div>
-  ),
+  )
 };

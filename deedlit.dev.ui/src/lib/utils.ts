@@ -1,4 +1,4 @@
-import { clsx, type ClassValue } from "clsx";
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -35,7 +35,7 @@ export const SPACING_PATTERNS = {
   chipStandard: "px-3 py-1",
 
   /** Badge padding with extra horizontal space */
-  badgeStandard: "px-2.5 py-1",
+  badgeStandard: "px-2.5 py-1"
 } as const;
 
 /**
@@ -62,7 +62,7 @@ export const LAYOUT_PATTERNS = {
   flexStartBetween: "flex items-start justify-between",
 
   /** Flex row with start items and space between (with gap-3) */
-  flexStartBetweenGap3: "flex items-start justify-between gap-3",
+  flexStartBetweenGap3: "flex items-start justify-between gap-3"
 } as const;
 
 /**
@@ -82,6 +82,5 @@ export const BORDER_PATTERNS = {
   modal: "border border-ui-modal",
 
   /** Active state border */
-  active: "border border-ui-active",
+  active: "border border-ui-active"
 } as const;
-

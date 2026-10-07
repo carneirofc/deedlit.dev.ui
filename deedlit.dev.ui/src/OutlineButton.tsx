@@ -1,8 +1,14 @@
 "use client";
 
-import { Children, forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Slot } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Slot } from "radix-ui";
+import {
+  type ButtonHTMLAttributes,
+  Children,
+  forwardRef,
+  isValidElement,
+  type ReactNode
+} from "react";
 
 import { cn } from "./utils";
 
@@ -26,21 +32,21 @@ export const buttonVariants = cva(
         ghost:
           "cyber-button-ghost border-ui-strong bg-[color:var(--surface-0)]/55 text-[color:var(--ui-ink)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--ui-border-active)_38%,transparent)] hover:border-ui-active hover:bg-[color:var(--ui-bg-soft)] hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--ui-border-active)_54%,transparent)] active:bg-[color:var(--ui-bg-soft)]",
         accent:
-          "cyber-button border-transparent text-[color:var(--text-0)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--panel-border-strong)_45%,transparent)] hover:border-transparent hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--panel-border-strong)_62%,transparent)] active:bg-[color:color-mix(in_oklab,var(--surface-0)_55%,var(--accent-cyan)_45%)]",
+          "cyber-button border-transparent text-[color:var(--text-0)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--panel-border-strong)_45%,transparent)] hover:border-transparent hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--panel-border-strong)_62%,transparent)] active:bg-[color:color-mix(in_oklab,var(--surface-0)_55%,var(--accent-cyan)_45%)]"
       },
       controlSize: {
         xs: "rounded-md px-2 py-1 text-ui-xs",
         sm: "rounded-lg px-3 py-1.5 text-ui-xs",
         md: "rounded-xl px-3 py-2 text-ui-xs",
         lg: "min-h-10 rounded-xl px-4 py-2 text-ui-sm",
-        icon: "rounded-lg p-1.5 text-ui-xs",
-      },
+        icon: "rounded-lg p-1.5 text-ui-xs"
+      }
     },
     defaultVariants: {
       variant: "neutral",
-      controlSize: "sm",
-    },
-  },
+      controlSize: "sm"
+    }
+  }
 );
 
 export type OutlineButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
@@ -86,7 +92,7 @@ const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function
     suppressHydrationWarning,
     ...props
   },
-  ref,
+  ref
 ) {
   const inferredLabel = extractTextLabel(children);
   const resolvedTooltip = tooltip ?? title ?? label ?? ariaLabel ?? inferredLabel;

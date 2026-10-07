@@ -37,7 +37,7 @@ export type PathPreview =
 
 export function usePathPreview(
   path: string,
-  opts: { enabled?: boolean; debounceMs?: number } = {},
+  opts: { enabled?: boolean; debounceMs?: number } = {}
 ): PathPreview {
   const { enabled = true, debounceMs = 400 } = opts;
   const [preview, setPreview] = useState<PathPreview>({ state: "idle" });
@@ -54,7 +54,7 @@ export function usePathPreview(
       setPreview({ state: "checking" });
       try {
         const res = await fetch(`/api/library/fs/browse?path=${encodeURIComponent(trimmed)}`, {
-          signal: controller.signal,
+          signal: controller.signal
         });
         const json = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -67,7 +67,7 @@ export function usePathPreview(
           state: "valid",
           resolvedPath: typeof json.path === "string" ? json.path : trimmed,
           imageCount: entries.filter((e) => !e.isDirectory && isImageFile(e.name)).length,
-          subdirCount: entries.filter((e) => e.isDirectory).length,
+          subdirCount: entries.filter((e) => e.isDirectory).length
         });
       } catch (err) {
         if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;

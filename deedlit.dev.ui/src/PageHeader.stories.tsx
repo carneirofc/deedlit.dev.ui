@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-
-import PageHeader from "./PageHeader";
 import InfoChip from "./InfoChip";
+import PageHeader from "./PageHeader";
 
 const meta = {
   title: "Components/PageHeader",
@@ -11,8 +10,9 @@ const meta = {
   args: {
     subtitle: "deedlit.dev // gallery",
     title: "Image library",
-    description: "Browse, tag and inspect every image indexed across your configured source directories.",
-  },
+    description:
+      "Browse, tag and inspect every image indexed across your configured source directories."
+  }
 } satisfies Meta<typeof PageHeader>;
 
 export default meta;
@@ -28,6 +28,6 @@ export const WithPills: Story = {
         <InfoChip>3 roots</InfoChip>
         <InfoChip>synced 2m ago</InfoChip>
       </>
-    ),
-  },
+    )
+  }
 };

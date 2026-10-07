@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogTrigger
 } from "./Dialog";
 import OutlineButton from "./OutlineButton";
 
@@ -17,7 +17,7 @@ const meta = {
   title: "Components/Dialog",
   component: Dialog,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 } satisfies Meta<typeof Dialog>;
 
 export default meta;
@@ -33,7 +33,8 @@ export const Default: Story = {
         <DialogHeader>
           <DialogTitle>Discard changes?</DialogTitle>
           <DialogDescription>
-            Focus is trapped, the background is inert, and Escape or the backdrop dismisses the dialog.
+            Focus is trapped, the background is inert, and Escape or the backdrop dismisses the
+            dialog.
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
@@ -51,7 +52,7 @@ export const Default: Story = {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  ),
+  )
 };
 
 export const LargeBodyScroll: Story = {
@@ -63,7 +64,9 @@ export const LargeBodyScroll: Story = {
       <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Scan report</DialogTitle>
-          <DialogDescription>The body scrolls while header and footer stay pinned.</DialogDescription>
+          <DialogDescription>
+            The body scrolls while header and footer stay pinned.
+          </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <div className="space-y-2">
@@ -81,5 +84,5 @@ export const LargeBodyScroll: Story = {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  ),
+  )
 };

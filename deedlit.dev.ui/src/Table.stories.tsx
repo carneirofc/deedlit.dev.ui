@@ -8,14 +8,14 @@ import {
   TableFooter,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "./Table";
 
 const meta = {
   title: "Components/Table",
   component: Table,
   tags: ["autodocs"],
-  parameters: { layout: "padded" },
+  parameters: { layout: "padded" }
 } satisfies Meta<typeof Table>;
 
 export default meta;
@@ -24,7 +24,7 @@ type Story = StoryObj<typeof meta>;
 const ROWS = [
   { dir: "/library/illustrations", images: 642, scanned: "2 min ago" },
   { dir: "/library/renders", images: 418, scanned: "2 min ago" },
-  { dir: "/library/inbox", images: 144, scanned: "12 min ago" },
+  { dir: "/library/inbox", images: 144, scanned: "12 min ago" }
 ];
 
 export const Default: Story = {
@@ -43,7 +43,9 @@ export const Default: Story = {
             <TableRow key={row.dir}>
               <TableCell className="font-medium">{row.dir}</TableCell>
               <TableCell className="text-right">{row.images}</TableCell>
-              <TableCell className="text-right text-[color:var(--ui-ink-subtle)]">{row.scanned}</TableCell>
+              <TableCell className="text-right text-[color:var(--ui-ink-subtle)]">
+                {row.scanned}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -56,7 +58,7 @@ export const Default: Story = {
         </TableFooter>
       </Table>
     </div>
-  ),
+  )
 };
 
 export const WithCaption: Story = {
@@ -80,5 +82,5 @@ export const WithCaption: Story = {
         </TableBody>
       </Table>
     </div>
-  ),
+  )
 };

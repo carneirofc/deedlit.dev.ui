@@ -8,11 +8,11 @@ const meta = {
   tags: ["autodocs"],
   args: {
     controlSize: "md",
-    defaultValue: "ponyXL",
+    defaultValue: "ponyXL"
   },
   argTypes: {
     controlSize: { control: "inline-radio", options: ["sm", "md"] },
-    disabled: { control: "boolean" },
+    disabled: { control: "boolean" }
   },
   render: (args) => (
     <SelectInput {...args}>
@@ -20,7 +20,7 @@ const meta = {
       <option value="sdxl-lightning">sdxl-lightning</option>
       <option value="flux-dev">flux-dev</option>
     </SelectInput>
-  ),
+  )
 } satisfies Meta<typeof SelectInput>;
 
 export default meta;

@@ -1,24 +1,24 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  HeartIcon,
-  XIcon,
-  TrashIcon,
-  FolderIcon,
-  FolderPlusIcon,
-  DownloadIcon,
-  CopyIcon,
-  PlusIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CopyIcon,
   DocumentIcon,
   DocumentPlusIcon,
-  ShuffleIcon,
-  PlayIcon,
-  PauseIcon,
+  DownloadIcon,
   EditIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  HeartIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  ShuffleIcon,
+  TrashIcon,
+  XIcon
 } from "./Icons";
 
 /**
@@ -28,7 +28,7 @@ import {
  */
 const meta: Meta = {
   title: "Components/Icons",
-  parameters: { layout: "padded" },
+  parameters: { layout: "padded" }
 };
 
 export default meta;
@@ -52,7 +52,7 @@ const ICONS = [
   ["ShuffleIcon", ShuffleIcon],
   ["PlayIcon", PlayIcon],
   ["PauseIcon", PauseIcon],
-  ["EditIcon", EditIcon],
+  ["EditIcon", EditIcon]
 ] as const;
 
 export const Gallery: Story = {
@@ -68,7 +68,7 @@ export const Gallery: Story = {
         </div>
       ))}
     </div>
-  ),
+  )
 };
 
 export const Sizes: Story = {
@@ -79,5 +79,5 @@ export const Sizes: Story = {
       <HeartIcon size="h-8 w-8" />
       <HeartIcon size="h-10 w-10" filled className="text-[color:var(--accent-pink)]" />
     </div>
-  ),
+  )
 };

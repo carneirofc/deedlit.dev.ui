@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { LibraryGraph } from "@/app/library/components/LibraryGraph";
-import { useCompareTray } from "@/lib/store/compare-tray";
 import type { CompareResult } from "@/lib/library/schemas";
+import { useCompareTray } from "@/lib/store/compare-tray";
 
 const panel = "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4";
 
@@ -19,7 +19,10 @@ function ComparePageInner() {
   const router = useRouter();
   const tray = useCompareTray();
   const idsParam = params.get("ids") ?? "";
-  const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
+  const ids = idsParam
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ function ComparePageInner() {
       const r = await fetch("/api/library/compare", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageIds }),
+        body: JSON.stringify({ imageIds })
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Compare failed");
@@ -55,7 +58,7 @@ function ComparePageInner() {
 
   const score = (a: string, b: string): number | null => {
     const hit = data?.pairwiseSimilarity.find(
-      (p) => (p.a === a && p.b === b) || (p.a === b && p.b === a),
+      (p) => (p.a === a && p.b === b) || (p.a === b && p.b === a)
     );
     return hit ? hit.score : null;
   };
@@ -125,7 +128,9 @@ function ComparePageInner() {
 
           {/* Pairwise similarity */}
           <section className={panel}>
-            <h2 className="mb-2 text-ui-sm font-semibold text-ui-ink-title">Embedding similarity</h2>
+            <h2 className="mb-2 text-ui-sm font-semibold text-ui-ink-title">
+              Embedding similarity
+            </h2>
             {data.similarityAvailable ? (
               <div className="flex flex-wrap gap-2">
                 {data.images.flatMap((a, i) =>
@@ -144,7 +149,7 @@ function ComparePageInner() {
                         </span>
                       </span>
                     );
-                  }),
+                  })
                 )}
               </div>
             ) : (
@@ -191,7 +196,10 @@ function ComparePageInner() {
                 <p className="mb-1 text-ui-2xs uppercase tracking-wide text-ui-ink-muted">Shared</p>
                 <div className="flex flex-wrap gap-1">
                   {data.sharedTags.map((t) => (
-                    <span key={t} className="rounded-full bg-accent-cyan/15 px-2 py-0.5 text-ui-2xs text-accent-cyan">
+                    <span
+                      key={t}
+                      className="rounded-full bg-accent-cyan/15 px-2 py-0.5 text-ui-2xs text-accent-cyan"
+                    >
                       {t}
                     </span>
                   ))}
@@ -209,7 +217,10 @@ function ComparePageInner() {
                       <span className="text-ui-2xs text-ui-ink-muted">—</span>
                     ) : (
                       data.uniqueTags[i].map((t) => (
-                        <span key={t} className="rounded-full bg-ui-bg px-2 py-0.5 text-ui-2xs text-ui-ink-muted">
+                        <span
+                          key={t}
+                          className="rounded-full bg-ui-bg px-2 py-0.5 text-ui-2xs text-ui-ink-muted"
+                        >
                           {t}
                         </span>
                       ))

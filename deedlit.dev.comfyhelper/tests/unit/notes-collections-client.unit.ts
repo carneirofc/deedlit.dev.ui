@@ -1,19 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
-  createNote,
-  getNote,
-  updateNote,
-  exportNote,
-  notesByImage,
-  createCollection,
-  listCollections,
-  getCollection,
-  renameCollection,
-  deleteCollection,
-  setCollectionImages,
   collectionsByImage,
+  createCollection,
+  createNote,
+  deleteCollection,
+  exportNote,
+  getCollection,
+  getNote,
+  listCollections,
   type NoteUpsert,
+  notesByImage,
+  renameCollection,
+  setCollectionImages,
+  updateNote
 } from "../../lib/api-client";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ function captureFetch(reply: unknown, status = 200): Captured {
     cap.body = init?.body ? JSON.parse(String(init.body)) : undefined;
     return new Response(status === 204 ? null : JSON.stringify(reply), {
       status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json" }
     });
   }) as typeof globalThis.fetch;
   return cap;
@@ -67,7 +67,7 @@ test("createNote POSTs the note body to /notes and returns the saved note", asyn
       positive: "knight, castle",
       negative: "blurry",
       blocks: { time: 1, blocks: [], version: "2.0" },
-      imageRefs: [SHA],
+      imageRefs: [SHA]
     };
     const cap = captureFetch({ id: "n1", ...note });
     try {

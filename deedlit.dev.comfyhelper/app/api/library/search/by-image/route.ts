@@ -1,6 +1,6 @@
+import { buildSearchFilter, hitsToCompactResults, searchByImageUpload } from "@/lib/api-client";
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { ImageSearchOptionsSchema } from "@/lib/library/schemas";
-import { buildSearchFilter, hitsToCompactResults, searchByImageUpload } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const rawOptions = form.get("options");
     const options = ImageSearchOptionsSchema.parse(
-      typeof rawOptions === "string" && rawOptions ? JSON.parse(rawOptions) : {},
+      typeof rawOptions === "string" && rawOptions ? JSON.parse(rawOptions) : {}
     );
 
     const filename = file instanceof File ? file.name : "upload";
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       // Forward the active facet filter so reverse-image results honour the same
       // safety/tag filter as text search (the gateway translates it to a Qdrant
       // payload filter; catalog-only facets are dropped there).
-      filter: buildSearchFilter(options.filters),
+      filter: buildSearchFilter(options.filters)
     });
 
     const raw = hitsToCompactResults(res.hits);
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       // The gateway always embeds via CLIP (deedlit.vision), so by-image search
       // is always semantic here — there is no local-features fallback path.
       semantic: true,
-      provider: "deedlit.vision (CLIP ViT-H-14)",
+      provider: "deedlit.vision (CLIP ViT-H-14)"
     });
   });
 }

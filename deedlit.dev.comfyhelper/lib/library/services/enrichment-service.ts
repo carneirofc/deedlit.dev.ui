@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
-
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
-import { getImageDetail } from "@/lib/library/repositories/image-repository";
 import { withTransaction } from "@/lib/library/db/postgres";
+import { getImageDetail } from "@/lib/library/repositories/image-repository";
 import { linkImageTag, upsertTag } from "@/lib/library/repositories/tag-repository";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-enrichment" });
 
@@ -27,7 +26,9 @@ export interface EnrichmentResult {
 /** Enrichment is strictly opt-in via configuration. */
 export function shouldRunVisionEnrichment(): boolean {
   const { enrichment } = getLibraryConfig();
-  return enrichment.enabled && enrichment.visionProvider !== "none" && enrichment.visionApiUrl !== "";
+  return (
+    enrichment.enabled && enrichment.visionProvider !== "none" && enrichment.visionApiUrl !== ""
+  );
 }
 
 const OUTPUT_INSTRUCTIONS = `You are a precise image cataloguer. Respond ONLY with JSON matching:
@@ -35,7 +36,11 @@ const OUTPUT_INSTRUCTIONS = `You are a precise image cataloguer. Respond ONLY wi
 
 async function imageToDataUri(filePath: string): Promise<string> {
   const buffer = await readFile(filePath);
-  const ext = filePath.toLowerCase().endsWith(".png") ? "png" : filePath.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
+  const ext = filePath.toLowerCase().endsWith(".png")
+    ? "png"
+    : filePath.toLowerCase().endsWith(".webp")
+      ? "webp"
+      : "jpeg";
   return `data:image/${ext};base64,${buffer.toString("base64")}`;
 }
 
@@ -44,7 +49,10 @@ async function imageToDataUri(filePath: string): Promise<string> {
  * default (works with OpenAI, Ollama, LM Studio, vLLM, etc.).  Returns the raw
  * parsed JSON or null on any failure — enrichment must never break ingestion.
  */
-async function callVisionProvider(filePath: string, existingPrompt: string | null): Promise<EnrichmentResult | null> {
+async function callVisionProvider(
+  filePath: string,
+  existingPrompt: string | null
+): Promise<EnrichmentResult | null> {
   const { enrichment } = getLibraryConfig();
   try {
     const dataUri = await imageToDataUri(filePath);
@@ -56,20 +64,20 @@ async function callVisionProvider(filePath: string, existingPrompt: string | nul
           role: "user",
           content: [
             { type: "text", text: `Existing prompt context: ${existingPrompt ?? "(none)"}` },
-            { type: "image_url", image_url: { url: dataUri } },
-          ],
-        },
+            { type: "image_url", image_url: { url: dataUri } }
+          ]
+        }
       ],
       temperature: 0.2,
-      response_format: { type: "json_object" },
+      response_format: { type: "json_object" }
     };
     const res = await fetch(enrichment.visionApiUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        ...(enrichment.visionApiKey ? { authorization: `Bearer ${enrichment.visionApiKey}` } : {}),
+        ...(enrichment.visionApiKey ? { authorization: `Bearer ${enrichment.visionApiKey}` } : {})
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     });
     if (!res.ok) {
       logger.warn({ status: res.status }, "Vision provider returned non-OK status");
@@ -86,7 +94,7 @@ async function callVisionProvider(filePath: string, existingPrompt: string | nul
       characters: parsed.characters ?? [],
       styles: parsed.styles ?? [],
       quality_notes: parsed.quality_notes ?? [],
-      metadata: parsed.metadata ?? {},
+      metadata: parsed.metadata ?? {}
     };
   } catch (error) {
     logger.warn({ err: error }, "Vision enrichment call failed");
@@ -119,13 +127,21 @@ export async function saveEnrichment(imageId: string, result: EnrichmentResult):
           enrichment.visionProvider,
           enrichment.visionModel || null,
           OUTPUT_INSTRUCTIONS,
-          JSON.stringify({ characters: result.characters, styles: result.styles, quality_notes: result.quality_notes, ...result.metadata }),
-        ],
+          JSON.stringify({
+            characters: result.characters,
+            styles: result.styles,
+            quality_notes: result.quality_notes,
+            ...result.metadata
+          })
+        ]
       );
     }
     for (const tag of result.suggested_tags) {
       const tagId = await upsertTag(client, tag.name, tag.category ?? null, "external_vision_llm");
-      await linkImageTag(client, imageId, tagId, { confidence: tag.confidence, source: "external_vision_llm" });
+      await linkImageTag(client, imageId, tagId, {
+        confidence: tag.confidence,
+        source: "external_vision_llm"
+      });
     }
   });
 }

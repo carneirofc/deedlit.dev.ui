@@ -6,7 +6,7 @@ import Pagination from "./Pagination";
 const meta = {
   title: "Components/Pagination",
   component: Pagination,
-  tags: ["autodocs"],
+  tags: ["autodocs"]
 } satisfies Meta<typeof Pagination>;
 
 export default meta;
@@ -26,7 +26,7 @@ export const Default: Story = {
         />
       </div>
     );
-  },
+  }
 };
 
 export const FirstPage: Story = {
@@ -34,7 +34,7 @@ export const FirstPage: Story = {
     <div className="w-80">
       <Pagination page={1} totalPages={5} onPrevPage={() => {}} onNextPage={() => {}} />
     </div>
-  ),
+  )
 };
 
 export const LastPage: Story = {
@@ -42,5 +42,5 @@ export const LastPage: Story = {
     <div className="w-80">
       <Pagination page={5} totalPages={5} onPrevPage={() => {}} onNextPage={() => {}} />
     </div>
-  ),
+  )
 };

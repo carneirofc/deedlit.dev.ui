@@ -1,41 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import { Gallery, TagSelect } from "@carneirofc/ui";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BulkActionBar, type BulkBusy } from "@/app/library/components/BulkActionBar";
 import { GraphFilterPanel } from "@/app/library/components/GraphFilterPanel";
 import { Lightbox } from "@/app/library/components/Lightbox";
 import { PathInput } from "@/components/PathInput";
 import type { ImagePatchBody } from "@/lib/api-client";
-import { pillBtnClass } from "@/lib/ui/buttonStyles";
 import { deleteImages } from "@/lib/library/bulk-delete";
-import { moveImages } from "@/lib/library/bulk-move";
 import {
   downloadCsv,
   downloadJson,
   downloadJsonl,
-  exportImages,
-  toSimpleRecord,
   type ExportKind,
+  exportImages,
+  toSimpleRecord
 } from "@/lib/library/bulk-export";
+import { moveImages } from "@/lib/library/bulk-move";
 import { patchImages } from "@/lib/library/bulk-patch";
 import type { CatalogSort, GraphScope } from "@/lib/library/schemas";
 import {
   gridColumnsClass,
   masonryColumnsClass,
-  useSettings,
   type SortMode,
-  type ViewMode,
+  useSettings,
+  type ViewMode
 } from "@/lib/store/settings";
+import { pillBtnClass } from "@/lib/ui/buttonStyles";
 
 type SafetyClass = "sfw" | "nsfw" | "explicit";
 const SAFETY_CLASSES: SafetyClass[] = ["sfw", "nsfw", "explicit"];
 const SAFETY_LABEL: Record<SafetyClass, string> = {
   sfw: "SFW",
   nsfw: "NSFW",
-  explicit: "Explicit",
+  explicit: "Explicit"
 };
 
 interface CompactResult {
@@ -83,14 +82,23 @@ const SORT_LABEL: Record<SortMode, string> = {
   rating_desc: "Rating ↓",
   rating_asc: "Rating ↑",
   name_asc: "Name A–Z",
-  name_desc: "Name Z–A",
+  name_desc: "Name Z–A"
 };
 
 // Sort options offered per context. The vector-search path is relevance-ranked
 // and its results carry no date/filename, so only relevance + rating (a
 // client-side reorder of the loaded window) make sense there; browse offers the
 // full server-side set.
-const BROWSE_SORTS: SortMode[] = ["newest", "oldest", "created_desc", "created_asc", "rating_desc", "rating_asc", "name_asc", "name_desc"];
+const BROWSE_SORTS: SortMode[] = [
+  "newest",
+  "oldest",
+  "created_desc",
+  "created_asc",
+  "rating_desc",
+  "rating_asc",
+  "name_asc",
+  "name_desc"
+];
 const SEARCH_SORTS: SortMode[] = ["relevance", "rating_desc", "rating_asc"];
 
 // How many pages to warm in the background beyond what's rendered, so "load
@@ -112,14 +120,18 @@ function isBrowsePath(mode: BrowseMode, query: string): boolean {
 
 const cls = {
   card: "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4",
-  input: "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
+  input:
+    "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
   btnActive: "border-accent-cyan text-accent-cyan",
-  label: "flex flex-col gap-1 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted",
+  label: "flex flex-col gap-1 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted"
 };
 
 function csv(value: string): string[] {
-  return value.split(",").map((t) => t.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function StarRating({ value }: { value: number }) {
@@ -172,7 +184,9 @@ export default function LibraryPage() {
   // what's on screen WITHOUT taking `results` as a dependency (that would churn
   // doFetch's identity and every effect keyed on it).
   const resultsRef = useRef<CompactResult[]>([]);
-  useEffect(() => { resultsRef.current = results; });
+  useEffect(() => {
+    resultsRef.current = results;
+  });
   const pageRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(false);
@@ -241,15 +255,45 @@ export default function LibraryPage() {
   // Stable ref for current filter values — lets doFetch() always read fresh state
   // even when called from callbacks that close over an older render.
   const filtersRef = useRef({
-    mode, query, tags, excludeTags, modelFamily, checkpoint, loras, sourceTool,
-    pathFilter, favorites, minRating, safety, limit, minScore, similarRef, imageFile, graphScope,
-    sort: settings.sortMode,
+    mode,
+    query,
+    tags,
+    excludeTags,
+    modelFamily,
+    checkpoint,
+    loras,
+    sourceTool,
+    pathFilter,
+    favorites,
+    minRating,
+    safety,
+    limit,
+    minScore,
+    similarRef,
+    imageFile,
+    graphScope,
+    sort: settings.sortMode
   });
   useEffect(() => {
     filtersRef.current = {
-      mode, query, tags, excludeTags, modelFamily, checkpoint, loras, sourceTool,
-      pathFilter, favorites, minRating, safety, limit, minScore, similarRef, imageFile, graphScope,
-      sort: settings.sortMode,
+      mode,
+      query,
+      tags,
+      excludeTags,
+      modelFamily,
+      checkpoint,
+      loras,
+      sourceTool,
+      pathFilter,
+      favorites,
+      minRating,
+      safety,
+      limit,
+      minScore,
+      similarRef,
+      imageFile,
+      graphScope,
+      sort: settings.sortMode
     };
   });
 
@@ -262,7 +306,7 @@ export default function LibraryPage() {
     async (
       s: typeof filtersRef.current,
       pageOffset: number,
-      signal: AbortSignal,
+      signal: AbortSignal
     ): Promise<{ fresh: CompactResult[]; more: boolean; note?: string }> => {
       const pageSize = s.limit;
       const safetySubset =
@@ -280,15 +324,22 @@ export default function LibraryPage() {
         ratingGte,
         // Only send a safety filter when a strict subset is selected; all (or
         // none) selected means "no filter" so unclassified images stay visible.
-        safety: safetySubset,
+        safety: safetySubset
       };
 
       if (s.mode === "similar" && s.similarRef) {
         const r = await fetch("/api/library/search/similar", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ imageId: s.similarRef.id, filters, limit: pageSize, offset: pageOffset, minScore: s.minScore, graphScope: s.graphScope ?? undefined }),
-          signal,
+          body: JSON.stringify({
+            imageId: s.similarRef.id,
+            filters,
+            limit: pageSize,
+            offset: pageOffset,
+            minScore: s.minScore,
+            graphScope: s.graphScope ?? undefined
+          }),
+          signal
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "Similarity search failed");
@@ -297,7 +348,15 @@ export default function LibraryPage() {
       if (s.mode === "image" && s.imageFile) {
         const fd = new FormData();
         fd.append("file", s.imageFile);
-        fd.append("options", JSON.stringify({ filters, limit: pageSize, minScore: s.minScore, graphScope: s.graphScope ?? undefined }));
+        fd.append(
+          "options",
+          JSON.stringify({
+            filters,
+            limit: pageSize,
+            minScore: s.minScore,
+            graphScope: s.graphScope ?? undefined
+          })
+        );
         const r = await fetch("/api/library/search/by-image", { method: "POST", body: fd, signal });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "Image search failed");
@@ -325,9 +384,9 @@ export default function LibraryPage() {
             path: s.pathFilter.trim() || undefined,
             sort: browseSort,
             limit: pageSize,
-            offset: pageOffset,
+            offset: pageOffset
           }),
-          signal,
+          signal
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "Browse failed");
@@ -344,16 +403,16 @@ export default function LibraryPage() {
           ...filters,
           graphScope: s.graphScope ?? undefined,
           limit: pageSize,
-          offset: pageOffset,
+          offset: pageOffset
         }),
-        signal,
+        signal
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Search failed");
       const fresh: CompactResult[] = j.results ?? [];
       return { fresh, more: fresh.length === pageSize };
     },
-    [],
+    []
   );
 
   // --- Background page prefetch -------------------------------------------
@@ -370,24 +429,39 @@ export default function LibraryPage() {
 
   const prefetchSig = (s: typeof filtersRef.current): string =>
     JSON.stringify({
-      mode: s.mode, query: s.query, tags: s.tags, excludeTags: s.excludeTags,
-      modelFamily: s.modelFamily, checkpoint: s.checkpoint, loras: s.loras, sourceTool: s.sourceTool,
+      mode: s.mode,
+      query: s.query,
+      tags: s.tags,
+      excludeTags: s.excludeTags,
+      modelFamily: s.modelFamily,
+      checkpoint: s.checkpoint,
+      loras: s.loras,
+      sourceTool: s.sourceTool,
       pathFilter: s.pathFilter,
-      favorites: s.favorites, minRating: s.minRating, safety: s.safety, limit: s.limit,
-      minScore: s.minScore, similar: s.similarRef?.id ?? null, image: !!s.imageFile,
-      graphScope: s.graphScope, sort: s.sort,
+      favorites: s.favorites,
+      minRating: s.minRating,
+      safety: s.safety,
+      limit: s.limit,
+      minScore: s.minScore,
+      similar: s.similarRef?.id ?? null,
+      image: !!s.imageFile,
+      graphScope: s.graphScope,
+      sort: s.sort
     });
 
   // by-image returns a single relevance-ranked window (no offset), so there are
   // no further pages to warm. Similar now pages by rank offset like browse/search.
-  const paginates = (s: typeof filtersRef.current): boolean =>
-    !(s.mode === "image" && s.imageFile);
+  const paginates = (s: typeof filtersRef.current): boolean => !(s.mode === "image" && s.imageFile);
 
   // Abort outstanding prefetches and rebind the buffer to a new filter signature.
   const resetPrefetch = useCallback((s: typeof filtersRef.current) => {
     prefetchRef.current.controllers.forEach((c) => c.abort());
     prefetchRef.current = {
-      sig: prefetchSig(s), pages: new Map(), inFlight: new Set(), controllers: [], exhausted: false,
+      sig: prefetchSig(s),
+      pages: new Map(),
+      inFlight: new Set(),
+      controllers: [],
+      exhausted: false
     };
   }, []);
 
@@ -441,7 +515,7 @@ export default function LibraryPage() {
         }
       })();
     },
-    [fetchPage],
+    [fetchPage]
   );
 
   const doFetch = useCallback(
@@ -539,7 +613,7 @@ export default function LibraryPage() {
         if (fetchGen.current === gen) setLoading(false);
       }
     },
-    [fetchPage, resetPrefetch, takePrefetched, schedulePrefetch, syncPageUrl],
+    [fetchPage, resetPrefetch, takePrefetched, schedulePrefetch, syncPageUrl]
   );
 
   // Run a plain text / filter search, dropping any active image / similar query.
@@ -617,7 +691,7 @@ export default function LibraryPage() {
       }
       if (failed.length > 0) {
         setError(
-          `Deleted ${deleted.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`,
+          `Deleted ${deleted.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`
         );
         setConfirmingBulk(false);
       } else {
@@ -658,7 +732,7 @@ export default function LibraryPage() {
       kind: Exclude<NonNullable<BulkBusy>, "export" | "delete">,
       build: (r: CompactResult) => ImagePatchBody,
       patch: (r: CompactResult) => CompactResult,
-      summary: (ok: number, total: number) => string,
+      summary: (ok: number, total: number) => string
     ) => {
       const rows = results.filter((r) => selected.has(r.imageId));
       if (rows.length === 0) return;
@@ -667,14 +741,16 @@ export default function LibraryPage() {
       setNotice(null);
       try {
         const { updated, failed } = await patchImages(
-          rows.map((r) => ({ id: r.imageId, body: build(r) })),
+          rows.map((r) => ({ id: r.imageId, body: build(r) }))
         );
         if (updated.length > 0) {
           const ok = new Set(updated);
           setResults((prev) => prev.map((r) => (ok.has(r.imageId) ? patch(r) : r)));
         }
         if (failed.length > 0) {
-          setError(`${summary(updated.length, rows.length)} ${failed.length} failed: ${failed[0].error}`);
+          setError(
+            `${summary(updated.length, rows.length)} ${failed.length} failed: ${failed[0].error}`
+          );
         } else {
           setNotice(summary(updated.length, rows.length));
         }
@@ -684,7 +760,7 @@ export default function LibraryPage() {
         setBulkBusy(null);
       }
     },
-    [results, selected],
+    [results, selected]
   );
 
   const bulkFavorite = useCallback(
@@ -693,9 +769,9 @@ export default function LibraryPage() {
         "favorite",
         () => ({ favorite: fav }),
         (r) => r, // favorite isn't shown on the card; no local mirror needed
-        (ok, total) => `${fav ? "Favorited" : "Unfavorited"} ${ok}/${total}.`,
+        (ok, total) => `${fav ? "Favorited" : "Unfavorited"} ${ok}/${total}.`
       ),
-    [applyBulk],
+    [applyBulk]
   );
 
   const bulkRating = useCallback(
@@ -705,10 +781,11 @@ export default function LibraryPage() {
         "rating",
         () => ({ rating: value }),
         (r) => ({ ...r, rating: value }),
-        (ok, total) => `${value === null ? "Cleared rating on" : `Set ${rating}★ on`} ${ok}/${total}.`,
+        (ok, total) =>
+          `${value === null ? "Cleared rating on" : `Set ${rating}★ on`} ${ok}/${total}.`
       );
     },
-    [applyBulk],
+    [applyBulk]
   );
 
   const bulkSafety = useCallback(
@@ -717,9 +794,9 @@ export default function LibraryPage() {
         "safety",
         () => ({ safety: value }),
         (r) => ({ ...r, safety: value }),
-        (ok, total) => `Set ${SAFETY_LABEL[value]} on ${ok}/${total}.`,
+        (ok, total) => `Set ${SAFETY_LABEL[value]} on ${ok}/${total}.`
       ),
-    [applyBulk],
+    [applyBulk]
   );
 
   const bulkAddTags = useCallback(
@@ -729,10 +806,10 @@ export default function LibraryPage() {
         "tags",
         (r) => ({ tags: merge(r) }),
         (r) => ({ ...r, tags: merge(r) }),
-        (ok, total) => `Added ${add.length} tag${add.length === 1 ? "" : "s"} to ${ok}/${total}.`,
+        (ok, total) => `Added ${add.length} tag${add.length === 1 ? "" : "s"} to ${ok}/${total}.`
       );
     },
-    [applyBulk],
+    [applyBulk]
   );
 
   const bulkRemoveTags = useCallback(
@@ -743,10 +820,11 @@ export default function LibraryPage() {
         "tags",
         (r) => ({ tags: strip(r) }),
         (r) => ({ ...r, tags: strip(r) }),
-        (ok, total) => `Removed ${remove.length} tag${remove.length === 1 ? "" : "s"} from ${ok}/${total}.`,
+        (ok, total) =>
+          `Removed ${remove.length} tag${remove.length === 1 ? "" : "s"} from ${ok}/${total}.`
       );
     },
-    [applyBulk],
+    [applyBulk]
   );
 
   // Export every selected image's catalog record. The server route fans the
@@ -754,78 +832,86 @@ export default function LibraryPage() {
   // whatever resolved still downloads. `complete-*` dump the full canonical
   // record; `simple-*` project it to the basics (id · sha · path · …) and add a
   // spreadsheet-friendly CSV.
-  const exportSelected = useCallback(async (kind: ExportKind) => {
-    const ids = [...selected];
-    if (ids.length === 0) return;
-    setBulkBusy("export");
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await exportImages(ids);
-      if (result.count > 0) {
-        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-        const base = `deedlit-export-${result.count}-images-${stamp}`;
-        const simple = () => result.images.map(toSimpleRecord);
-        switch (kind) {
-          // Complete JSON keeps the export wrapper (meta + errors); JSONL is the
-          // bare records, one per line.
-          case "complete-json":
-            downloadJson(result, `${base}.json`);
-            break;
-          case "complete-jsonl":
-            downloadJsonl(result.images, `${base}.jsonl`);
-            break;
-          case "simple-json":
-            downloadJson(
-              { exportedAt: result.exportedAt, count: result.count, images: simple() },
-              `${base}-simple.json`,
-            );
-            break;
-          case "simple-jsonl":
-            downloadJsonl(simple(), `${base}-simple.jsonl`);
-            break;
-          case "simple-csv":
-            downloadCsv(simple(), `${base}-simple.csv`);
-            break;
+  const exportSelected = useCallback(
+    async (kind: ExportKind) => {
+      const ids = [...selected];
+      if (ids.length === 0) return;
+      setBulkBusy("export");
+      setError(null);
+      setNotice(null);
+      try {
+        const result = await exportImages(ids);
+        if (result.count > 0) {
+          const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+          const base = `deedlit-export-${result.count}-images-${stamp}`;
+          const simple = () => result.images.map(toSimpleRecord);
+          switch (kind) {
+            // Complete JSON keeps the export wrapper (meta + errors); JSONL is the
+            // bare records, one per line.
+            case "complete-json":
+              downloadJson(result, `${base}.json`);
+              break;
+            case "complete-jsonl":
+              downloadJsonl(result.images, `${base}.jsonl`);
+              break;
+            case "simple-json":
+              downloadJson(
+                { exportedAt: result.exportedAt, count: result.count, images: simple() },
+                `${base}-simple.json`
+              );
+              break;
+            case "simple-jsonl":
+              downloadJsonl(simple(), `${base}-simple.jsonl`);
+              break;
+            case "simple-csv":
+              downloadCsv(simple(), `${base}-simple.csv`);
+              break;
+          }
         }
+        const label = kind.startsWith("simple") ? "simple" : "complete";
+        if (result.errors.length > 0) {
+          setError(
+            `Exported ${result.count}/${ids.length}. ${result.errors.length} failed: ${result.errors[0].error}`
+          );
+        } else {
+          setNotice(`Exported ${result.count} image${result.count === 1 ? "" : "s"} (${label}).`);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Export failed");
+      } finally {
+        setBulkBusy(null);
       }
-      const label = kind.startsWith("simple") ? "simple" : "complete";
-      if (result.errors.length > 0) {
-        setError(
-          `Exported ${result.count}/${ids.length}. ${result.errors.length} failed: ${result.errors[0].error}`,
-        );
-      } else {
-        setNotice(`Exported ${result.count} image${result.count === 1 ? "" : "s"} (${label}).`);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Export failed");
-    } finally {
-      setBulkBusy(null);
-    }
-  }, [selected]);
+    },
+    [selected]
+  );
 
-  const bulkMove = useCallback(async (targetFolder: string) => {
-    const ids = [...selected];
-    if (ids.length === 0) return;
-    setBulkBusy("move");
-    setError(null);
-    setNotice(null);
-    try {
-      const { moved, failed } = await moveImages(ids, targetFolder);
-      if (moved.length > 0) {
-        setNotice(`Moved ${moved.length}/${ids.length} file${moved.length === 1 ? "" : "s"} to ${targetFolder}.`);
+  const bulkMove = useCallback(
+    async (targetFolder: string) => {
+      const ids = [...selected];
+      if (ids.length === 0) return;
+      setBulkBusy("move");
+      setError(null);
+      setNotice(null);
+      try {
+        const { moved, failed } = await moveImages(ids, targetFolder);
+        if (moved.length > 0) {
+          setNotice(
+            `Moved ${moved.length}/${ids.length} file${moved.length === 1 ? "" : "s"} to ${targetFolder}.`
+          );
+        }
+        if (failed.length > 0) {
+          setError(
+            `Moved ${moved.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`
+          );
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Move failed");
+      } finally {
+        setBulkBusy(null);
       }
-      if (failed.length > 0) {
-        setError(
-          `Moved ${moved.length}/${ids.length}. ${failed.length} failed: ${failed[0].error}`,
-        );
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Move failed");
-    } finally {
-      setBulkBusy(null);
-    }
-  }, [selected]);
+    },
+    [selected]
+  );
 
   // Rate a single image from the lightbox. Updates the grid row immediately so
   // the card reflects the change without a refetch.
@@ -834,12 +920,10 @@ export default function LibraryPage() {
       const res = await fetch(`/api/library/images/${encodeURIComponent(imageId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rating }),
+        body: JSON.stringify({ rating })
       });
       if (res.ok) {
-        setResults((prev) =>
-          prev.map((r) => (r.imageId === imageId ? { ...r, rating } : r)),
-        );
+        setResults((prev) => prev.map((r) => (r.imageId === imageId ? { ...r, rating } : r)));
       }
     } catch {
       // silent — non-critical
@@ -861,7 +945,7 @@ export default function LibraryPage() {
     await fetch("/api/library/notes", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] }),
+      body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] })
     });
   }, []);
 
@@ -872,7 +956,7 @@ export default function LibraryPage() {
       setMode("similar");
       doFetch(false, { mode: "similar", similarRef: ref });
     },
-    [doFetch],
+    [doFetch]
   );
 
   const clearSimilar = useCallback(() => {
@@ -893,7 +977,7 @@ export default function LibraryPage() {
       setMode("image");
       doFetch(false, { mode: "image", imageFile: file, similarRef: null });
     },
-    [doFetch],
+    [doFetch]
   );
 
   // Drop the image query and return to text/filter browsing.
@@ -912,7 +996,9 @@ export default function LibraryPage() {
   useEffect(() => {
     if (!showImageSearch && mode !== "image") return;
     const onPaste = (e: ClipboardEvent) => {
-      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) =>
+        i.type.startsWith("image/")
+      );
       const file = item?.getAsFile();
       if (file) {
         e.preventDefault();
@@ -931,11 +1017,16 @@ export default function LibraryPage() {
     const pollJobs = () =>
       fetch("/api/library/jobs", { signal: ac.signal })
         .then((r) => r.json())
-        .then((j) => { if (j.jobs) setJobs(j.jobs); })
+        .then((j) => {
+          if (j.jobs) setJobs(j.jobs);
+        })
         .catch(() => {});
     pollJobs();
     const id = setInterval(pollJobs, 3000);
-    return () => { clearInterval(id); ac.abort(); };
+    return () => {
+      clearInterval(id);
+      ac.abort();
+    };
   }, [showIngest]);
 
   // First search — wait for saved settings so pagination / filter defaults
@@ -981,7 +1072,7 @@ export default function LibraryPage() {
       safety: settings.defaultSafety,
       limit: settings.pageSize,
       similarRef: null,
-      imageFile: null,
+      imageFile: null
     } as const;
     void (async () => {
       await doFetch(false, overrides);
@@ -1005,7 +1096,7 @@ export default function LibraryPage() {
       (entries) => {
         if (entries[0].isIntersecting && !loading) loadMore();
       },
-      { rootMargin: `${lookahead}px 0px` },
+      { rootMargin: `${lookahead}px 0px` }
     );
     ob.observe(el);
     return () => ob.disconnect();
@@ -1042,7 +1133,7 @@ export default function LibraryPage() {
       // Pull a small window when we may splice (catch a short burst of arrivals);
       // a single row is enough just to detect change for the banner path.
       limit: newestFirst ? 12 : 1,
-      offset: 0,
+      offset: 0
     };
     let alive = true;
     const ac = new AbortController();
@@ -1057,7 +1148,7 @@ export default function LibraryPage() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(body),
-          signal: ac.signal,
+          signal: ac.signal
         });
         if (!r.ok) return;
         const j = await r.json();
@@ -1070,8 +1161,7 @@ export default function LibraryPage() {
         }
         if (topId === newestIdRef.current) return; // nothing new
 
-        const canSplice =
-          newestFirst && !lightboxOpenRef.current && window.scrollY < 200;
+        const canSplice = newestFirst && !lightboxOpenRef.current && window.scrollY < 200;
         if (canSplice) {
           setResults((prev) => {
             const seen = new Set(prev.map((p) => p.imageId));
@@ -1093,7 +1183,9 @@ export default function LibraryPage() {
     const id = setInterval(check, 4000);
     // Catch up the instant the tab regains focus, so returning users see fresh
     // arrivals immediately rather than waiting out the interval.
-    const onVisible = () => { if (!document.hidden) void check(); };
+    const onVisible = () => {
+      if (!document.hidden) void check();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
@@ -1101,7 +1193,18 @@ export default function LibraryPage() {
       document.removeEventListener("visibilitychange", onVisible);
       ac.abort(); // cancel any in-flight poll on unmount / filter change
     };
-  }, [mode, query, tags, excludeTags, favorites, minRating, safety, pathFilter, settings.sortMode, invalidatePrefetchPages]);
+  }, [
+    mode,
+    query,
+    tags,
+    excludeTags,
+    favorites,
+    minRating,
+    safety,
+    pathFilter,
+    settings.sortMode,
+    invalidatePrefetchPages
+  ]);
 
   const startIngest = async () => {
     if (!folderPath.trim()) return;
@@ -1109,7 +1212,7 @@ export default function LibraryPage() {
       const r = await fetch("/api/library/ingest/folder", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ folderPath: folderPath.trim() }),
+        body: JSON.stringify({ folderPath: folderPath.trim() })
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Ingest failed");
@@ -1150,9 +1253,16 @@ export default function LibraryPage() {
     const ac = new AbortController();
     fetch("/api/library/tags?limit=2000", { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : { tags: [] }))
-      .then((j) => { if (alive && Array.isArray(j.tags)) setAllTags(j.tags as string[]); })
-      .catch(() => { /* quiet — aborted on unmount or the picker stays empty */ });
-    return () => { alive = false; ac.abort(); };
+      .then((j) => {
+        if (alive && Array.isArray(j.tags)) setAllTags(j.tags as string[]);
+      })
+      .catch(() => {
+        /* quiet — aborted on unmount or the picker stays empty */
+      });
+    return () => {
+      alive = false;
+      ac.abort();
+    };
   }, []);
 
   // The vector path can't sort by date/name (its rows lack them), so honour a
@@ -1165,9 +1275,7 @@ export default function LibraryPage() {
     }
     const dir = sortValue === "rating_desc" ? -1 : 1;
     const nullVal = dir === -1 ? -Infinity : Infinity;
-    return [...results].sort(
-      (a, b) => ((a.rating ?? nullVal) - (b.rating ?? nullVal)) * dir,
-    );
+    return [...results].sort((a, b) => ((a.rating ?? nullVal) - (b.rating ?? nullVal)) * dir);
   }, [results, browsePath, sortValue]);
 
   // --- Split by source directory -------------------------------------------
@@ -1200,7 +1308,7 @@ export default function LibraryPage() {
   // card the grid shows); otherwise it is displayResults unchanged.
   const galleryItems = useMemo(
     () => (grouping ? groupSections.flatMap((g) => g.items) : displayResults),
-    [grouping, groupSections, displayResults],
+    [grouping, groupSections, displayResults]
   );
 
   // True per-folder totals (the whole library, not just the loaded page) for the
@@ -1216,13 +1324,21 @@ export default function LibraryPage() {
       .then((j) => {
         if (!alive) return;
         const m = new Map<string, number>();
-        for (const d of (j.directories ?? []) as Array<{ directory: string; image_count: number }>) {
+        for (const d of (j.directories ?? []) as Array<{
+          directory: string;
+          image_count: number;
+        }>) {
           if (d && typeof d.directory === "string") m.set(d.directory, Number(d.image_count) || 0);
         }
         setDirTotals(m);
       })
-      .catch(() => { /* quiet — headers fall back to the loaded count */ });
-    return () => { alive = false; ac.abort(); };
+      .catch(() => {
+        /* quiet — headers fall back to the loaded count */
+      });
+    return () => {
+      alive = false;
+      ac.abort();
+    };
   }, [grouping]);
 
   // Collapsed folder sections (by directory key).
@@ -1356,7 +1472,14 @@ export default function LibraryPage() {
           className={pillBtnClass}
           title="Find similar images"
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" />
           </svg>
@@ -1391,7 +1514,16 @@ export default function LibraryPage() {
             }`}
             title="Select multiple images for bulk actions (or Ctrl/Cmd+click a card)"
           >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="M9 11l3 3 8-8" />
               <path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />
             </svg>
@@ -1421,7 +1553,16 @@ export default function LibraryPage() {
               }`}
               title="Split results into collapsible sections by source directory"
             >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               </svg>
               {settings.groupBy === "folder" ? "Grouped" : "Group"}
@@ -1443,12 +1584,18 @@ export default function LibraryPage() {
               ))}
             </select>
           </label>
-          <div className="flex gap-0.5 rounded-lg border border-ui-border/60 bg-ui-bg p-0.5" role="group" aria-label="Result layout">
-            {([
-              ["grid", "Grid"],
-              ["masonry", "Masonry"],
-              ["list", "List"],
-            ] as Array<[ViewMode, string]>).map(([v, label]) => (
+          <div
+            className="flex gap-0.5 rounded-lg border border-ui-border/60 bg-ui-bg p-0.5"
+            role="group"
+            aria-label="Result layout"
+          >
+            {(
+              [
+                ["grid", "Grid"],
+                ["masonry", "Masonry"],
+                ["list", "List"]
+              ] as Array<[ViewMode, string]>
+            ).map(([v, label]) => (
               <button
                 key={v}
                 data-testid={`library-view-mode-${v}`}
@@ -1509,13 +1656,27 @@ export default function LibraryPage() {
               aria-pressed={imagePanelOpen}
               title="Search by image"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z" />
                 <circle cx="12" cy="13" r="3.5" />
               </svg>
               <span className="hidden sm:inline">By image</span>
             </button>
-            <button data-testid="library-search-submit" className={cls.btn} onClick={search} disabled={loading}>
+            <button
+              data-testid="library-search-submit"
+              className={cls.btn}
+              onClick={search}
+              disabled={loading}
+            >
               {loading ? "Loading…" : "Search"}
             </button>
           </div>
@@ -1686,7 +1847,10 @@ export default function LibraryPage() {
           <GraphFilterPanel
             value={graphScope}
             relatedImageId={similarRef?.id}
-            onChange={(scope) => { setGraphScope(scope); doFetch(false, { graphScope: scope }); }}
+            onChange={(scope) => {
+              setGraphScope(scope);
+              doFetch(false, { graphScope: scope });
+            }}
           />
 
           {/* Advanced filters */}
@@ -1713,9 +1877,8 @@ export default function LibraryPage() {
           {showAdvanced && (
             <div className="grid gap-3 rounded-lg border border-ui-border/40 bg-ui-bg/40 p-3 sm:grid-cols-2 lg:grid-cols-3">
               <p className="col-span-full text-ui-2xs text-ui-ink-muted/70">
-                Tags, rating, favorite, safety & path filter plain browsing too.
-                Model, checkpoint, LoRA & source-tool apply when a text or image
-                search is active.
+                Tags, rating, favorite, safety & path filter plain browsing too. Model, checkpoint,
+                LoRA & source-tool apply when a text or image search is active.
               </p>
               <label className={`${cls.label} col-span-full`}>
                 Path contains
@@ -1725,7 +1888,9 @@ export default function LibraryPage() {
                   placeholder="folder or filename fragment — e.g. 2024/portraits or _upscaled"
                   value={pathFilter}
                   onChange={(e) => setPathFilter(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && doFetch(false, { pathFilter: e.currentTarget.value })}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && doFetch(false, { pathFilter: e.currentTarget.value })
+                  }
                 />
                 <span className="text-ui-2xs normal-case tracking-normal text-ui-ink-muted/70">
                   matches the on-disk image path (any separator); applies to plain browsing
@@ -1827,7 +1992,16 @@ export default function LibraryPage() {
           onClick={() => doFetch(false)}
           className="sticky top-2 z-20 mx-auto flex items-center gap-2 rounded-full border border-accent-cyan/50 bg-accent-cyan/15 px-4 py-1.5 text-ui-xs font-medium text-accent-cyan shadow-sm backdrop-blur-sm transition hover:bg-accent-cyan/25"
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M21 12a9 9 0 1 1-9-9" />
             <path d="M21 3v6h-6" />
           </svg>
@@ -1886,13 +2060,33 @@ export default function LibraryPage() {
                     className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-ui-border/50 bg-ui-bg-soft/40 px-3 py-2 text-left transition hover:border-accent-cyan/60"
                     title={label}
                   >
-                    <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 shrink-0 text-ui-ink-muted transition-transform ${collapsed ? "" : "rotate-90"}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-3.5 w-3.5 shrink-0 text-ui-ink-muted transition-transform ${collapsed ? "" : "rotate-90"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
                       <path d="M9 6l6 6-6 6" />
                     </svg>
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ui-ink-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 shrink-0 text-ui-ink-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
                       <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                     </svg>
-                    <span className="min-w-0 flex-1 truncate text-ui-sm font-medium text-ui-ink">{label}</span>
+                    <span className="min-w-0 flex-1 truncate text-ui-sm font-medium text-ui-ink">
+                      {label}
+                    </span>
                     <span className="shrink-0 rounded-full bg-ui-bg px-2 py-0.5 text-ui-2xs text-ui-ink-muted">
                       {total != null && total !== g.items.length
                         ? `${g.items.length} of ${total}`
@@ -1992,7 +2186,7 @@ export default function LibraryPage() {
           slideshow={{
             interval: settings.slideshowInterval,
             loop: settings.slideshowLoop,
-            shuffle: settings.slideshowShuffle,
+            shuffle: settings.slideshowShuffle
           }}
           autoPlay={lightboxAutoPlay}
           hasMore={hasMore}
@@ -2042,7 +2236,9 @@ function CardMeta({ r, showScores }: { r: CompactResult; showScores: boolean }) 
         </span>
       )}
       {r.model && (
-        <span className="rounded bg-ui-bg px-1.5 py-0.5 text-ui-2xs text-ui-ink-muted">{r.model}</span>
+        <span className="rounded bg-ui-bg px-1.5 py-0.5 text-ui-2xs text-ui-ink-muted">
+          {r.model}
+        </span>
       )}
     </div>
   );
@@ -2052,7 +2248,7 @@ function ImageDropzone({
   preview,
   note,
   onFile,
-  onClear,
+  onClear
 }: {
   preview: string | null;
   note: string | null;
@@ -2069,9 +2265,16 @@ function ImageDropzone({
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
       onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); pickFirstImage(e.dataTransfer.files); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        pickFirstImage(e.dataTransfer.files);
+      }}
       onPaste={(e) => pickFirstImage(e.clipboardData.files)}
       className={`flex items-center gap-4 rounded-lg border border-dashed p-4 transition ${
         dragging ? "border-accent-cyan bg-accent-cyan/10" : "border-ui-border/70 bg-ui-bg/40"
@@ -2086,7 +2289,16 @@ function ImageDropzone({
         />
       ) : (
         <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-ui-border/40 text-ui-ink-muted">
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-7 w-7"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <circle cx="9" cy="9" r="2" />
             <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 20" />
@@ -2097,12 +2309,27 @@ function ImageDropzone({
       <div className="min-w-0 flex-1">
         <p className="text-ui-sm font-medium text-ui-ink-title">Search by image</p>
         <p className="text-ui-xs text-ui-ink-muted">
-          Paste (Ctrl/Cmd+V), drop, or choose a file. The image is embedded and matched — never stored.
+          Paste (Ctrl/Cmd+V), drop, or choose a file. The image is embedded and matched — never
+          stored.
         </p>
         {note && <p className="mt-1 text-ui-2xs text-ui-ink-muted/80">{note}</p>}
         <div className="mt-2 flex gap-2">
-          <button data-testid="library-image-dropzone-choose-file" className={cls.btn} onClick={() => inputRef.current?.click()}>Choose file</button>
-          {preview && <button data-testid="library-image-dropzone-clear" className={cls.btn} onClick={onClear}>Clear</button>}
+          <button
+            data-testid="library-image-dropzone-choose-file"
+            className={cls.btn}
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose file
+          </button>
+          {preview && (
+            <button
+              data-testid="library-image-dropzone-clear"
+              className={cls.btn}
+              onClick={onClear}
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -2112,7 +2339,10 @@ function ImageDropzone({
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => { pickFirstImage(e.target.files); e.target.value = ""; }}
+        onChange={(e) => {
+          pickFirstImage(e.target.files);
+          e.target.value = "";
+        }}
       />
     </div>
   );

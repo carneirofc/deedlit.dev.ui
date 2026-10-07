@@ -2,27 +2,27 @@
 
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type ReactNode,
+  useState
 } from "react";
 
 import {
+  type Activity,
   applyJobsToActivities,
   errorMessage,
   extractError,
   hasActiveJob,
   isTerminal,
-  normalizeJob,
-  type Activity,
   type JobSnapshot,
+  normalizeJob
 } from "@/lib/store/activity-jobs";
 
-export type { Activity, ActivityStatus, ActivityProgress } from "@/lib/store/activity-jobs";
+export type { Activity, ActivityProgress, ActivityStatus } from "@/lib/store/activity-jobs";
 
 // ---------------------------------------------------------------------------
 // Tunables.
@@ -62,7 +62,11 @@ interface ActivityValue {
    * `track` + fetch + JSON: does the fetch, ok-check and error-detail
    * extraction in one call. Throws on a non-2xx response.
    */
-  fetchJson: <T = unknown>(label: string, input: RequestInfo | URL, init?: RequestInit) => Promise<T>;
+  fetchJson: <T = unknown>(
+    label: string,
+    input: RequestInfo | URL,
+    init?: RequestInit
+  ) => Promise<T>;
   /** Register a job-linked row the poller will drive to completion. No-op if jobId is falsy. */
   trackJob: (label: string, jobId: string | null | undefined) => void;
   /** Remove one row from the dock. */
@@ -103,11 +107,11 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         throw e;
       }
     },
-    [push, patch],
+    [push, patch]
   );
 
   const fetchJson = useCallback(
-    <T = unknown,>(label: string, input: RequestInfo | URL, init?: RequestInit): Promise<T> =>
+    <T = unknown>(label: string, input: RequestInfo | URL, init?: RequestInit): Promise<T> =>
       track(label, async () => {
         const res = await fetch(input, init);
         let body: unknown;
@@ -119,7 +123,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         if (!res.ok) throw new Error(extractError(body, res));
         return body as T;
       }),
-    [track],
+    [track]
   );
 
   const trackJob = useCallback(
@@ -131,10 +135,10 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         status: "running",
         jobId,
         progress: { processed: 0, total: 0, failed: 0 },
-        startedAt: Date.now(),
+        startedAt: Date.now()
       });
     },
-    [push],
+    [push]
   );
 
   const dismiss = useCallback((id: string) => {
@@ -205,9 +209,9 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
       fetchJson,
       trackJob,
       dismiss,
-      clearFinished,
+      clearFinished
     }),
-    [activities, jobs, jobsLoading, track, fetchJson, trackJob, dismiss, clearFinished],
+    [activities, jobs, jobsLoading, track, fetchJson, trackJob, dismiss, clearFinished]
   );
 
   return <ActivityContext.Provider value={value}>{children}</ActivityContext.Provider>;

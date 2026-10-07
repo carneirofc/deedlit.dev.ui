@@ -8,7 +8,7 @@ const meta = {
   title: "Components/ConfirmationDialog",
   component: ConfirmationDialog,
   tags: ["autodocs"],
-  parameters: { layout: "fullscreen" },
+  parameters: { layout: "fullscreen" }
 } satisfies Meta<typeof ConfirmationDialog>;
 
 export default meta;
@@ -19,15 +19,15 @@ const DIALOG = {
   details: [
     "/library/illustrations — 642 images",
     "/library/renders — 418 images",
-    "/library/inbox — 144 images",
+    "/library/inbox — 144 images"
   ],
   outcomes: [
     "The directories are removed from the scan configuration.",
     "Indexed metadata for 1,204 images is discarded.",
-    "Files on disk are left untouched.",
+    "Files on disk are left untouched."
   ],
   confirmLabel: "Delete roots",
-  cancelLabel: "Keep them",
+  cancelLabel: "Keep them"
 };
 
 export const Default: Story = {
@@ -39,7 +39,9 @@ export const Default: Story = {
         <OutlineButton variant="danger" onClick={() => setOpen(true)}>
           Delete roots
         </OutlineButton>
-        {result && <p className="text-ui-sm text-[color:var(--ui-ink-secondary)]">Last choice: {result}</p>}
+        {result && (
+          <p className="text-ui-sm text-[color:var(--ui-ink-secondary)]">Last choice: {result}</p>
+        )}
         {open && (
           <ConfirmationDialog
             dialog={DIALOG}
@@ -51,5 +53,5 @@ export const Default: Story = {
         )}
       </div>
     );
-  },
+  }
 };

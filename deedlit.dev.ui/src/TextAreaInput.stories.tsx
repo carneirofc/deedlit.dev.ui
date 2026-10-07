@@ -9,12 +9,12 @@ const meta = {
   args: {
     controlSize: "md",
     placeholder: "Describe the image…",
-    rows: 4,
+    rows: 4
   },
   argTypes: {
     controlSize: { control: "inline-radio", options: ["sm", "md"] },
-    disabled: { control: "boolean" },
-  },
+    disabled: { control: "boolean" }
+  }
 } satisfies Meta<typeof TextAreaInput>;
 
 export default meta;
@@ -25,7 +25,7 @@ export const Default: Story = {
     <div className="w-80">
       <TextAreaInput {...args} />
     </div>
-  ),
+  )
 };
 
 export const Sizes: Story = {
@@ -34,7 +34,7 @@ export const Sizes: Story = {
       <TextAreaInput {...args} controlSize="sm" placeholder="sm" />
       <TextAreaInput {...args} controlSize="md" placeholder="md" />
     </div>
-  ),
+  )
 };
 
 export const Disabled: Story = {
@@ -43,5 +43,5 @@ export const Disabled: Story = {
     <div className="w-80">
       <TextAreaInput {...args} />
     </div>
-  ),
+  )
 };

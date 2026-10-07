@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ComponentPropsWithoutRef } from "react";
+import { type ComponentPropsWithoutRef, forwardRef } from "react";
 
 import { cn, SPACING_PATTERNS } from "./utils";
 
@@ -9,7 +9,7 @@ export type CyberSubpanelProps = ComponentPropsWithoutRef<"div">;
 
 export const CyberPanel = forwardRef<HTMLElement, CyberPanelProps>(function CyberPanel(
   { className, ...props },
-  ref,
+  ref
 ) {
   return (
     <section
@@ -24,7 +24,7 @@ CyberPanel.displayName = "CyberPanel";
 
 export const CyberSubpanel = forwardRef<HTMLDivElement, CyberSubpanelProps>(function CyberSubpanel(
   { className, ...props },
-  ref,
+  ref
 ) {
   return (
     <div

@@ -18,12 +18,12 @@ const TONE_CLASSES: Record<StatusTone, string> = {
   error: "border-error-edge bg-error text-error-ink",
   warn: "border-warn-edge bg-warn text-warn-ink",
   success: "border-success-edge bg-success text-success-ink",
-  info: "border-ui bg-[color:var(--surface-0)] text-[color:var(--ui-ink-muted)]",
+  info: "border-ui bg-[color:var(--surface-0)] text-[color:var(--ui-ink-muted)]"
 };
 
 const StatusMessage = forwardRef<HTMLParagraphElement, StatusMessageProps>(function StatusMessage(
   { testId, role, tone, children, className },
-  ref,
+  ref
 ) {
   const baseClass = cn("rounded-xl border text-ui-sm", SPACING_PATTERNS.controlMd);
 
@@ -42,4 +42,3 @@ const StatusMessage = forwardRef<HTMLParagraphElement, StatusMessageProps>(funct
 });
 
 export default StatusMessage;
-

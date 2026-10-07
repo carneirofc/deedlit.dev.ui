@@ -6,7 +6,7 @@ import SegmentedControl from "./SegmentedControl";
 const meta = {
   title: "Components/SegmentedControl",
   component: SegmentedControl,
-  tags: ["autodocs"],
+  tags: ["autodocs"]
 } satisfies Meta<typeof SegmentedControl>;
 
 export default meta;
@@ -21,11 +21,11 @@ export const Default: Story = {
         onValueChange={setMode}
         options={[
           { value: "and", label: "AND" },
-          { value: "or", label: "OR" },
+          { value: "or", label: "OR" }
         ]}
       />
     );
-  },
+  }
 };
 
 export const ManyOptions: Story = {
@@ -39,9 +39,9 @@ export const ManyOptions: Story = {
           { value: "grid", label: "Grid" },
           { value: "list", label: "List" },
           { value: "masonry", label: "Masonry" },
-          { value: "table", label: "Table", disabled: true },
+          { value: "table", label: "Table", disabled: true }
         ]}
       />
     );
-  },
+  }
 };

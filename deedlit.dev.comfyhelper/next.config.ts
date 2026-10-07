@@ -1,5 +1,5 @@
-import type { NextConfig } from "next";
 import path from "node:path";
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@carneirofc/ui"],
@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     "@aws-sdk/client-s3",
     "@opentelemetry/instrumentation-pg",
     "@opentelemetry/instrumentation-aws-sdk",
-    "ioredis",
+    "ioredis"
   ],
   turbopack: {
     resolveAlias: {
@@ -23,16 +23,19 @@ const nextConfig: NextConfig = {
     }
   },
   webpack(config) {
-    config.resolve.alias["@carneirofc/ui"] = path.resolve(__dirname, "../deedlit.dev.ui/src/index.ts");
+    config.resolve.alias["@carneirofc/ui"] = path.resolve(
+      __dirname,
+      "../deedlit.dev.ui/src/index.ts"
+    );
     return config;
   },
   images: {
     qualities: [60, 75],
     localPatterns: [
       {
-        pathname: "/api/library/images/**",
-      },
-    ],
+        pathname: "/api/library/images/**"
+      }
+    ]
   },
   // Accept an optional image extension on the proxy routes (e.g. `/file.webp`)
   // so the Qdrant dashboard renders the payload URLs as image previews. The
@@ -40,10 +43,16 @@ const nextConfig: NextConfig = {
   // so we strip it here. Plain `/file` (no `.`) still routes directly.
   async rewrites() {
     return [
-      { source: "/api/library/images/:imageId/file.:ext", destination: "/api/library/images/:imageId/file" },
-      { source: "/api/library/images/:imageId/thumbnail.:ext", destination: "/api/library/images/:imageId/thumbnail" },
+      {
+        source: "/api/library/images/:imageId/file.:ext",
+        destination: "/api/library/images/:imageId/file"
+      },
+      {
+        source: "/api/library/images/:imageId/thumbnail.:ext",
+        destination: "/api/library/images/:imageId/thumbnail"
+      }
     ];
-  },
+  }
 };
 
 export default nextConfig;

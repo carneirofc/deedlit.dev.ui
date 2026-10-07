@@ -1,9 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
-import { getObjectBuffer, isObjectStoreEnabled, putObject } from "@/lib/library/storage/object-store";
+import {
+  getObjectBuffer,
+  isObjectStoreEnabled,
+  putObject
+} from "@/lib/library/storage/object-store";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-embedding" });
 
@@ -58,7 +61,7 @@ export function vectorStats(vec: number[]): VectorStats {
     nonZero,
     min: vec.length ? min : 0,
     max: vec.length ? max : 0,
-    sample: vec.slice(0, 8),
+    sample: vec.slice(0, 8)
   };
 }
 
@@ -76,7 +79,7 @@ export function getEmbeddingDiagnostics(): EmbeddingDiagnostics {
     provider: getEmbeddingProvider(),
     dimensions: embeddingDimensions,
     hasExternalImageEmbeddings: hasExternalImageEmbeddings(),
-    clipVisionApiUrl: clipVisionApiUrl || null,
+    clipVisionApiUrl: clipVisionApiUrl || null
   };
 }
 
@@ -105,29 +108,38 @@ export async function pingVisionApi(): Promise<VisionApiHealth> {
       configured: false,
       url: null,
       reachable: false,
-      detail: "CLIP_VISION_API_URL not set — deedlit.vision is required (no local fallback).",
+      detail: "CLIP_VISION_API_URL not set — deedlit.vision is required (no local fallback)."
     };
   }
   try {
     const res = await fetch(`${clipVisionApiUrl}/health`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) {
-      return { configured: true, url: clipVisionApiUrl, reachable: false, detail: `vision /health HTTP ${res.status}` };
+      return {
+        configured: true,
+        url: clipVisionApiUrl,
+        reachable: false,
+        detail: `vision /health HTTP ${res.status}`
+      };
     }
-    const json = (await res.json()) as { model_preset?: string; expected_dim?: number; device?: string };
+    const json = (await res.json()) as {
+      model_preset?: string;
+      expected_dim?: number;
+      device?: string;
+    };
     return {
       configured: true,
       url: clipVisionApiUrl,
       reachable: true,
       modelPreset: json.model_preset,
       expectedDim: json.expected_dim,
-      device: json.device,
+      device: json.device
     };
   } catch (error) {
     return {
       configured: true,
       url: clipVisionApiUrl,
       reachable: false,
-      detail: error instanceof Error ? error.message : "unreachable",
+      detail: error instanceof Error ? error.message : "unreachable"
     };
   }
 }
@@ -140,7 +152,7 @@ export async function pingVisionApi(): Promise<VisionApiHealth> {
 async function callVisionApiImageBuffer(
   buffer: Buffer,
   mime: string,
-  filename: string,
+  filename: string
 ): Promise<number[]> {
   const { clipVisionApiUrl } = getLibraryConfig();
   // Copy into a fresh ArrayBuffer-backed view so Blob accepts it as a BlobPart
@@ -155,7 +167,7 @@ async function callVisionApiImageBuffer(
     const text = await res.text().catch(() => "");
     throw new Error(`deedlit.vision /embed/image ${res.status}: ${text}`);
   }
-  const json = await res.json() as { embedding: number[] };
+  const json = (await res.json()) as { embedding: number[] };
   return json.embedding;
 }
 
@@ -166,7 +178,11 @@ function mimeForExtension(ext: string): string {
 async function callVisionApiImage(imagePath: string): Promise<number[]> {
   const buffer = await readFile(imagePath);
   const filename = path.basename(imagePath);
-  return callVisionApiImageBuffer(buffer, mimeForExtension(path.extname(filename).toLowerCase()), filename);
+  return callVisionApiImageBuffer(
+    buffer,
+    mimeForExtension(path.extname(filename).toLowerCase()),
+    filename
+  );
 }
 
 /**
@@ -178,13 +194,13 @@ async function callVisionApiText(text: string): Promise<number[]> {
   const res = await fetch(`${clipVisionApiUrl}/embed/text`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text })
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`deedlit.vision /embed/text ${res.status}: ${t}`);
   }
-  const json = await res.json() as { embedding: number[] };
+  const json = (await res.json()) as { embedding: number[] };
   return json.embedding;
 }
 
@@ -193,7 +209,7 @@ export class VisionServiceNotConfiguredError extends Error {
   constructor() {
     super(
       "CLIP_VISION_API_URL is not set — the deedlit.vision service is required for embeddings. " +
-        "There is no local fallback; start deedlit.vision and set CLIP_VISION_API_URL (e.g. http://localhost:8000).",
+        "There is no local fallback; start deedlit.vision and set CLIP_VISION_API_URL (e.g. http://localhost:8000)."
     );
     this.name = "VisionServiceNotConfiguredError";
   }
@@ -219,7 +235,7 @@ export async function generateImageEmbedding(imagePath: string): Promise<number[
 export async function generateImageEmbeddingFromBuffer(
   buffer: Buffer,
   mime = "image/png",
-  filename = "pasted-image",
+  filename = "pasted-image"
 ): Promise<number[]> {
   const { clipVisionApiUrl } = getLibraryConfig();
   if (!clipVisionApiUrl) {
@@ -252,7 +268,10 @@ function embeddingKey(sha256: string): string {
  * Image embedding with object-store cache keyed by (provider, sha256).
  * Falls back to direct computation when object storage is disabled.
  */
-export async function getOrComputeImageEmbedding(imagePath: string, sha256: string): Promise<number[]> {
+export async function getOrComputeImageEmbedding(
+  imagePath: string,
+  sha256: string
+): Promise<number[]> {
   if (!isObjectStoreEnabled()) {
     return generateImageEmbedding(imagePath);
   }
@@ -277,7 +296,7 @@ export async function getOrComputeImageEmbedding(imagePath: string, sha256: stri
   const vector = await generateImageEmbedding(imagePath);
   if (!isZeroVector(vector)) {
     await putObject(key, JSON.stringify({ sha256, vector }), "application/json").catch((error) =>
-      logger.warn({ err: error, sha256 }, "failed to cache embedding"),
+      logger.warn({ err: error, sha256 }, "failed to cache embedding")
     );
   }
   return vector;

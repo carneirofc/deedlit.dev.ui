@@ -38,12 +38,12 @@ export interface TagSelectProps {
 const VARIANT = {
   include: {
     chip: "border-accent-cyan/50 bg-accent-cyan/15 text-accent-cyan",
-    ring: "focus-within:border-accent-cyan",
+    ring: "focus-within:border-accent-cyan"
   },
   exclude: {
     chip: "border-rose-500/50 bg-rose-500/15 text-rose-400",
-    ring: "focus-within:border-rose-400",
-  },
+    ring: "focus-within:border-rose-400"
+  }
 } as const;
 
 /**
@@ -64,7 +64,7 @@ function TagSelect({
   onCommit,
   maxSuggestions = 8,
   className,
-  testId,
+  testId
 }: TagSelectProps) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
@@ -74,8 +74,7 @@ function TagSelect({
   const listId = useId();
   const styles = VARIANT[variant];
 
-  const has = (tag: string) =>
-    value.some((v) => v.toLowerCase() === tag.toLowerCase());
+  const has = (tag: string) => value.some((v) => v.toLowerCase() === tag.toLowerCase());
 
   // Live server-backed suggestions: debounce the draft and fetch while the
   // dropdown is open. The latest result wins; a stale in-flight one is dropped.
@@ -84,10 +83,17 @@ function TagSelect({
     let alive = true;
     const handle = setTimeout(() => {
       fetchSuggestions(draft.trim())
-        .then((r) => { if (alive) setRemote(r); })
-        .catch(() => { /* keep the previous list on a transient failure */ });
+        .then((r) => {
+          if (alive) setRemote(r);
+        })
+        .catch(() => {
+          /* keep the previous list on a transient failure */
+        });
     }, 150);
-    return () => { alive = false; clearTimeout(handle); };
+    return () => {
+      alive = false;
+      clearTimeout(handle);
+    };
   }, [draft, open, fetchSuggestions]);
 
   const filtered = useMemo(() => {
@@ -151,7 +157,7 @@ function TagSelect({
       <div
         className={cn(
           "flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-lg border border-ui-border/70 bg-ui-bg px-2 py-1.5 text-ui-sm outline-none transition",
-          styles.ring,
+          styles.ring
         )}
         onClick={() => inputRef.current?.focus()}
       >
@@ -160,7 +166,7 @@ function TagSelect({
             key={tag}
             className={cn(
               "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-ui-2xs font-medium",
-              styles.chip,
+              styles.chip
             )}
           >
             {tag}
@@ -217,7 +223,7 @@ function TagSelect({
                 data-testid={testId ? `${testId}-suggestion-${s}` : undefined}
                 className={cn(
                   "w-full truncate rounded-md px-2 py-1 text-left text-ui-xs transition",
-                  i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg",
+                  i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg"
                 )}
               >
                 {s}

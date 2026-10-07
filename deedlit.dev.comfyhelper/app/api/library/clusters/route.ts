@@ -1,6 +1,6 @@
+import { callMcpTool } from "@/lib/api-client";
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
 import { ClusterRequestSchema } from "@/lib/library/schemas";
-import { callMcpTool } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,13 +23,13 @@ export async function POST(request: Request) {
       sample: body.sample,
       neighbors: body.neighbors,
       threshold: body.threshold,
-      resolution: body.resolution,
+      resolution: body.resolution
     });
     const structured = (tool.structuredContent ?? {}) as Record<string, unknown>;
     if (structured.stubbed) {
       return jsonError(
         "Clustering is not available yet: no cluster service is wired behind the gateway.",
-        501,
+        501
       );
     }
     return jsonOk(structured);

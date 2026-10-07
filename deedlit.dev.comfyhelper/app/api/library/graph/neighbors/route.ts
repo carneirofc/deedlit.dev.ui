@@ -17,7 +17,5 @@ export const dynamic = "force-dynamic";
  * TODO(#17): wire scoped filtering once the gateway resolves graph scopes.
  */
 export async function POST() {
-  return handleRoute(async () =>
-    jsonOk({ ids: [], count: 0, unsupported: true }),
-  );
+  return handleRoute(async () => jsonOk({ ids: [], count: 0, unsupported: true }));
 }

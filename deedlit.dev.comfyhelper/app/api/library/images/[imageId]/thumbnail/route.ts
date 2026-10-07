@@ -1,6 +1,6 @@
-import { handleRoute, jsonError } from "@/lib/library/http";
 import { blobUrl } from "@/lib/api-client";
-import { getCachedImage, setCachedImage, IMAGE_CACHE_CONTROL } from "@/lib/library/image-cache";
+import { handleRoute, jsonError } from "@/lib/library/http";
+import { getCachedImage, IMAGE_CACHE_CONTROL, setCachedImage } from "@/lib/library/image-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(request: Request, context: RouteContext) {
     if (request.headers.get("if-none-match") === etag) {
       return new Response(null, {
         status: 304,
-        headers: { "cache-control": IMAGE_CACHE_CONTROL, etag },
+        headers: { "cache-control": IMAGE_CACHE_CONTROL, etag }
       });
     }
 
@@ -27,16 +27,18 @@ export async function GET(request: Request, context: RouteContext) {
         headers: {
           "cache-control": IMAGE_CACHE_CONTROL,
           etag,
-          "content-type": cached.contentType,
-        },
+          "content-type": cached.contentType
+        }
       });
     }
 
     const upstream = blobUrl(imageId, "thumbnail");
-    if (!upstream) return jsonError("Thumbnail serving is not configured (set DEEDLIT_BLOB_URL).", 404);
+    if (!upstream)
+      return jsonError("Thumbnail serving is not configured (set DEEDLIT_BLOB_URL).", 404);
 
     const res = await fetch(upstream, { cache: "no-store" });
-    if (!res.ok || !res.body) return jsonError("Thumbnail not found.", res.status === 404 ? 404 : 502);
+    if (!res.ok || !res.body)
+      return jsonError("Thumbnail not found.", res.status === 404 ? 404 : 502);
 
     const ct = res.headers.get("content-type") ?? "image/webp";
     const buf = Buffer.from(await res.arrayBuffer());
@@ -47,8 +49,8 @@ export async function GET(request: Request, context: RouteContext) {
       headers: {
         "cache-control": IMAGE_CACHE_CONTROL,
         etag,
-        "content-type": ct,
-      },
+        "content-type": ct
+      }
     });
   });
 }

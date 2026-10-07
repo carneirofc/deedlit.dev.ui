@@ -1,5 +1,5 @@
+import { getIngestConfig, type IngestConfig, updateIngestConfig } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
-import { getIngestConfig, updateIngestConfig, type IngestConfig } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

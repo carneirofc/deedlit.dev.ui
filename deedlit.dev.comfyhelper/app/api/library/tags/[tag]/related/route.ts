@@ -1,5 +1,5 @@
-import { handleRoute, jsonOk } from "@/lib/library/http";
 import { callMcpTool } from "@/lib/api-client";
+import { handleRoute, jsonOk } from "@/lib/library/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function GET(request: Request, context: RouteContext) {
     const structured = (tool.structuredContent ?? {}) as { related?: RelatedTagRaw[] };
     const related = (structured.related ?? []).map((r) => ({
       name: r.name ?? r.tag ?? "",
-      coOccurrence: r.coOccurrence ?? r.weight ?? 0,
+      coOccurrence: r.coOccurrence ?? r.weight ?? 0
     }));
     return jsonOk({ tag: decoded, related });
   });

@@ -25,13 +25,13 @@ export interface BulkDeleteOptions {
 
 export async function deleteImages(
   ids: string[],
-  opts: BulkDeleteOptions = {},
+  opts: BulkDeleteOptions = {}
 ): Promise<BulkDeleteOutcome> {
   if (ids.length === 0) return { deleted: [], failed: [] };
 
   const fail = (error: string): BulkDeleteOutcome => ({
     deleted: [],
-    failed: ids.map((id) => ({ id, error })),
+    failed: ids.map((id) => ({ id, error }))
   });
 
   try {
@@ -39,7 +39,7 @@ export async function deleteImages(
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ids }),
-      signal: opts.signal,
+      signal: opts.signal
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -49,9 +49,7 @@ export async function deleteImages(
     // `missing` (already absent) satisfies the goal state, so count it as deleted.
     const deleted = [...(j.deleted ?? []), ...(j.missing ?? [])];
     const gone = new Set(deleted);
-    const failed = ids
-      .filter((id) => !gone.has(id))
-      .map((id) => ({ id, error: "not deleted" }));
+    const failed = ids.filter((id) => !gone.has(id)).map((id) => ({ id, error: "not deleted" }));
     return { deleted, failed };
   } catch (e) {
     return fail(e instanceof Error ? e.message : "Request failed");

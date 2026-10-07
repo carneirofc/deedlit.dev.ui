@@ -17,14 +17,14 @@ export function inferModelFamily(name: string): string | null {
 export async function upsertModel(
   client: PoolClient,
   name: string,
-  family: string | null = null,
+  family: string | null = null
 ): Promise<string> {
   const result = await client.query<{ id: string }>(
     `INSERT INTO models (name, family)
      VALUES ($1, $2)
      ON CONFLICT (name) DO UPDATE SET family = COALESCE(models.family, EXCLUDED.family)
      RETURNING id`,
-    [name, family ?? inferModelFamily(name)],
+    [name, family ?? inferModelFamily(name)]
   );
   return result.rows[0].id;
 }
@@ -32,14 +32,14 @@ export async function upsertModel(
 export async function upsertCheckpoint(
   client: PoolClient,
   name: string,
-  modelId: string | null = null,
+  modelId: string | null = null
 ): Promise<string> {
   const result = await client.query<{ id: string }>(
     `INSERT INTO checkpoints (name, model_id)
      VALUES ($1, $2)
      ON CONFLICT (name) DO UPDATE SET model_id = COALESCE(checkpoints.model_id, EXCLUDED.model_id)
      RETURNING id`,
-    [name, modelId],
+    [name, modelId]
   );
   return result.rows[0].id;
 }
@@ -50,7 +50,7 @@ export async function upsertLora(client: PoolClient, name: string): Promise<stri
      VALUES ($1)
      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
      RETURNING id`,
-    [name],
+    [name]
   );
   return result.rows[0].id;
 }
@@ -60,12 +60,12 @@ export async function linkImageLora(
   imageId: string,
   loraId: string,
   weight: number | null,
-  source: string,
+  source: string
 ): Promise<void> {
   await client.query(
     `INSERT INTO image_loras (image_id, lora_id, weight, source)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (image_id, lora_id) DO UPDATE SET weight = EXCLUDED.weight`,
-    [imageId, loraId, weight, source],
+    [imageId, loraId, weight, source]
   );
 }

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } },
-      { status: 400 },
+      { status: 400 }
     );
   }
   const response = await mcpRpc(body);
@@ -36,6 +36,6 @@ export async function GET() {
     server: "comfyhelper-image-library",
     transport: "http-jsonrpc",
     proxiedTo: "deedlit.api",
-    tools: (res?.result?.tools ?? []).map((t) => ({ name: t.name, description: t.description })),
+    tools: (res?.result?.tools ?? []).map((t) => ({ name: t.name, description: t.description }))
   });
 }

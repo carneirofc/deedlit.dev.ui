@@ -6,7 +6,7 @@ const meta = {
   title: "Components/Tabs",
   component: Tabs,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 } satisfies Meta<typeof Tabs>;
 
 export default meta;
@@ -29,12 +29,18 @@ export const Default: Story = {
       <TabsContent value="details" className="mt-3 text-ui-sm text-[color:var(--ui-ink-secondary)]">
         Arrow keys move between tabs; each panel is linked via aria-controls.
       </TabsContent>
-      <TabsContent value="workflow" className="mt-3 text-ui-sm text-[color:var(--ui-ink-secondary)]">
+      <TabsContent
+        value="workflow"
+        className="mt-3 text-ui-sm text-[color:var(--ui-ink-secondary)]"
+      >
         Workflow graph and node parameters.
       </TabsContent>
-      <TabsContent value="raw" className="mt-3 font-mono text-ui-xs text-[color:var(--ui-ink-secondary)]">
-        {"{ \"steps\": 28, \"cfg\": 7 }"}
+      <TabsContent
+        value="raw"
+        className="mt-3 font-mono text-ui-xs text-[color:var(--ui-ink-secondary)]"
+      >
+        {'{ "steps": 28, "cfg": 7 }'}
       </TabsContent>
     </Tabs>
-  ),
+  )
 };

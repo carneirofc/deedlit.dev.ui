@@ -1,5 +1,5 @@
-import { handleRoute, jsonOk } from "@/lib/library/http";
 import { listTasks } from "@/lib/api-client";
+import { handleRoute, jsonOk } from "@/lib/library/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       sha256: sp.get("sha256") ?? undefined,
       type: sp.get("type") ?? undefined,
       status: sp.get("status") ?? undefined,
-      limit: Number.isFinite(limit) ? limit : 200,
+      limit: Number.isFinite(limit) ? limit : 200
     });
     return jsonOk({ tasks });
   });

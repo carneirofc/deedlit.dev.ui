@@ -35,13 +35,7 @@ export interface PathInputProps {
 }
 
 /** The live validation/preview line shown under the field when enabled. */
-function PathPreviewLine({
-  value,
-  knownPaths,
-}: {
-  value: string;
-  knownPaths?: readonly string[];
-}) {
+function PathPreviewLine({ value, knownPaths }: { value: string; knownPaths?: readonly string[] }) {
   const preview = usePathPreview(value);
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -93,7 +87,9 @@ export function PathInput({ showPreview, knownPaths, ...rest }: PathInputProps) 
   return (
     <UiPathInput
       {...rest}
-      preview={showPreview ? <PathPreviewLine value={rest.value} knownPaths={knownPaths} /> : undefined}
+      preview={
+        showPreview ? <PathPreviewLine value={rest.value} knownPaths={knownPaths} /> : undefined
+      }
     />
   );
 }

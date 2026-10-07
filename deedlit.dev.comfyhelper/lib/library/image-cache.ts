@@ -48,7 +48,12 @@ export async function getCachedImage(sha256: string, kind: ImageKind): Promise<C
   }
 }
 
-export async function setCachedImage(sha256: string, kind: ImageKind, data: Buffer, contentType: string): Promise<void> {
+export async function setCachedImage(
+  sha256: string,
+  kind: ImageKind,
+  data: Buffer,
+  contentType: string
+): Promise<void> {
   const redis = getRedisClient();
   if (!redis) return;
   try {

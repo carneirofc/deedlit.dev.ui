@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  forwardRef,
-  type ComponentPropsWithoutRef,
-  type ElementRef,
-  type ReactNode,
-} from "react";
 import { Dialog as RadixDialog } from "radix-ui";
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, type ReactNode } from "react";
 
-import { cn, SPACING_PATTERNS, BORDER_PATTERNS } from "./utils";
+import { BORDER_PATTERNS, cn, SPACING_PATTERNS } from "./utils";
 
 export type DialogSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -17,7 +12,7 @@ const SIZE_CLASS_NAMES: Record<DialogSize, string> = {
   md: "max-w-2xl",
   lg: "max-w-4xl",
   xl: "max-w-6xl",
-  full: "max-w-[96vw]",
+  full: "max-w-[96vw]"
 };
 
 /**
@@ -55,10 +50,7 @@ export const DialogOverlay = forwardRef<
   return (
     <RadixDialog.Overlay
       ref={ref}
-      className={cn(
-        "ui-anim-overlay fixed inset-0 z-130 bg-ui-overlay-strong",
-        className,
-      )}
+      className={cn("ui-anim-overlay fixed inset-0 z-130 bg-ui-overlay-strong", className)}
       {...props}
     />
   );
@@ -75,55 +67,63 @@ export type DialogContentProps = ComponentPropsWithoutRef<typeof RadixDialog.Con
   portal?: boolean;
 };
 
-export const DialogContent = forwardRef<
-  ElementRef<typeof RadixDialog.Content>,
-  DialogContentProps
->(function DialogContent(
-  {
-    className,
-    children,
-    size = "md",
-    showCloseButton = true,
-    closeLabel = "Close dialog",
-    overlayClassName,
-    portal = true,
-    ...props
-  },
-  ref,
-) {
-  const body = (
-    <>
-      <DialogOverlay className={overlayClassName} />
-      <RadixDialog.Content
-        ref={ref}
-        className={cn(
-          "ui-anim-dialog fixed left-1/2 top-1/2 z-130 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border-ui-modal bg-ui-bg-card shadow-ui-strong",
-          SIZE_CLASS_NAMES[size],
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton ? (
-          <RadixDialog.Close
-            aria-label={closeLabel}
-            title={closeLabel}
-            className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-ui-soft text-ui-ink-subtle transition hover:bg-ui-bg-soft hover:text-ui-ink-strong active:scale-95"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18" />
-              <path d="M6 6l12 12" />
-            </svg>
-            <span className="sr-only">{closeLabel}</span>
-          </RadixDialog.Close>
-        ) : null}
-      </RadixDialog.Content>
-    </>
-  );
+export const DialogContent = forwardRef<ElementRef<typeof RadixDialog.Content>, DialogContentProps>(
+  function DialogContent(
+    {
+      className,
+      children,
+      size = "md",
+      showCloseButton = true,
+      closeLabel = "Close dialog",
+      overlayClassName,
+      portal = true,
+      ...props
+    },
+    ref
+  ) {
+    const body = (
+      <>
+        <DialogOverlay className={overlayClassName} />
+        <RadixDialog.Content
+          ref={ref}
+          className={cn(
+            "ui-anim-dialog fixed left-1/2 top-1/2 z-130 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border-ui-modal bg-ui-bg-card shadow-ui-strong",
+            SIZE_CLASS_NAMES[size],
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton ? (
+            <RadixDialog.Close
+              aria-label={closeLabel}
+              title={closeLabel}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-ui-soft text-ui-ink-subtle transition hover:bg-ui-bg-soft hover:text-ui-ink-strong active:scale-95"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6L6 18" />
+                <path d="M6 6l12 12" />
+              </svg>
+              <span className="sr-only">{closeLabel}</span>
+            </RadixDialog.Close>
+          ) : null}
+        </RadixDialog.Content>
+      </>
+    );
 
-  if (!portal) return body;
-  return <RadixDialog.Portal>{body}</RadixDialog.Portal>;
-});
+    if (!portal) return body;
+    return <RadixDialog.Portal>{body}</RadixDialog.Portal>;
+  }
+);
 DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: ComponentPropsWithoutRef<"div">) {
@@ -134,7 +134,7 @@ export function DialogHeader({ className, ...props }: ComponentPropsWithoutRef<"
         "flex flex-col gap-1 pr-10",
         BORDER_PATTERNS.bottomFaint,
         SPACING_PATTERNS.dialogSectionResponsive,
-        className,
+        className
       )}
       {...props}
     />
@@ -181,7 +181,7 @@ export function DialogFooter({ className, children, ...props }: ComponentPropsWi
         "flex items-center justify-end gap-2",
         BORDER_PATTERNS.topFaint,
         SPACING_PATTERNS.dialogSectionResponsive,
-        className,
+        className
       )}
       {...props}
     >

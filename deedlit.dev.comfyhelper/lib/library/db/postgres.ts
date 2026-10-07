@@ -1,7 +1,6 @@
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
-
-import { getLogger } from "@/lib/logger";
 import { getLibraryConfig } from "@/lib/library/config";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-postgres" });
 
@@ -20,7 +19,7 @@ export function getPool(): Pool {
       connectionString: databaseUrl,
       max: 10,
       idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000
     });
     pool.on("error", (err) => {
       logger.error({ err }, "Idle PostgreSQL client error");
@@ -33,7 +32,7 @@ export function getPool(): Pool {
 /** Run a parameterised query. */
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params: ReadonlyArray<unknown> = [],
+  params: ReadonlyArray<unknown> = []
 ): Promise<QueryResult<T>> {
   return getPool().query<T>(text, params as unknown[]);
 }
@@ -41,7 +40,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 /** Convenience: return only the rows. */
 export async function rows<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params: ReadonlyArray<unknown> = [],
+  params: ReadonlyArray<unknown> = []
 ): Promise<T[]> {
   const result = await query<T>(text, params);
   return result.rows;
@@ -50,7 +49,7 @@ export async function rows<T extends QueryResultRow = QueryResultRow>(
 /** Convenience: return the first row, or null. */
 export async function maybeRow<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params: ReadonlyArray<unknown> = [],
+  params: ReadonlyArray<unknown> = []
 ): Promise<T | null> {
   const result = await query<T>(text, params);
   return result.rows[0] ?? null;

@@ -1,79 +1,134 @@
+export type {
+  Activity,
+  ActivityDockProps,
+  ActivityProgress,
+  ActivityStatus,
+  ActivityToastsProps
+} from "./ActivityDock";
 export { ActivityDock, ActivityToasts } from "./ActivityDock";
-export { default as ConfirmationDialog } from "./ConfirmationDialog";
-export { default as CollapsiblePanel } from "./CollapsiblePanel";
-export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./Collapsible";
+export { default as Checkbox } from "./Checkbox";
+export type { CodeBlockProps } from "./CodeBlock";
 export { default as CodeBlock } from "./CodeBlock";
+export { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./Collapsible";
+export type { CollapsiblePanelProps } from "./CollapsiblePanel";
+export { default as CollapsiblePanel } from "./CollapsiblePanel";
+export type { CompareTrayBarProps, CompareTrayItem } from "./CompareTrayBar";
+export { CompareTrayBar } from "./CompareTrayBar";
+export type { ConfirmationDialogData, ConfirmationDialogProps } from "./ConfirmationDialog";
+export { default as ConfirmationDialog } from "./ConfirmationDialog";
+export type { CopyButtonProps } from "./CopyButton";
 export { default as CopyButton } from "./CopyButton";
+export type { CyberPanelProps, CyberSubpanelProps } from "./CyberPanels";
+export { CyberPanel, CyberSubpanel } from "./CyberPanels";
+export type { DialogContentProps, DialogSize } from "./Dialog";
 export {
   Dialog,
-  DialogTrigger,
-  DialogClose,
-  DialogPortal,
-  DialogOverlay,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
   DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger
 } from "./Dialog";
-export { default as DirectoryPicker, DEFAULT_FS_BROWSE_ENDPOINT } from "./DirectoryPicker";
+export type { DirectoryPickerProps } from "./DirectoryPicker";
+export { DEFAULT_FS_BROWSE_ENDPOINT, default as DirectoryPicker } from "./DirectoryPicker";
+export type { DockPanelProps, DockPanelSize } from "./DockPanel";
 export { default as DockPanel } from "./DockPanel";
 export {
   DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuCheckboxItem,
-  DropdownMenuRadioItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
+  DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
+  DropdownMenuTrigger
 } from "./DropdownMenu";
-export { default as PathInput } from "./PathInput";
-export { default as EmptyState } from "./EmptyState";
-export { default as Gallery } from "./Gallery";
-export { default as InfoChip } from "./InfoChip";
+export type { EmptyStateProps, EmptyStateTone } from "./EmptyState";
+export { default as EmptyState, emptyStateVariants } from "./EmptyState";
+export type { FilterSelectionCardProps } from "./FilterSelectionCard";
 export { default as FilterSelectionCard } from "./FilterSelectionCard";
-export { CompareTrayBar } from "./CompareTrayBar";
-export { CyberPanel, CyberSubpanel } from "./CyberPanels";
+export type { GalleryItemContext, GalleryProps, GalleryViewMode } from "./Gallery";
+export { default as Gallery } from "./Gallery";
+export type { IconProps } from "./Icons";
+// ── Icons ────────────────────────────────────────────────────────────
+export {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  DocumentIcon,
+  DocumentPlusIcon,
+  DownloadIcon,
+  EditIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  HeartIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  ShuffleIcon,
+  TrashIcon,
+  XIcon
+} from "./Icons";
+export type { InfoChipProps } from "./InfoChip";
+export { default as InfoChip } from "./InfoChip";
+export type { KeyValueFieldProps } from "./KeyValueField";
 export { default as KeyValueField } from "./KeyValueField";
+export { useControllableState } from "./lib/use-controllable-state";
+export type { MediaStageProps } from "./MediaStage";
 export { default as MediaStage } from "./MediaStage";
-export { default as MetadataTabBar } from "./MetadataTabBar";
+export type { MetadataInfoBlockProps } from "./MetadataInfoBlock";
 export { default as MetadataInfoBlock } from "./MetadataInfoBlock";
-export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
-export { default as OutlineButton } from "./OutlineButton";
+export type { MetadataTabBarProps, MetadataTabValue } from "./MetadataTabBar";
+export { default as MetadataTabBar } from "./MetadataTabBar";
+export type { OutlineButtonProps, OutlineButtonSize, OutlineButtonVariant } from "./OutlineButton";
+export { buttonVariants, default as OutlineButton } from "./OutlineButton";
+export type { PageHeaderProps } from "./PageHeader";
 export { default as PageHeader } from "./PageHeader";
+export type { PaginationProps } from "./Pagination";
 export { default as Pagination } from "./Pagination";
+export type { PanelSectionHeaderProps } from "./PanelSectionHeader";
 export { default as PanelSectionHeader } from "./PanelSectionHeader";
-export { default as PromptBlock } from "./PromptBlock";
-export { default as ScanProgress, DEFAULT_SCAN_STAGE_LABELS } from "./ScanProgress";
+export type { PathInputProps } from "./PathInput";
+export { default as PathInput } from "./PathInput";
+export type { PromptBlockProps, PromptBlockTone } from "./PromptBlock";
+export { default as PromptBlock, promptBlockTextVariants } from "./PromptBlock";
+export type { ScanProgressProps } from "./ScanProgress";
+export { DEFAULT_SCAN_STAGE_LABELS, default as ScanProgress } from "./ScanProgress";
+export type { SectionLabelProps } from "./SectionLabel";
 export { default as SectionLabel } from "./SectionLabel";
+export type { SegmentedControlOption, SegmentedControlProps } from "./SegmentedControl";
 export { default as SegmentedControl } from "./SegmentedControl";
+export type { SelectInputProps, SelectInputSize } from "./SelectInput";
 export { default as SelectInput } from "./SelectInput";
-export { default as StatusBanner } from "./StatusBanner";
+export type { StatusBadgeProps, StatusBadgeTone } from "./StatusBadge";
+export { default as StatusBadge, statusBadgeVariants } from "./StatusBadge";
+export type { StatusBannerProps, StatusBannerTone } from "./StatusBanner";
+export { default as StatusBanner, statusBannerVariants } from "./StatusBanner";
+export type { StatusMessageProps, StatusTone } from "./StatusMessage";
 export { default as StatusMessage } from "./StatusMessage";
-export { default as StatusBadge } from "./StatusBadge";
-export { default as SurfacePanel } from "./SurfacePanel";
-export { default as TagSelect } from "./TagSelect";
-export { default as ThemeToggleButton } from "./ThemeToggleButton";
-export { default as Toast } from "./Toast";
-export { default as TextAreaInput } from "./TextAreaInput";
-export { default as TextInput } from "./TextInput";
-export { default as WarningList } from "./WarningList";
-export { default as Checkbox } from "./Checkbox";
-
-// ── Styling utilities & variant recipes ──────────────────────────────
-export { cn, SPACING_PATTERNS, LAYOUT_PATTERNS, BORDER_PATTERNS } from "./utils";
-export { buttonVariants } from "./OutlineButton";
-export { statusBadgeVariants } from "./StatusBadge";
-export { statusBannerVariants } from "./StatusBanner";
-export { emptyStateVariants } from "./EmptyState";
-export { promptBlockTextVariants } from "./PromptBlock";
-export { surfacePanelVariants } from "./SurfacePanel";
+export type { SurfacePanelPadding, SurfacePanelProps, SurfacePanelTone } from "./SurfacePanel";
+export { default as SurfacePanel, surfacePanelVariants } from "./SurfacePanel";
+export type {
+  TableBodyProps,
+  TableCaptionProps,
+  TableCellProps,
+  TableFooterProps,
+  TableHeaderProps,
+  TableHeadProps,
+  TableProps,
+  TableRowProps
+} from "./Table";
 export {
   Table,
   TableBody,
@@ -82,84 +137,20 @@ export {
   TableFooter,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "./Table";
-
-// ── Icons ────────────────────────────────────────────────────────────
-export {
-  HeartIcon,
-  XIcon,
-  TrashIcon,
-  FolderIcon,
-  FolderPlusIcon,
-  DownloadIcon,
-  CopyIcon,
-  PlusIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  DocumentIcon,
-  DocumentPlusIcon,
-  ShuffleIcon,
-  PlayIcon,
-  PauseIcon,
-  EditIcon,
-} from "./Icons";
-
-export type {
-  Activity,
-  ActivityStatus,
-  ActivityProgress,
-  ActivityDockProps,
-  ActivityToastsProps,
-} from "./ActivityDock";
-export type { CodeBlockProps } from "./CodeBlock";
-export type { ConfirmationDialogData, ConfirmationDialogProps } from "./ConfirmationDialog";
-export type { CollapsiblePanelProps } from "./CollapsiblePanel";
-export { useControllableState } from "./lib/use-controllable-state";
-export type { CopyButtonProps } from "./CopyButton";
-export type { DirectoryPickerProps } from "./DirectoryPicker";
-export type { DockPanelProps, DockPanelSize } from "./DockPanel";
-export type { DialogSize, DialogContentProps } from "./Dialog";
-export type { PathInputProps } from "./PathInput";
-export type { EmptyStateProps, EmptyStateTone } from "./EmptyState";
-export type { GalleryProps, GalleryViewMode, GalleryItemContext } from "./Gallery";
-export type { InfoChipProps } from "./InfoChip";
-export type { FilterSelectionCardProps } from "./FilterSelectionCard";
-export type { CompareTrayBarProps, CompareTrayItem } from "./CompareTrayBar";
-export type { CyberPanelProps, CyberSubpanelProps } from "./CyberPanels";
-export type { IconProps } from "./Icons";
-export type { KeyValueFieldProps } from "./KeyValueField";
-export type { MediaStageProps } from "./MediaStage";
-export type { MetadataTabBarProps, MetadataTabValue } from "./MetadataTabBar";
-export type { MetadataInfoBlockProps } from "./MetadataInfoBlock";
-export type { OutlineButtonProps, OutlineButtonSize, OutlineButtonVariant } from "./OutlineButton";
-export type { PageHeaderProps } from "./PageHeader";
-export type { PaginationProps } from "./Pagination";
-export type { PanelSectionHeaderProps } from "./PanelSectionHeader";
-export type { PromptBlockProps, PromptBlockTone } from "./PromptBlock";
-export type { ScanProgressProps } from "./ScanProgress";
-export type { SectionLabelProps } from "./SectionLabel";
-export type { SegmentedControlOption, SegmentedControlProps } from "./SegmentedControl";
-export type { SelectInputProps, SelectInputSize } from "./SelectInput";
-export type { StatusBannerProps, StatusBannerTone } from "./StatusBanner";
-export type { StatusMessageProps, StatusTone } from "./StatusMessage";
-export type { StatusBadgeProps, StatusBadgeTone } from "./StatusBadge";
-export type { SurfacePanelProps, SurfacePanelTone, SurfacePanelPadding } from "./SurfacePanel";
+export { Tabs, TabsContent, TabsList, TabsTrigger } from "./Tabs";
 export type { TagSelectProps } from "./TagSelect";
-export type { ThemeToggleButtonProps, ThemeMode } from "./ThemeToggleButton";
-export type { ToastProps, ToastRole, ToastTone } from "./Toast";
+export { default as TagSelect } from "./TagSelect";
 export type { TextAreaInputProps, TextAreaInputSize } from "./TextAreaInput";
+export { default as TextAreaInput } from "./TextAreaInput";
 export type { TextInputProps, TextInputSize } from "./TextInput";
+export { default as TextInput } from "./TextInput";
+export type { ThemeMode, ThemeToggleButtonProps } from "./ThemeToggleButton";
+export { default as ThemeToggleButton } from "./ThemeToggleButton";
+export type { ToastProps, ToastRole, ToastTone } from "./Toast";
+export { default as Toast } from "./Toast";
+// ── Styling utilities & variant recipes ──────────────────────────────
+export { BORDER_PATTERNS, cn, LAYOUT_PATTERNS, SPACING_PATTERNS } from "./utils";
 export type { WarningListProps } from "./WarningList";
-export type {
-  TableBodyProps,
-  TableCaptionProps,
-  TableCellProps,
-  TableFooterProps,
-  TableHeadProps,
-  TableHeaderProps,
-  TableProps,
-  TableRowProps,
-} from "./Table";
+export { default as WarningList } from "./WarningList";

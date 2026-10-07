@@ -1,5 +1,5 @@
-import { handleRoute, jsonOk } from "@/lib/library/http";
 import { listCatalogImages } from "@/lib/api-client";
+import { handleRoute, jsonOk } from "@/lib/library/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       favorite: favoriteParam === "true" ? true : undefined,
       path: path || undefined,
       limit: Number.isFinite(limit) ? limit : 50,
-      offset: Number.isFinite(offset) ? offset : 0,
+      offset: Number.isFinite(offset) ? offset : 0
     });
     return jsonOk({ images });
   });

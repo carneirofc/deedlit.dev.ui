@@ -14,28 +14,26 @@ export type IconProps = SVGAttributes<SVGSVGElement> & {
 const BASE_ICON_CLASSES = "shrink-0 fill-none stroke-current";
 const DEFAULT_SIZE = "h-4 w-4";
 
-function icon(
-  displayName: string,
-  paths: (props: IconProps) => React.ReactNode,
-) {
-  const Component = forwardRef<SVGSVGElement, IconProps>(
-    function IconComponent({ size, className, ...props }, ref) {
-      return (
-        <svg
-          ref={ref}
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className={cn(BASE_ICON_CLASSES, size ?? DEFAULT_SIZE, className)}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          {...props}
-        >
-          {paths(props)}
-        </svg>
-      );
-    },
-  );
+function icon(displayName: string, paths: (props: IconProps) => React.ReactNode) {
+  const Component = forwardRef<SVGSVGElement, IconProps>(function IconComponent(
+    { size, className, ...props },
+    ref
+  ) {
+    return (
+      <svg
+        ref={ref}
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className={cn(BASE_ICON_CLASSES, size ?? DEFAULT_SIZE, className)}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+      >
+        {paths(props)}
+      </svg>
+    );
+  });
   Component.displayName = displayName;
   return Component;
 }
@@ -59,7 +57,7 @@ export const HeartIcon = forwardRef<SVGSVGElement, IconProps & { filled?: boolea
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
       </svg>
     );
-  },
+  }
 );
 HeartIcon.displayName = "HeartIcon";
 
@@ -107,25 +105,15 @@ export const CopyIcon = icon("CopyIcon", () => (
   </>
 ));
 
-export const PlusIcon = icon("PlusIcon", () => (
-  <path d="M12 5v14M5 12h14" />
-));
+export const PlusIcon = icon("PlusIcon", () => <path d="M12 5v14M5 12h14" />);
 
-export const CheckIcon = icon("CheckIcon", () => (
-  <path d="M20 6L9 17l-5-5" />
-));
+export const CheckIcon = icon("CheckIcon", () => <path d="M20 6L9 17l-5-5" />);
 
-export const ChevronDownIcon = icon("ChevronDownIcon", () => (
-  <path d="M6 9l6 6 6-6" />
-));
+export const ChevronDownIcon = icon("ChevronDownIcon", () => <path d="M6 9l6 6 6-6" />);
 
-export const ChevronLeftIcon = icon("ChevronLeftIcon", () => (
-  <path d="M15 18l-6-6 6-6" />
-));
+export const ChevronLeftIcon = icon("ChevronLeftIcon", () => <path d="M15 18l-6-6 6-6" />);
 
-export const ChevronRightIcon = icon("ChevronRightIcon", () => (
-  <path d="M9 18l6-6-6-6" />
-));
+export const ChevronRightIcon = icon("ChevronRightIcon", () => <path d="M9 18l6-6-6-6" />);
 
 export const DocumentIcon = icon("DocumentIcon", () => (
   <>
@@ -153,9 +141,7 @@ export const ShuffleIcon = icon("ShuffleIcon", () => (
   </>
 ));
 
-export const PlayIcon = icon("PlayIcon", () => (
-  <path d="M8 5v14l11-7z" />
-));
+export const PlayIcon = icon("PlayIcon", () => <path d="M8 5v14l11-7z" />);
 
 export const PauseIcon = icon("PauseIcon", () => (
   <>

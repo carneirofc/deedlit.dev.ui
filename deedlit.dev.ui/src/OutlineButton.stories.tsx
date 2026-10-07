@@ -11,19 +11,19 @@ const meta = {
     children: "Button",
     variant: "neutral",
     controlSize: "sm",
-    onClick: fn(),
+    onClick: fn()
   },
   argTypes: {
     variant: {
       control: "inline-radio",
-      options: ["neutral", "danger", "ghost", "accent"],
+      options: ["neutral", "danger", "ghost", "accent"]
     },
     controlSize: {
       control: "inline-radio",
-      options: ["xs", "sm", "md", "lg", "icon"],
+      options: ["xs", "sm", "md", "lg", "icon"]
     },
-    disabled: { control: "boolean" },
-  },
+    disabled: { control: "boolean" }
+  }
 } satisfies Meta<typeof OutlineButton>;
 
 export default meta;
@@ -55,7 +55,7 @@ export const Variants: Story = {
         Danger
       </OutlineButton>
     </div>
-  ),
+  )
 };
 
 export const Sizes: Story = {
@@ -74,7 +74,7 @@ export const Sizes: Story = {
         lg
       </OutlineButton>
     </div>
-  ),
+  )
 };
 
 /**
@@ -88,5 +88,5 @@ export const AsChildLink: Story = {
         Open link
       </a>
     </OutlineButton>
-  ),
+  )
 };

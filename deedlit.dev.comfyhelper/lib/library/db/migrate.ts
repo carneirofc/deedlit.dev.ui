@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-
-import { getLogger } from "@/lib/logger";
 import { withTransaction } from "@/lib/library/db/postgres";
+import { getLogger } from "@/lib/logger";
 
 const logger = getLogger({ scope: "library-migrate" });
 

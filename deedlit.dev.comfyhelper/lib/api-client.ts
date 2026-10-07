@@ -26,10 +26,10 @@
 import type {
   CompactResult,
   DirectoryCount,
-  Graph,
   GenerationParams,
+  Graph,
   ImageTag,
-  LoraRef,
+  LoraRef
 } from "@/lib/library/schemas";
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,10 @@ export function getBlobBaseUrl(): string | null {
 }
 
 /** Build the upstream blob URL for an image, or null if blob serving is unconfigured. */
-export function blobUrl(sha256: string, kind: "thumbnail" | "embedding" | "original"): string | null {
+export function blobUrl(
+  sha256: string,
+  kind: "thumbnail" | "embedding" | "original"
+): string | null {
   const base = getBlobBaseUrl();
   if (!base) return null;
   // catalog serves thumbnail/embedding; "original" maps to the image bytes.
@@ -70,7 +73,7 @@ export class GatewayError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly detail?: unknown,
+    readonly detail?: unknown
   ) {
     super(message);
     this.name = "GatewayError";
@@ -108,18 +111,14 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
     // Always fetch fresh; the UI controls its own caching.
-    cache: "no-store",
+    cache: "no-store"
   };
 
   let res: Response;
   try {
     res = await fetch(url.toString(), init);
   } catch (cause) {
-    throw new GatewayError(
-      `gateway unreachable at ${base} (${method} ${path})`,
-      503,
-      cause,
-    );
+    throw new GatewayError(`gateway unreachable at ${base} (${method} ${path})`, 503, cause);
   }
 
   if (!res.ok) {
@@ -264,11 +263,11 @@ export async function getDetail(sha256: string, signal?: AbortSignal): Promise<D
 export async function getImage(
   sha256: string,
   opts: { light?: boolean } = {},
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<CatalogImage> {
   return request<CatalogImage>(`/images/${encodeURIComponent(sha256)}`, {
     query: opts.light ? { fields: "light" } : undefined,
-    signal,
+    signal
   });
 }
 
@@ -291,10 +290,13 @@ export interface DeleteImageResult {
  * derived projections. A {@link GatewayError} with status 404 means the image
  * is not in the library.
  */
-export async function deleteImage(sha256: string, signal?: AbortSignal): Promise<DeleteImageResult> {
+export async function deleteImage(
+  sha256: string,
+  signal?: AbortSignal
+): Promise<DeleteImageResult> {
   return request<DeleteImageResult>(`/images/${encodeURIComponent(sha256)}`, {
     method: "DELETE",
-    signal,
+    signal
   });
 }
 
@@ -318,18 +320,18 @@ export interface BatchDeleteResult {
  */
 export async function batchDeleteImages(
   sha256s: string[],
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<BatchDeleteResult> {
   const res = await request<Partial<BatchDeleteResult>>("/images/batch-delete", {
     method: "POST",
     body: { sha256s },
-    signal,
+    signal
   });
   return {
     deleted: Array.isArray(res?.deleted) ? res.deleted : [],
     missing: Array.isArray(res?.missing) ? res.missing : [],
     search: Boolean(res?.search),
-    graph: Boolean(res?.graph),
+    graph: Boolean(res?.graph)
   };
 }
 
@@ -361,7 +363,7 @@ export interface MissingFilesResult {
  */
 export async function findMissingFiles(
   limit = 500,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<MissingFilesResult> {
   const res = await request<{
     checked?: number;
@@ -373,7 +375,7 @@ export async function findMissingFiles(
     checked: Number(res?.checked ?? 0),
     missing: Array.isArray(res?.missing) ? res.missing : [],
     missingCount: Number(res?.missing_count ?? 0),
-    truncated: Boolean(res?.truncated),
+    truncated: Boolean(res?.truncated)
   };
 }
 
@@ -385,7 +387,10 @@ export interface GatewaySearchRequest {
   filter?: Record<string, unknown> | null;
 }
 
-export async function search(req: GatewaySearchRequest, signal?: AbortSignal): Promise<SearchResponse> {
+export async function search(
+  req: GatewaySearchRequest,
+  signal?: AbortSignal
+): Promise<SearchResponse> {
   const res = await request<SearchResponse>("/search", { method: "POST", body: req, signal });
   return { fusion: res?.fusion, hits: Array.isArray(res?.hits) ? res.hits : [] };
 }
@@ -408,7 +413,7 @@ export async function searchByImageUpload(
   file: Blob,
   filename: string,
   opts: GatewayImageSearchOptions,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<SearchResponse> {
   const base = getGatewayBaseUrl();
   const fd = new FormData();
@@ -423,7 +428,7 @@ export async function searchByImageUpload(
       method: "POST",
       body: fd,
       signal,
-      cache: "no-store",
+      cache: "no-store"
     });
   } catch (cause) {
     throw new GatewayError(`gateway unreachable at ${base} (POST /search/by-image)`, 503, cause);
@@ -456,7 +461,7 @@ export async function listJobs(signal?: AbortSignal): Promise<Array<Record<strin
 
 export async function dispatchJob(
   payload: Record<string, unknown>,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>("/jobs", { method: "POST", body: payload, signal });
 }
@@ -512,7 +517,7 @@ export interface FsBrowseResult {
 export async function browseFs(path: string | null, signal?: AbortSignal): Promise<FsBrowseResult> {
   return request<FsBrowseResult>("/fs/browse", {
     query: path ? { path } : undefined,
-    signal,
+    signal
   });
 }
 
@@ -566,16 +571,23 @@ export async function listSourceFolders(signal?: AbortSignal): Promise<SourceFol
   return Array.isArray(res) ? (res as SourceFolder[]) : [];
 }
 
-export async function createSourceFolder(body: SourceFolderUpsert, signal?: AbortSignal): Promise<SourceFolder> {
+export async function createSourceFolder(
+  body: SourceFolderUpsert,
+  signal?: AbortSignal
+): Promise<SourceFolder> {
   return request<SourceFolder>("/folders", { method: "POST", body, signal });
 }
 
 export async function updateSourceFolder(
   id: string,
   body: SourceFolderPatch,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<SourceFolder> {
-  return request<SourceFolder>(`/folders/${encodeURIComponent(id)}`, { method: "PATCH", body, signal });
+  return request<SourceFolder>(`/folders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body,
+    signal
+  });
 }
 
 export async function deleteSourceFolder(id: string, signal?: AbortSignal): Promise<void> {
@@ -583,10 +595,13 @@ export async function deleteSourceFolder(id: string, signal?: AbortSignal): Prom
 }
 
 /** Dispatch an immediate ingest scan of a configured folder ("Scan now"). */
-export async function scanSourceFolder(id: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+export async function scanSourceFolder(
+  id: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>(`/folders/${encodeURIComponent(id)}/scan`, {
     method: "POST",
-    signal,
+    signal
   });
 }
 
@@ -645,15 +660,15 @@ export interface QueuePeek {
 export async function peekQueueMessages(
   name: string,
   limit = 20,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<QueuePeek> {
   const res = await request<{ messages?: QueueMessage[]; remaining?: number }>(
     `/queues/${encodeURIComponent(name)}/messages`,
-    { query: { limit }, signal },
+    { query: { limit }, signal }
   );
   return {
     messages: Array.isArray(res?.messages) ? res.messages : [],
-    remaining: typeof res?.remaining === "number" ? res.remaining : 0,
+    remaining: typeof res?.remaining === "number" ? res.remaining : 0
   };
 }
 
@@ -666,7 +681,7 @@ export async function purgeQueue(name: string, signal?: AbortSignal): Promise<vo
 export async function requeueDlq(base: string, signal?: AbortSignal): Promise<{ count: number }> {
   return request<{ count: number }>(`/dlq/${encodeURIComponent(base)}/requeue`, {
     method: "POST",
-    signal,
+    signal
   });
 }
 
@@ -685,7 +700,7 @@ export interface Task {
 
 export async function listTasks(
   params: { sha256?: string; type?: string; status?: string; limit?: number } = {},
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<Task[]> {
   const res = await request<unknown>("/tasks", { query: params, signal });
   return Array.isArray(res) ? (res as Task[]) : [];
@@ -712,17 +727,16 @@ export interface IngestConfig {
 export async function getIngestConfig(signal?: AbortSignal): Promise<IngestConfig> {
   const res = await request<Partial<IngestConfig>>("/ingest/config", { signal });
   return {
-    ingest_concurrency:
-      typeof res?.ingest_concurrency === "number" ? res.ingest_concurrency : 8,
+    ingest_concurrency: typeof res?.ingest_concurrency === "number" ? res.ingest_concurrency : 8,
     // Default ON when the field is absent (older ingest builds) — matches the
     // service default so the toggle doesn't read as off against an unset value.
-    llm_enabled: res?.llm_enabled !== false,
+    llm_enabled: res?.llm_enabled !== false
   };
 }
 
 export async function updateIngestConfig(
   patch: Partial<IngestConfig>,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<IngestConfig> {
   return request<IngestConfig>("/ingest/config", { method: "PUT", body: patch, signal });
 }
@@ -766,7 +780,7 @@ export interface CatalogBrowseParams {
 /** Browse raw catalog records (gateway GET /images), sorted + paginated. */
 export async function listCatalogImages(
   params: CatalogBrowseParams = {},
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<CatalogImage[]> {
   const res = await request<unknown>("/images", {
     query: {
@@ -778,9 +792,9 @@ export async function listCatalogImages(
       path: params.path,
       sort: params.sort,
       limit: params.limit,
-      offset: params.offset,
+      offset: params.offset
     },
-    signal,
+    signal
   });
   return Array.isArray(res) ? (res as CatalogImage[]) : [];
 }
@@ -793,11 +807,11 @@ export async function listCatalogImages(
  */
 export async function listDirectories(
   limit = 2000,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<DirectoryCount[]> {
   const res = await request<unknown>("/images/directories", {
     query: { limit },
-    signal,
+    signal
   });
   return Array.isArray(res) ? (res as DirectoryCount[]) : [];
 }
@@ -810,7 +824,7 @@ export async function listDirectories(
 export async function suggestTags(
   prefix: string,
   limit = 10,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<string[]> {
   const res = await request<unknown>("/tags", { query: { prefix, limit }, signal });
   return Array.isArray(res) ? (res as string[]) : [];
@@ -828,11 +842,11 @@ export async function suggestGraphEntities(
   type: string,
   prefix: string,
   limit = 50,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<string[]> {
   const res = await request<unknown>("/graph/entities", {
     query: { type, prefix, limit },
-    signal,
+    signal
   });
   return Array.isArray(res) ? (res as string[]) : [];
 }
@@ -850,28 +864,34 @@ export interface ImagePatchBody {
 export async function patchImage(
   sha256: string,
   body: ImagePatchBody,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<CatalogImage> {
   return request<CatalogImage>(`/images/${encodeURIComponent(sha256)}`, {
     method: "PATCH",
     body,
-    signal,
+    signal
   });
 }
 
 /** Re-project one image (gateway POST /images/{sha}/reindex -> index task). */
-export async function reindexImage(sha256: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+export async function reindexImage(
+  sha256: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>(`/images/${encodeURIComponent(sha256)}/reindex`, {
     method: "POST",
-    signal,
+    signal
   });
 }
 
 /** Re-label one image (gateway POST /images/{sha}/relabel -> label task). */
-export async function relabelImage(sha256: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+export async function relabelImage(
+  sha256: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>(`/images/${encodeURIComponent(sha256)}/relabel`, {
     method: "POST",
-    signal,
+    signal
   });
 }
 
@@ -910,7 +930,11 @@ export async function getNote(id: string, signal?: AbortSignal): Promise<Note> {
   return request<Note>(`/notes/${encodeURIComponent(id)}`, { signal });
 }
 
-export async function updateNote(id: string, body: NoteUpsert, signal?: AbortSignal): Promise<Note> {
+export async function updateNote(
+  id: string,
+  body: NoteUpsert,
+  signal?: AbortSignal
+): Promise<Note> {
   return request<Note>(`/notes/${encodeURIComponent(id)}`, { method: "PUT", body, signal });
 }
 
@@ -943,7 +967,10 @@ export interface Collection {
   images: string[];
 }
 
-export async function createCollection(body: CollectionUpsert, signal?: AbortSignal): Promise<Collection> {
+export async function createCollection(
+  body: CollectionUpsert,
+  signal?: AbortSignal
+): Promise<Collection> {
   return request<Collection>("/collections", { method: "POST", body, signal });
 }
 
@@ -957,11 +984,15 @@ export async function getCollection(id: string, signal?: AbortSignal): Promise<C
 }
 
 /** Rename a collection (PUT /collections/{id} with the new name). */
-export async function renameCollection(id: string, name: string, signal?: AbortSignal): Promise<Collection> {
+export async function renameCollection(
+  id: string,
+  name: string,
+  signal?: AbortSignal
+): Promise<Collection> {
   return request<Collection>(`/collections/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: { name },
-    signal,
+    signal
   });
 }
 
@@ -974,16 +1005,25 @@ export async function deleteCollection(id: string, signal?: AbortSignal): Promis
  * Set semantics: `images` is the complete, ordered sha256 list — adds, removes,
  * and reorders are all expressed by sending the desired final list.
  */
-export async function setCollectionImages(id: string, images: string[], signal?: AbortSignal): Promise<void> {
+export async function setCollectionImages(
+  id: string,
+  images: string[],
+  signal?: AbortSignal
+): Promise<void> {
   await request<unknown>(`/collections/${encodeURIComponent(id)}/images`, {
     method: "PUT",
     body: { images },
-    signal,
+    signal
   });
 }
 
-export async function collectionsByImage(sha256: string, signal?: AbortSignal): Promise<Collection[]> {
-  const res = await request<unknown>(`/collections/by-image/${encodeURIComponent(sha256)}`, { signal });
+export async function collectionsByImage(
+  sha256: string,
+  signal?: AbortSignal
+): Promise<Collection[]> {
+  const res = await request<unknown>(`/collections/by-image/${encodeURIComponent(sha256)}`, {
+    signal
+  });
   return Array.isArray(res) ? (res as Collection[]) : [];
 }
 
@@ -1010,13 +1050,13 @@ let mcpId = 0;
 export async function callMcpTool(
   name: string,
   args: Record<string, unknown>,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<McpToolCallResult> {
   const body = {
     jsonrpc: "2.0",
     id: ++mcpId,
     method: "tools/call",
-    params: { name, arguments: args },
+    params: { name, arguments: args }
   };
   const res = (await mcpRpc(body, signal)) as {
     result?: McpToolCallResult;
@@ -1058,7 +1098,10 @@ function stringArray(v: unknown): string[] {
 }
 
 /** Build the one-line summary used on result cards from a search payload. */
-function summarizePayload(payload: Record<string, unknown> | null | undefined, fallback: string): string {
+function summarizePayload(
+  payload: Record<string, unknown> | null | undefined,
+  fallback: string
+): string {
   if (!payload) return fallback;
   const prompt = str(payload.prompt) ?? str(payload.summary);
   if (prompt) return prompt.replace(/\s+/g, " ").trim().slice(0, 140);
@@ -1074,8 +1117,7 @@ export function hitToCompactResult(hit: SearchHit): CompactResult {
     imageId: hit.sha256,
     score: typeof hit.score === "number" ? hit.score : null,
     // Prefer a payload-provided URL; otherwise route bytes through the local proxy.
-    thumbnailUrl:
-      str(p.thumbnail_url) ?? str(p.thumbnailUrl) ?? thumbnailUrl(hit.sha256),
+    thumbnailUrl: str(p.thumbnail_url) ?? str(p.thumbnailUrl) ?? thumbnailUrl(hit.sha256),
     gridUrl: gridUrl(hit.sha256),
     summary: summarizePayload(p, hit.sha256),
     tags: stringArray(p.tags),
@@ -1084,8 +1126,7 @@ export function hitToCompactResult(hit: SearchHit): CompactResult {
     rating: typeof p.rating === "number" ? p.rating : null,
     // Content-safety class (catalog browse forwards the row's `safety`; the
     // vector path carries it in the Qdrant payload). null when unclassified.
-    safety:
-      p.safety === "sfw" || p.safety === "nsfw" || p.safety === "explicit" ? p.safety : null,
+    safety: p.safety === "sfw" || p.safety === "nsfw" || p.safety === "explicit" ? p.safety : null
   };
 }
 
@@ -1129,7 +1170,7 @@ export function catalogImageToCompactResult(image: CatalogImage): CompactResult 
       image.safety === "sfw" || image.safety === "nsfw" || image.safety === "explicit"
         ? image.safety
         : null,
-    directory,
+    directory
   };
 }
 
@@ -1151,7 +1192,7 @@ function mapGenerationParams(image: CatalogImage): GenerationParams | null {
     denoise: params.denoise ?? null,
     width: params.width ?? null,
     height: params.height ?? null,
-    clipSkip: params.clipskip ?? null,
+    clipSkip: params.clipskip ?? null
   };
 }
 
@@ -1159,7 +1200,7 @@ function mapTags(image: CatalogImage): ImageTag[] {
   return (image.tags ?? []).map((t) => ({
     name: t,
     normalizedName: t,
-    source: null,
+    source: null
   }));
 }
 
@@ -1182,7 +1223,9 @@ const DESCRIPTION_PROVIDER = "deedlit.labelagent";
 function mapDescriptions(image: CatalogImage): UiImageDetail["descriptions"] {
   const description = str(image.description);
   if (!description) return [];
-  return [{ id: `${image.sha256}:${DESCRIPTION_PROVIDER}`, description, provider: DESCRIPTION_PROVIDER }];
+  return [
+    { id: `${image.sha256}:${DESCRIPTION_PROVIDER}`, description, provider: DESCRIPTION_PROVIDER }
+  ];
 }
 
 /**
@@ -1235,7 +1278,7 @@ export function imageToUiDetail(image: CatalogImage): UiImageDetail {
     tags: mapTags(image),
     loras: mapLoras(image),
     generationParams: mapGenerationParams(image),
-    descriptions: mapDescriptions(image),
+    descriptions: mapDescriptions(image)
   };
 }
 
@@ -1246,7 +1289,12 @@ export function imageToUiDetail(image: CatalogImage): UiImageDetail {
  */
 export function neighborsToGraph(focusSha256: string, neighbors: GraphNeighbor[]): Graph {
   const nodes: Graph["nodes"] = [
-    { id: focusSha256, label: focusSha256.slice(0, 8), type: "Image", properties: { seed: true, thumbnailUrl: thumbnailUrl(focusSha256) } },
+    {
+      id: focusSha256,
+      label: focusSha256.slice(0, 8),
+      type: "Image",
+      properties: { seed: true, thumbnailUrl: thumbnailUrl(focusSha256) }
+    }
   ];
   const edges: Graph["edges"] = [];
   for (const n of neighbors) {
@@ -1254,7 +1302,7 @@ export function neighborsToGraph(focusSha256: string, neighbors: GraphNeighbor[]
       id: n.sha256,
       label: n.sha256.slice(0, 8),
       type: "Image",
-      properties: { thumbnailUrl: thumbnailUrl(n.sha256) },
+      properties: { thumbnailUrl: thumbnailUrl(n.sha256) }
     });
     edges.push({ from: focusSha256, to: n.sha256, type: n.relation });
   }
@@ -1265,7 +1313,9 @@ export function neighborsToGraph(focusSha256: string, neighbors: GraphNeighbor[]
  * Translate the legacy UI filter object (camelCase) into the flat filter the
  * gateway/search expects. Only includes keys with values.
  */
-export function buildSearchFilter(filters: Record<string, unknown> | undefined): Record<string, unknown> | null {
+export function buildSearchFilter(
+  filters: Record<string, unknown> | undefined
+): Record<string, unknown> | null {
   if (!filters) return null;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(filters)) {

@@ -8,19 +8,19 @@ export default defineConfig({
   workers: 1,
   timeout: 45_000,
   expect: {
-    timeout: 10_000,
+    timeout: 10_000
   },
   reporter: "list",
   use: {
     baseURL: "http://localhost:3000",
     trace: "off",
     screenshot: "off",
-    video: "off",
+    video: "off"
   },
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+      use: { ...devices["Desktop Chrome"] }
+    }
+  ]
 });

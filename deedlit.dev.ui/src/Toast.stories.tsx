@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-
-import Toast from "./Toast";
 import OutlineButton from "./OutlineButton";
+import Toast from "./Toast";
 
 const meta = {
   title: "Components/Toast",
@@ -10,8 +9,8 @@ const meta = {
   tags: ["autodocs"],
   parameters: { layout: "fullscreen" },
   argTypes: {
-    tone: { control: "inline-radio", options: ["info", "success", "warn", "error"] },
-  },
+    tone: { control: "inline-radio", options: ["info", "success", "warn", "error"] }
+  }
 } satisfies Meta<typeof Toast>;
 
 export default meta;
@@ -33,7 +32,7 @@ export const Default: Story = {
         />
       </div>
     );
-  },
+  }
 };
 
 export const Error: Story = {
@@ -46,5 +45,5 @@ export const Error: Story = {
         description="Could not read the source path. Check that the directory exists."
       />
     </div>
-  ),
+  )
 };

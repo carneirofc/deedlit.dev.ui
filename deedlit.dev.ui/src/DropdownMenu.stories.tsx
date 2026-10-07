@@ -3,20 +3,20 @@ import { fn } from "storybook/test";
 
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "./DropdownMenu";
-import OutlineButton from "./OutlineButton";
 import { CheckIcon } from "./Icons";
+import OutlineButton from "./OutlineButton";
 
 const meta = {
   title: "Components/DropdownMenu",
   component: DropdownMenu,
   tags: ["autodocs"],
-  parameters: { layout: "centered" },
+  parameters: { layout: "centered" }
 } satisfies Meta<typeof DropdownMenu>;
 
 export default meta;
@@ -34,7 +34,7 @@ export const Default: Story = {
         <DropdownMenuItem onSelect={fn()}>Highest rated</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  ),
+  )
 };
 
 export const WithIndicators: Story = {
@@ -61,5 +61,5 @@ export const WithIndicators: Story = {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  ),
+  )
 };

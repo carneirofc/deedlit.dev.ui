@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 
 import { PathInput } from "@/components/PathInput";
 import { SourceFoldersPanel } from "@/components/SourceFoldersPanel";
@@ -40,7 +39,7 @@ const PIPELINE_STAGES = [
   "vision:sparse",
   "catalog",
   "search",
-  "graph",
+  "graph"
 ] as const;
 
 // Grafana base URL for the trace deep-link (compose maps it to :3002).
@@ -66,7 +65,7 @@ const DEFAULT_INGEST_OPTIONS: IngestOptions = {
   extractMetadata: true,
   runExternalEnrichment: false,
   indexQdrant: true,
-  syncNeo4j: true,
+  syncNeo4j: true
 };
 
 // ---------------------------------------------------------------------------
@@ -78,7 +77,7 @@ const cls = {
   input:
     "w-full rounded-lg border border-ui-border/70 bg-ui-bg px-3 py-2 text-ui-sm outline-none focus:border-accent-cyan",
   btn: "rounded-lg border border-ui-border/70 bg-ui-bg-soft px-3 py-2 text-ui-sm font-medium transition hover:bg-accent-cyan/10 disabled:opacity-50",
-  btnActive: "border-accent-cyan text-accent-cyan",
+  btnActive: "border-accent-cyan text-accent-cyan"
 };
 
 const ACTIVE_JOB_STATUSES = new Set(["pending", "running"]);
@@ -101,38 +100,38 @@ const MAINTENANCE_ACTIONS: MaintenanceAction[] = [
     key: "rebuild-qdrant",
     label: "Rebuild Qdrant",
     description: "Recompute & re-index every image vector.",
-    endpoint: "/api/library/maintenance/rebuild-qdrant",
+    endpoint: "/api/library/maintenance/rebuild-qdrant"
   },
   {
     key: "rebuild-neo4j",
     label: "Rebuild Neo4j",
     description: "Resync the graph projection from Postgres.",
-    endpoint: "/api/library/maintenance/rebuild-neo4j",
+    endpoint: "/api/library/maintenance/rebuild-neo4j"
   },
   {
     key: "prune-graph-orphans",
     label: "Prune graph orphans",
     description: "Remove orphaned tag/model nodes left behind by deleted images.",
-    endpoint: "/api/library/maintenance/prune-graph-orphans",
+    endpoint: "/api/library/maintenance/prune-graph-orphans"
   },
   {
     key: "regenerate-thumbnails",
     label: "Regenerate thumbnails",
     description: "Generate thumbnails for images missing one.",
-    endpoint: "/api/library/maintenance/regenerate-thumbnails",
+    endpoint: "/api/library/maintenance/regenerate-thumbnails"
   },
   {
     key: "rescan-files",
     label: "Rescan files",
     description: "Mark images whose source file vanished as missing.",
-    endpoint: "/api/library/maintenance/rescan-files",
+    endpoint: "/api/library/maintenance/rescan-files"
   },
   {
     key: "backfill-labels",
     label: "Backfill labels",
     description: "Run the labelagent on every image missing an AI description.",
-    endpoint: "/api/library/maintenance/backfill-labels",
-  },
+    endpoint: "/api/library/maintenance/backfill-labels"
+  }
 ];
 
 interface ActionRun {
@@ -196,9 +195,7 @@ export default function AdminPage() {
   const [runs, setRuns] = useState<Record<string, ActionRun>>({});
 
   // Missing-files cleanup
-  const [missingState, setMissingState] = useState<
-    "idle" | "scanning" | "done" | "error"
-  >("idle");
+  const [missingState, setMissingState] = useState<"idle" | "scanning" | "done" | "error">("idle");
   const [missing, setMissing] = useState<MissingFilesResult | null>(null);
   const [missingError, setMissingError] = useState<string | null>(null);
   const [selectedMissing, setSelectedMissing] = useState<Set<string>>(new Set());
@@ -258,8 +255,8 @@ export default function AdminPage() {
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ folderPath: path, ...options }),
-      },
+        body: JSON.stringify({ folderPath: path, ...options })
+      }
     );
     trackJob(`Ingest ${name}`, j.job_id);
     return j.job_id;
@@ -318,22 +315,22 @@ export default function AdminPage() {
       const j = await fetchJson<{ id?: string | null; job_id?: string | null }>(
         action.label,
         action.endpoint,
-        { method: "POST" },
+        { method: "POST" }
       );
       // Maintenance actions dispatch a job too — surface its live progress in the dock.
       trackJob(action.label, j.id ?? j.job_id);
       refreshJobs();
       setRuns((prev) => ({
         ...prev,
-        [action.key]: { status: "done", result: JSON.stringify(j) },
+        [action.key]: { status: "done", result: JSON.stringify(j) }
       }));
     } catch (e) {
       setRuns((prev) => ({
         ...prev,
         [action.key]: {
           status: "error",
-          result: e instanceof Error ? e.message : "failed",
-        },
+          result: e instanceof Error ? e.message : "failed"
+        }
       }));
     }
   };
@@ -344,9 +341,7 @@ export default function AdminPage() {
     setMissingNotice(null);
     setSelectedMissing(new Set());
     try {
-      const res = await fetch(
-        `/api/library/maintenance/missing-files?limit=${MISSING_SCAN_LIMIT}`,
-      );
+      const res = await fetch(`/api/library/maintenance/missing-files?limit=${MISSING_SCAN_LIMIT}`);
       const body = (await res.json()) as MissingFilesResult & { error?: string };
       if (!res.ok) throw new Error(body?.error || `scan failed (${res.status})`);
       setMissing(body);
@@ -387,8 +382,8 @@ export default function AdminPage() {
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids }),
-        },
+          body: JSON.stringify({ ids })
+        }
       );
       const deleted = new Set(Array.isArray(j.deleted) ? j.deleted : ids);
       // Drop the cleaned-up entries from the list and the selection.
@@ -397,12 +392,14 @@ export default function AdminPage() {
           ? {
               ...prev,
               missing: prev.missing.filter((m) => !deleted.has(m.sha256)),
-              missingCount: Math.max(0, prev.missingCount - deleted.size),
+              missingCount: Math.max(0, prev.missingCount - deleted.size)
             }
-          : prev,
+          : prev
       );
       setSelectedMissing(new Set());
-      setMissingNotice(`Cleaned up ${deleted.size} stale catalog entr${deleted.size === 1 ? "y" : "ies"}.`);
+      setMissingNotice(
+        `Cleaned up ${deleted.size} stale catalog entr${deleted.size === 1 ? "y" : "ies"}.`
+      );
     } catch (e) {
       setMissingError(e instanceof Error ? e.message : "Cleanup failed");
     } finally {
@@ -413,7 +410,7 @@ export default function AdminPage() {
   const cancelJob = async (jobId: string) => {
     try {
       await fetchJson(`Cancel job ${jobId.slice(0, 8)}`, `/api/library/jobs/${jobId}/cancel`, {
-        method: "POST",
+        method: "POST"
       });
       refreshJobs();
     } catch (e) {
@@ -493,7 +490,8 @@ export default function AdminPage() {
           <span>
             <span className="block text-ui-sm font-semibold text-ui-ink-title">Image Cache</span>
             <span className="block text-ui-2xs text-ui-ink-muted">
-              Redis hit rate, entry counts, TTLs &amp; flush control for the thumbnail/original cache.
+              Redis hit rate, entry counts, TTLs &amp; flush control for the thumbnail/original
+              cache.
             </span>
           </span>
         </span>
@@ -544,7 +542,8 @@ export default function AdminPage() {
                 {ingestBusy ? "Starting…" : "Start ingestion"}
               </button>
               <span className="text-ui-2xs text-ui-ink-muted">
-                {splitPaths(multiText).length} path{splitPaths(multiText).length === 1 ? "" : "s"} · one job each
+                {splitPaths(multiText).length} path{splitPaths(multiText).length === 1 ? "" : "s"} ·
+                one job each
               </span>
             </div>
           </div>
@@ -643,7 +642,8 @@ export default function AdminPage() {
           <div>
             <h2 className="text-ui-sm font-semibold text-ui-ink-title">Missing files</h2>
             <p className="text-ui-2xs text-ui-ink-muted">
-              Find cataloged images whose source file vanished from disk, then un-index the stale entries.
+              Find cataloged images whose source file vanished from disk, then un-index the stale
+              entries.
             </p>
           </div>
           <button
@@ -692,7 +692,10 @@ export default function AdminPage() {
                     <input
                       type="checkbox"
                       className="rounded"
-                      checked={selectedMissing.size === missing.missing.length && missing.missing.length > 0}
+                      checked={
+                        selectedMissing.size === missing.missing.length &&
+                        missing.missing.length > 0
+                      }
                       onChange={toggleAllMissing}
                       data-testid="missing-select-all"
                     />
@@ -722,7 +725,10 @@ export default function AdminPage() {
                           data-testid={`missing-row-${m.sha256}`}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-ui-xs text-ui-ink" title={m.filepath}>
+                          <span
+                            className="block truncate text-ui-xs text-ui-ink"
+                            title={m.filepath}
+                          >
                             {m.filepath}
                           </span>
                           <span className="block truncate font-mono text-ui-2xs text-ui-ink-muted">
@@ -757,7 +763,8 @@ export default function AdminPage() {
           <div className="flex flex-col gap-1">
             {jobs.map((j) => {
               const isOpen = expanded === j.id;
-              const pct = j.totalFiles > 0 ? Math.round((j.processedFiles / j.totalFiles) * 100) : 0;
+              const pct =
+                j.totalFiles > 0 ? Math.round((j.processedFiles / j.totalFiles) * 100) : 0;
               return (
                 <div key={j.id} className="rounded-lg border border-ui-border/50 bg-ui-bg">
                   <div className="flex items-center gap-3 px-3 py-2">
@@ -827,7 +834,8 @@ export default function AdminPage() {
                           <div className="mt-1 flex flex-col gap-0.5">
                             {PIPELINE_STAGES.filter((s) => s in j.stageCounts).map((s) => {
                               const reached = j.stageCounts[s] ?? 0;
-                              const w = j.totalFiles > 0 ? Math.round((reached / j.totalFiles) * 100) : 0;
+                              const w =
+                                j.totalFiles > 0 ? Math.round((reached / j.totalFiles) * 100) : 0;
                               return (
                                 <div key={s} className="flex items-center gap-2">
                                   <span className="w-24 shrink-0 truncate text-ui-ink">{s}</span>

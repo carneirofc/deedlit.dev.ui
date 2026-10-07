@@ -9,11 +9,11 @@ const meta = {
   component: CopyButton,
   tags: ["autodocs"],
   args: {
-    onClick: fn(),
+    onClick: fn()
   },
   argTypes: {
-    copied: { control: "boolean" },
-  },
+    copied: { control: "boolean" }
+  }
 } satisfies Meta<typeof CopyButton>;
 
 export default meta;
@@ -37,5 +37,5 @@ export const Interactive: Story = {
         }}
       />
     );
-  },
+  }
 };

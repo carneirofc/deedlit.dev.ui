@@ -12,11 +12,11 @@ const meta = {
     label: "Positive Prompt",
     tone: "positive",
     children: "masterpiece, best quality, cinematic lighting, depth of field, 8k",
-    onCopy: fn(),
+    onCopy: fn()
   },
   argTypes: {
-    tone: { control: "inline-radio", options: ["positive", "negative", "neutral"] },
-  },
+    tone: { control: "inline-radio", options: ["positive", "negative", "neutral"] }
+  }
 } satisfies Meta<typeof PromptBlock>;
 
 export default meta;
@@ -27,16 +27,20 @@ export const Positive: Story = {
     <div className="w-96">
       <PromptBlock {...args} />
     </div>
-  ),
+  )
 };
 
 export const Negative: Story = {
-  args: { label: "Negative Prompt", tone: "negative", children: "blurry, lowres, watermark, text, jpeg artifacts" },
+  args: {
+    label: "Negative Prompt",
+    tone: "negative",
+    children: "blurry, lowres, watermark, text, jpeg artifacts"
+  },
   render: (args) => (
     <div className="w-96">
       <PromptBlock {...args} />
     </div>
-  ),
+  )
 };
 
 export const Interactive: Story = {
@@ -54,5 +58,5 @@ export const Interactive: Story = {
         />
       </div>
     );
-  },
+  }
 };

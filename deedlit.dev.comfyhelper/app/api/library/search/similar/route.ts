@@ -1,6 +1,6 @@
+import { callMcpTool, hitsToCompactResults, type SearchHit } from "@/lib/api-client";
 import { handleRoute, jsonOk } from "@/lib/library/http";
 import { SimilarSearchRequestSchema } from "@/lib/library/schemas";
-import { callMcpTool, hitsToCompactResults, type SearchHit } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       // Forward the active facet filter so by-image results honour the same
       // safety/tag filter as text search (tags/excludeTags/safety apply on the
       // vector path; the gateway translates them to a Qdrant filter).
-      ...(body.filters ? { filters: body.filters } : {}),
+      ...(body.filters ? { filters: body.filters } : {})
     });
     const structured = (tool.structuredContent ?? {}) as { results?: SearchHit[] };
     const raw = hitsToCompactResults(structured.results ?? []);
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       count: results.length,
       hasMore,
       provider: "deedlit.search",
-      semantic: true,
+      semantic: true
     });
   });
 }

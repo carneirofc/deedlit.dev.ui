@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 type NavItem = {
   href: string;
@@ -24,7 +24,12 @@ type ExternalItem = {
 // ── Icon set ──────────────────────────────────────────────────────────
 const icon = {
   library: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+    >
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       <circle cx="11" cy="9" r="1.4" />
@@ -32,13 +37,27 @@ const icon = {
     </svg>
   ),
   admin: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 2 4 5v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3z" />
       <path d="m9 12 2 2 4-4" />
     </svg>
   ),
   manage: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="4" y1="6" x2="20" y2="6" />
       <line x1="4" y1="12" x2="20" y2="12" />
       <line x1="4" y1="18" x2="20" y2="18" />
@@ -48,36 +67,78 @@ const icon = {
     </svg>
   ),
   health: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
   ),
   queues: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 7h16M4 12h16M4 17h10" />
       <circle cx="19" cy="17" r="2" />
     </svg>
   ),
   db: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <ellipse cx="12" cy="5" rx="8" ry="3" />
       <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
       <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
     </svg>
   ),
   cache: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
     </svg>
   ),
   settings: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
   vision: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 2a4 4 0 0 1 4 4c0 1.5-.8 2.8-2 3.5V12" />
       <path d="M8 6a4 4 0 0 1 4-4" />
       <circle cx="12" cy="16" r="4" />
@@ -87,7 +148,14 @@ const icon = {
     </svg>
   ),
   comfy: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="3" y="3" width="7" height="7" rx="1" />
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -95,7 +163,14 @@ const icon = {
     </svg>
   ),
   neo4j: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="5" r="2" />
       <circle cx="5" cy="19" r="2" />
       <circle cx="19" cy="19" r="2" />
@@ -103,7 +178,14 @@ const icon = {
     </svg>
   ),
   qdrant: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="6" cy="6" r="1.5" />
       <circle cx="18" cy="6" r="1.5" />
       <circle cx="6" cy="18" r="1.5" />
@@ -113,12 +195,19 @@ const icon = {
     </svg>
   ),
   rustfs: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <ellipse cx="12" cy="5" rx="9" ry="3" />
       <path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
       <path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6" />
     </svg>
-  ),
+  )
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -127,7 +216,8 @@ const NAV_ITEMS: NavItem[] = [
     label: "Image Library",
     testId: "library",
     icon: icon.library,
-    match: (p) => (p === "/library" || p.startsWith("/library/")) && !p.startsWith("/library/settings"),
+    match: (p) =>
+      (p === "/library" || p.startsWith("/library/")) && !p.startsWith("/library/settings")
   },
   {
     href: "/manage",
@@ -135,17 +225,33 @@ const NAV_ITEMS: NavItem[] = [
     testId: "manage",
     icon: icon.manage,
     // Stays active across every management surface (the hub + all /admin pages).
-    match: (p) => p === "/manage" || p.startsWith("/admin"),
+    match: (p) => p === "/manage" || p.startsWith("/admin")
   },
-  { href: "/library/settings", label: "Settings", testId: "settings", icon: icon.settings, match: (p) => p.startsWith("/library/settings") },
+  {
+    href: "/library/settings",
+    label: "Settings",
+    testId: "settings",
+    icon: icon.settings,
+    match: (p) => p.startsWith("/library/settings")
+  }
 ];
 
 const EXTERNAL_ITEMS: ExternalItem[] = [
-  { href: "http://localhost:8000", label: "deedlit.vision — CLIP embedding API", icon: icon.vision, testId: "vision" },
+  {
+    href: "http://localhost:8000",
+    label: "deedlit.vision — CLIP embedding API",
+    icon: icon.vision,
+    testId: "vision"
+  },
   { href: "http://localhost:8188", label: "ComfyUI", icon: icon.comfy, testId: "comfyui" },
   { href: "http://localhost:7474", label: "Neo4j Browser", icon: icon.neo4j, testId: "neo4j" },
-  { href: "http://localhost:6333/dashboard", label: "Qdrant Dashboard", icon: icon.qdrant, testId: "qdrant" },
-  { href: "http://localhost:9001", label: "RustFS Console", icon: icon.rustfs, testId: "rustfs" },
+  {
+    href: "http://localhost:6333/dashboard",
+    label: "Qdrant Dashboard",
+    icon: icon.qdrant,
+    testId: "qdrant"
+  },
+  { href: "http://localhost:9001", label: "RustFS Console", icon: icon.rustfs, testId: "rustfs" }
 ];
 
 function navItemClass(isActive: boolean): string {
@@ -204,7 +310,7 @@ function SheetRow({
   isActive,
   external,
   onNavigate,
-  testId,
+  testId
 }: {
   href: string;
   label: string;
@@ -222,7 +328,14 @@ function SheetRow({
       <span className="grid h-6 w-6 shrink-0 place-items-center">{iconNode}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {external && (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 fill-none stroke-current opacity-50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-3.5 w-3.5 shrink-0 fill-none stroke-current opacity-50"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
           <polyline points="15 3 21 3 21 9" />
           <line x1="10" y1="14" x2="21" y2="3" />
@@ -233,13 +346,29 @@ function SheetRow({
 
   if (external) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} data-testid={testId} className={className} onClick={onNavigate}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={label}
+        data-testid={testId}
+        className={className}
+        onClick={onNavigate}
+      >
         {inner}
       </a>
     );
   }
   return (
-    <Link href={href} prefetch={false} aria-label={label} aria-current={isActive ? "page" : undefined} data-testid={testId} className={className} onClick={onNavigate}>
+    <Link
+      href={href}
+      prefetch={false}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
+      data-testid={testId}
+      className={className}
+      onClick={onNavigate}
+    >
       {inner}
     </Link>
   );
@@ -298,7 +427,16 @@ export function AppSidebar() {
           data-testid="app-sidebar-mobile-menu-toggle"
           className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-ui-ink-muted transition hover:bg-ui-bg-soft hover:text-ui-ink-title md:hidden"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             {menuOpen ? (
               <>
                 <path d="M18 6L6 18" />

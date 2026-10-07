@@ -33,7 +33,8 @@ export type CompareTrayBarProps = {
 
 const COMPARE_ACTION_BASE = "rounded-lg px-3 py-2 text-ui-xs font-medium transition";
 const COMPARE_ACTION_ENABLED = "bg-accent-cyan text-ui-bg-deep hover:opacity-90";
-const COMPARE_ACTION_DISABLED = "pointer-events-none border border-ui-border/50 text-ui-ink-muted opacity-50";
+const COMPARE_ACTION_DISABLED =
+  "pointer-events-none border border-ui-border/50 text-ui-ink-muted opacity-50";
 
 /**
  * Floating selection tray: shows queued items as thumbnails with quick-remove,
@@ -50,14 +51,14 @@ export function CompareTrayBar({
   clearLabel = "Clear",
   removeLabel = "Remove from comparison",
   className,
-  renderCompareAction,
+  renderCompareAction
 }: CompareTrayBarProps) {
   if (items.length === 0) return null;
 
   const disabled = items.length < minToCompare;
   const actionClassName = cn(
     COMPARE_ACTION_BASE,
-    disabled ? COMPARE_ACTION_DISABLED : COMPARE_ACTION_ENABLED,
+    disabled ? COMPARE_ACTION_DISABLED : COMPARE_ACTION_ENABLED
   );
 
   return (
@@ -65,14 +66,20 @@ export function CompareTrayBar({
       data-testid="compare-tray"
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-20 z-70 flex justify-center px-3 md:bottom-4",
-        className,
+        className
       )}
     >
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-ui-border/70 bg-ui-bg/95 p-2.5 shadow-panel-lg backdrop-blur-xl">
-        {label ? <span className="hidden px-1 text-ui-xs text-ui-ink-muted sm:block">{label}</span> : null}
+        {label ? (
+          <span className="hidden px-1 text-ui-xs text-ui-ink-muted sm:block">{label}</span>
+        ) : null}
         <div className="flex items-center gap-1.5">
           {items.map((item) => (
-            <div key={item.id} className="group relative" data-testid={`compare-tray-item-${item.id}`}>
+            <div
+              key={item.id}
+              className="group relative"
+              data-testid={`compare-tray-item-${item.id}`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.thumbnailUrl}

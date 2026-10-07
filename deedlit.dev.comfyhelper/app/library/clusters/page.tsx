@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
-
-import { LibraryGraph, clusterColor } from "@/app/library/components/LibraryGraph";
 import { GraphFilterPanel } from "@/app/library/components/GraphFilterPanel";
-import { useCompareTray } from "@/lib/store/compare-tray";
+import { clusterColor, LibraryGraph } from "@/app/library/components/LibraryGraph";
 import type { ClusterResult, GraphScope } from "@/lib/library/schemas";
+import { useCompareTray } from "@/lib/store/compare-tray";
 
 const panel = "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4";
 const input =
@@ -22,7 +21,7 @@ function Slider({
   max,
   step,
   onChange,
-  testId,
+  testId
 }: {
   label: string;
   value: number;
@@ -77,12 +76,15 @@ export default function ClustersPage() {
     setLoading(true);
     setError(null);
     setSelected(null);
-    const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const tagList = tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     const filters = {
       tags: tagList.length ? tagList : undefined,
       modelFamily: modelFamily.trim() || undefined,
       favorite: favorites || undefined,
-      ratingGte: minRating > 0 ? minRating : undefined,
+      ratingGte: minRating > 0 ? minRating : undefined
     };
     try {
       const r = await fetch("/api/library/clusters", {
@@ -94,8 +96,8 @@ export default function ClustersPage() {
           sample,
           neighbors,
           threshold,
-          resolution,
-        }),
+          resolution
+        })
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Clustering failed");
@@ -105,7 +107,17 @@ export default function ClustersPage() {
     } finally {
       setLoading(false);
     }
-  }, [tags, modelFamily, favorites, minRating, graphScope, sample, neighbors, threshold, resolution]);
+  }, [
+    tags,
+    modelFamily,
+    favorites,
+    minRating,
+    graphScope,
+    sample,
+    neighbors,
+    threshold,
+    resolution
+  ]);
 
   const selectedCluster = data?.clusters.find((c) => c.id === selected) ?? null;
 
@@ -115,7 +127,8 @@ export default function ClustersPage() {
         <div>
           <h1 className="text-ui-2xl font-semibold text-ui-ink-title">Cluster explorer</h1>
           <p className="text-ui-sm text-ui-ink-muted">
-            Embedding similarity (Qdrant) grouped with Louvain community detection, filtered by Neo4j.
+            Embedding similarity (Qdrant) grouped with Louvain community detection, filtered by
+            Neo4j.
           </p>
         </div>
         <Link href="/library" prefetch={false} className="text-ui-sm text-accent-cyan">
@@ -225,7 +238,8 @@ export default function ClustersPage() {
       {data && (
         <>
           <p className="text-ui-sm text-ui-ink-muted">
-            {data.clusters.length} clusters · {data.sampled} images sampled · {data.edges} similarity links
+            {data.clusters.length} clusters · {data.sampled} images sampled · {data.edges}{" "}
+            similarity links
           </p>
 
           {data.graph.nodes.length > 0 && (
@@ -250,7 +264,9 @@ export default function ClustersPage() {
                   onClick={() => setSelected(selected === c.id ? null : c.id)}
                   data-testid={`clusters-cluster-card-${c.id}`}
                   className={`flex flex-col gap-2 rounded-xl border bg-ui-bg-soft/40 p-2 text-left transition ${
-                    selected === c.id ? "border-accent-cyan" : "border-ui-border/60 hover:border-accent-cyan/60"
+                    selected === c.id
+                      ? "border-accent-cyan"
+                      : "border-ui-border/60 hover:border-accent-cyan/60"
                   }`}
                 >
                   <div className="relative overflow-hidden rounded-lg">
@@ -272,7 +288,10 @@ export default function ClustersPage() {
                     <p className="text-ui-2xs text-ui-ink-muted">{c.size} images</p>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {c.topTags.slice(0, 3).map((t) => (
-                        <span key={t} className="rounded bg-ui-bg px-1.5 py-0.5 text-ui-2xs text-ui-ink-muted">
+                        <span
+                          key={t}
+                          className="rounded bg-ui-bg px-1.5 py-0.5 text-ui-2xs text-ui-ink-muted"
+                        >
                           {t}
                         </span>
                       ))}
@@ -300,8 +319,15 @@ export default function ClustersPage() {
               </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
                 {selectedCluster.imageIds.map((id) => (
-                  <div key={id} className="group relative overflow-hidden rounded-lg border border-ui-border/60">
-                    <Link href={`/library/${id}`} prefetch={false} data-testid={`clusters-image-link-${id}`}>
+                  <div
+                    key={id}
+                    className="group relative overflow-hidden rounded-lg border border-ui-border/60"
+                  >
+                    <Link
+                      href={`/library/${id}`}
+                      prefetch={false}
+                      data-testid={`clusters-image-link-${id}`}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`/api/library/images/${id}/thumbnail`}

@@ -15,7 +15,7 @@ export type MetadataTabBarProps = {
 const TAB_OPTIONS: Array<{ value: MetadataTabValue; label: string }> = [
   { value: "details", label: "Details" },
   { value: "workflow", label: "Workflow" },
-  { value: "raw", label: "Raw Metadata" },
+  { value: "raw", label: "Raw Metadata" }
 ];
 
 /**
@@ -28,7 +28,7 @@ export default function MetadataTabBar({
   value,
   onValueChange,
   className,
-  optionClassName,
+  optionClassName
 }: MetadataTabBarProps) {
   return (
     <Tabs

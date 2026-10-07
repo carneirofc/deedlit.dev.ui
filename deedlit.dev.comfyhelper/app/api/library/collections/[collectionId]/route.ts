@@ -1,10 +1,5 @@
+import { deleteCollection, GatewayError, getCollection, renameCollection } from "@/lib/api-client";
 import { handleRoute, jsonError, jsonOk } from "@/lib/library/http";
-import {
-  getCollection,
-  renameCollection,
-  deleteCollection,
-  GatewayError,
-} from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +13,8 @@ export async function GET(_request: Request, context: RouteContext) {
     try {
       return jsonOk(await getCollection(collectionId));
     } catch (e) {
-      if (e instanceof GatewayError && e.status === 404) return jsonError("Collection not found.", 404);
+      if (e instanceof GatewayError && e.status === 404)
+        return jsonError("Collection not found.", 404);
       throw e;
     }
   });
@@ -32,7 +28,8 @@ export async function PUT(request: Request, context: RouteContext) {
     try {
       return jsonOk(await renameCollection(collectionId, name));
     } catch (e) {
-      if (e instanceof GatewayError && e.status === 404) return jsonError("Collection not found.", 404);
+      if (e instanceof GatewayError && e.status === 404)
+        return jsonError("Collection not found.", 404);
       throw e;
     }
   });
@@ -46,7 +43,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       await deleteCollection(collectionId);
       return jsonOk({ status: "ok" });
     } catch (e) {
-      if (e instanceof GatewayError && e.status === 404) return jsonError("Collection not found.", 404);
+      if (e instanceof GatewayError && e.status === 404)
+        return jsonError("Collection not found.", 404);
       throw e;
     }
   });

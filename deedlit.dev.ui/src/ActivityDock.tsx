@@ -100,7 +100,9 @@ function ActivityRow({ a, onDismiss }: { a: Activity; onDismiss: (id: string) =>
             {a.stage}
           </span>
         )}
-        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-ui-2xs font-medium ${statusChip(a.status)}`}>
+        <span
+          className={`shrink-0 rounded-full px-1.5 py-0.5 text-ui-2xs font-medium ${statusChip(a.status)}`}
+        >
           {statusLabel(a.status)}
         </span>
         <button
@@ -208,7 +210,9 @@ export function ActivityDock({ activities, onDismiss, onClearFinished }: Activit
         ) : (
           <span className="h-2 w-2 rounded-full bg-emerald-500" />
         )}
-        <span className={errors > 0 && active === 0 ? "text-rose-500" : "text-ui-ink"}>{pillLabel}</span>
+        <span className={errors > 0 && active === 0 ? "text-rose-500" : "text-ui-ink"}>
+          {pillLabel}
+        </span>
       </button>
     </div>
   );
@@ -233,7 +237,7 @@ export type ActivityToastsProps = {
 export function ActivityToasts({
   activities,
   successTtlMs = SUCCESS_TTL_MS,
-  errorTtlMs = ERROR_TTL_MS,
+  errorTtlMs = ERROR_TTL_MS
 }: ActivityToastsProps) {
   const [now, setNow] = useState(() => Date.now());
 

@@ -8,7 +8,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
  */
 const meta: Meta = {
   title: "Foundations/Colors",
-  parameters: { layout: "fullscreen", a11y: { test: "off" } },
+  parameters: { layout: "fullscreen", a11y: { test: "off" } }
 };
 
 export default meta;
@@ -49,10 +49,20 @@ const INKS = [
   "--ui-ink-muted",
   "--ui-ink-subtle",
   "--ui-ink-faint",
-  "--ui-ink-link",
+  "--ui-ink-link"
 ];
 
-function StatusCard({ bg, edge, ink, label }: { bg: string; edge: string; ink: string; label: string }) {
+function StatusCard({
+  bg,
+  edge,
+  ink,
+  label
+}: {
+  bg: string;
+  edge: string;
+  ink: string;
+  label: string;
+}) {
   return (
     <div
       className="rounded-xl border px-3 py-3 text-ui-sm"
@@ -75,7 +85,7 @@ export const Accents: Story = {
         ))}
       </div>
     </div>
-  ),
+  )
 };
 
 export const TextInk: Story = {
@@ -86,7 +96,7 @@ export const TextInk: Story = {
         <InkRow key={name} name={name} />
       ))}
     </div>
-  ),
+  )
 };
 
 export const Status: Story = {
@@ -111,5 +121,5 @@ export const Status: Story = {
         ink="--status-error-text"
       />
     </div>
-  ),
+  )
 };

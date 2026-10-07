@@ -8,11 +8,11 @@ const meta = {
   tags: ["autodocs"],
   args: {
     tone: "default",
-    children: "No images match the current filters.",
+    children: "No images match the current filters."
   },
   argTypes: {
-    tone: { control: "inline-radio", options: ["default", "subtle"] },
-  },
+    tone: { control: "inline-radio", options: ["default", "subtle"] }
+  }
 } satisfies Meta<typeof EmptyState>;
 
 export default meta;

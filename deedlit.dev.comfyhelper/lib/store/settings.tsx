@@ -2,12 +2,12 @@
 
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useState,
-  type ReactNode,
+  useState
 } from "react";
 
 const STORAGE_KEY = "comfyhelper-library-settings";
@@ -26,7 +26,7 @@ export const SAFETY_CLASSES: readonly SafetyClass[] = ["sfw", "nsfw", "explicit"
 export const SAFETY_LABEL: Record<SafetyClass, string> = {
   sfw: "SFW",
   nsfw: "NSFW",
-  explicit: "Explicit",
+  explicit: "Explicit"
 };
 
 /**
@@ -54,7 +54,7 @@ export const SORT_MODES: readonly SortMode[] = [
   "rating_desc",
   "rating_asc",
   "name_asc",
-  "name_desc",
+  "name_desc"
 ] as const;
 
 /**
@@ -165,7 +165,7 @@ export const DEFAULT_SETTINGS: LibrarySettings = {
 
   slideshowInterval: 5,
   slideshowLoop: true,
-  slideshowShuffle: false,
+  slideshowShuffle: false
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -228,7 +228,7 @@ function mergeSettings(raw: unknown): LibrarySettings {
 
     slideshowInterval: num("slideshowInterval", 1, 60),
     slideshowLoop: bool("slideshowLoop"),
-    slideshowShuffle: bool("slideshowShuffle"),
+    slideshowShuffle: bool("slideshowShuffle")
   };
 }
 
@@ -272,17 +272,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setKey = useCallback(
     <K extends keyof LibrarySettings>(key: K, value: LibrarySettings[K]) =>
       setSettings((prev) => ({ ...prev, [key]: value })),
-    [],
+    []
   );
   const update = useCallback(
     (patch: Partial<LibrarySettings>) => setSettings((prev) => ({ ...prev, ...patch })),
-    [],
+    []
   );
   const reset = useCallback(() => setSettings({ ...DEFAULT_SETTINGS }), []);
 
   const value = useMemo<SettingsValue>(
     () => ({ settings, hydrated, setKey, update, reset }),
-    [settings, hydrated, setKey, update, reset],
+    [settings, hydrated, setKey, update, reset]
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
@@ -305,13 +305,16 @@ const GRID_COLUMNS: Record<GridDensity, string> = {
   comfortable:
     "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-8 4xl:grid-cols-10 5xl:grid-cols-12",
   spacious:
-    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 4xl:grid-cols-8",
+    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 4xl:grid-cols-8"
 };
 
 const MASONRY_COLUMNS: Record<GridDensity, string> = {
-  compact: "columns-3 sm:columns-4 lg:columns-6 xl:columns-7 2xl:columns-8 3xl:columns-10 4xl:columns-12 5xl:columns-14",
-  comfortable: "columns-2 sm:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 3xl:columns-8 4xl:columns-10 5xl:columns-12",
-  spacious: "columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 3xl:columns-6 4xl:columns-8",
+  compact:
+    "columns-3 sm:columns-4 lg:columns-6 xl:columns-7 2xl:columns-8 3xl:columns-10 4xl:columns-12 5xl:columns-14",
+  comfortable:
+    "columns-2 sm:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 3xl:columns-8 4xl:columns-10 5xl:columns-12",
+  spacious:
+    "columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 3xl:columns-6 4xl:columns-8"
 };
 
 export function gridColumnsClass(density: GridDensity): string {

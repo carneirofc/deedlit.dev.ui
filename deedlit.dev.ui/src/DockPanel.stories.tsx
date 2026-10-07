@@ -9,8 +9,8 @@ const meta = {
   tags: ["autodocs"],
   parameters: { layout: "fullscreen" },
   argTypes: {
-    size: { control: "inline-radio", options: ["sm", "md", "lg", "xl"] },
-  },
+    size: { control: "inline-radio", options: ["sm", "md", "lg", "xl"] }
+  }
 } satisfies Meta<typeof DockPanel>;
 
 export default meta;
@@ -25,14 +25,16 @@ export const Default: Story = {
         Use the toggle pinned to the bottom-right to open the dock.
         <DockPanel {...args} isOpen={open} onOpenChange={setOpen}>
           <ul className="space-y-2">
-            {["render_001.png", "render_002.png", "render_003.png", "render_004.png"].map((name) => (
-              <li key={name} className="rounded-lg bg-[color:var(--ui-bg-soft)] px-3 py-2">
-                {name}
-              </li>
-            ))}
+            {["render_001.png", "render_002.png", "render_003.png", "render_004.png"].map(
+              (name) => (
+                <li key={name} className="rounded-lg bg-[color:var(--ui-bg-soft)] px-3 py-2">
+                  {name}
+                </li>
+              )
+            )}
           </ul>
         </DockPanel>
       </div>
     );
-  },
+  }
 };

@@ -22,7 +22,11 @@ function toExcludedTagSet(exclude?: ReadonlySet<string> | readonly string[]): Re
   }
 
   if (isReadonlySet(exclude)) {
-    return new Set(Array.from(exclude).map((entry) => normalizePromptToken(entry)).filter(Boolean));
+    return new Set(
+      Array.from(exclude)
+        .map((entry) => normalizePromptToken(entry))
+        .filter(Boolean)
+    );
   }
 
   if (Array.isArray(exclude)) {
@@ -38,7 +42,7 @@ export type ExtractTagsFromPromptOptions = {
 
 export function extractTagsFromPrompt(
   prompt?: string,
-  options?: ExtractTagsFromPromptOptions,
+  options?: ExtractTagsFromPromptOptions
 ): string[] {
   if (!prompt) {
     return [];

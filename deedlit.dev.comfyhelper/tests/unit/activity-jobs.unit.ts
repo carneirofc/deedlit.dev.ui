@@ -1,16 +1,16 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
-  applyJobToActivity,
+  type Activity,
   applyJobsToActivities,
+  applyJobToActivity,
   errorMessage,
   extractError,
   hasActiveJob,
   isTerminal,
-  normalizeJob,
-  TERMINAL_JOB_STATUSES,
-  type Activity,
   type JobSnapshot,
+  normalizeJob,
+  TERMINAL_JOB_STATUSES
 } from "../../lib/store/activity-jobs";
 
 const NOW = 1_000_000;
@@ -23,7 +23,7 @@ function jobActivity(over: Partial<Activity> = {}): Activity {
     jobId: "job-1",
     progress: { processed: 0, total: 0, failed: 0 },
     startedAt: 0,
-    ...over,
+    ...over
   };
 }
 
@@ -37,7 +37,7 @@ function snapshot(over: Partial<JobSnapshot> = {}): JobSnapshot {
     errorMessage: null,
     stage: null,
     stageCounts: {},
-    ...over,
+    ...over
   };
 }
 
@@ -57,7 +57,7 @@ test("settles to success on a completed job", () => {
   const out = applyJobToActivity(
     jobActivity(),
     snapshot({ status: "completed", processedFiles: 10 }),
-    NOW,
+    NOW
   );
   expect(out.status).toBe("success");
   expect(out.progress).toEqual({ processed: 10, total: 10, failed: 0 });
@@ -69,7 +69,7 @@ test("settles to error with the job's message on a failed job", () => {
   const out = applyJobToActivity(
     jobActivity(),
     snapshot({ status: "failed", errorMessage: "disk full", failedFiles: 2 }),
-    NOW,
+    NOW
   );
   expect(out.status).toBe("error");
   expect(out.message).toBe("disk full");
@@ -118,11 +118,11 @@ test("leaves an activity whose job is absent from the list untouched", () => {
 test("maps each job onto its linked activity by id", () => {
   const activities: Activity[] = [
     jobActivity({ id: "a1", jobId: "job-1" }),
-    jobActivity({ id: "a2", jobId: "job-2", label: "Rebuild Qdrant" }),
+    jobActivity({ id: "a2", jobId: "job-2", label: "Rebuild Qdrant" })
   ];
   const jobs = [
     snapshot({ id: "job-1", status: "completed", processedFiles: 10 }),
-    snapshot({ id: "job-2", status: "running", processedFiles: 5 }),
+    snapshot({ id: "job-2", status: "running", processedFiles: 5 })
   ];
   const out = applyJobsToActivities(activities, jobs, NOW);
   expect(out[0].status).toBe("success");
@@ -163,8 +163,8 @@ test("normalizeJob coerces fields and tolerates junk", () => {
       totalFiles: 4,
       processedFiles: 2,
       failedFiles: 1,
-      errorMessage: "x",
-    }),
+      errorMessage: "x"
+    })
   ).toEqual({
     id: "job-9",
     status: "running",
@@ -173,7 +173,7 @@ test("normalizeJob coerces fields and tolerates junk", () => {
     failedFiles: 1,
     errorMessage: "x",
     stage: null,
-    stageCounts: {},
+    stageCounts: {}
   });
 
   expect(normalizeJob(null)).toEqual({
@@ -184,23 +184,29 @@ test("normalizeJob coerces fields and tolerates junk", () => {
     failedFiles: 0,
     errorMessage: null,
     stage: null,
-    stageCounts: {},
+    stageCounts: {}
   });
 });
 
 test("normalizeJob reads the live stage from camelCase or snake_case", () => {
   // camelCase (the /api/library/jobs route shape)
-  expect(normalizeJob({ id: "j", stage: "vision:dense", stageCounts: { metadata: 5 } })).toMatchObject({
+  expect(
+    normalizeJob({ id: "j", stage: "vision:dense", stageCounts: { metadata: 5 } })
+  ).toMatchObject({
     stage: "vision:dense",
-    stageCounts: { metadata: 5 },
+    stageCounts: { metadata: 5 }
   });
   // snake_case (the raw ingest service shape)
-  expect(normalizeJob({ id: "j", current_stage: "catalog", stage_counts: { catalog: 2 } })).toMatchObject({
+  expect(
+    normalizeJob({ id: "j", current_stage: "catalog", stage_counts: { catalog: 2 } })
+  ).toMatchObject({
     stage: "catalog",
-    stageCounts: { catalog: 2 },
+    stageCounts: { catalog: 2 }
   });
   // junk stage_counts entries are dropped
-  expect(normalizeJob({ id: "j", stage_counts: { good: 3, bad: "x" } }).stageCounts).toEqual({ good: 3 });
+  expect(normalizeJob({ id: "j", stage_counts: { good: 3, bad: "x" } }).stageCounts).toEqual({
+    good: 3
+  });
 });
 
 test("applyJobToActivity carries the active stage and clears it on settle", () => {
@@ -215,7 +221,11 @@ test("applyJobToActivity carries the active stage and clears it on settle", () =
   expect(moved.stage).toBe("label");
 
   // Settled: no service is working, so the stage clears.
-  const done = applyJobToActivity(jobActivity(), snapshot({ status: "completed", stage: "graph" }), NOW);
+  const done = applyJobToActivity(
+    jobActivity(),
+    snapshot({ status: "completed", stage: "graph" }),
+    NOW
+  );
   expect(done.status).toBe("success");
   expect(done.stage).toBeNull();
 });

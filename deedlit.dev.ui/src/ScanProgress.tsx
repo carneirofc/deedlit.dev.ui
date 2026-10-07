@@ -22,7 +22,7 @@ const DEFAULT_SCAN_STAGE_LABELS = [
   "Walking directories recursively",
   "Reading sidecar JSON metadata",
   "Extracting embedded PNG metadata",
-  "Finalizing image index",
+  "Finalizing image index"
 ] as const;
 
 function getStageIndex(elapsedSeconds: number): number {
@@ -47,20 +47,24 @@ function getStageIndex(elapsedSeconds: number): number {
 
 export { DEFAULT_SCAN_STAGE_LABELS };
 
-const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function ScanProgress({
-  title = "Scanning image library",
-  rootCount,
-  className,
-  progressPercent,
-  processedCount,
-  totalCount,
-  statusLabel,
-  stageLabels,
-  testId,
-}, ref) {
+const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function ScanProgress(
+  {
+    title = "Scanning image library",
+    rootCount,
+    className,
+    progressPercent,
+    processedCount,
+    totalCount,
+    statusLabel,
+    stageLabels,
+    testId
+  },
+  ref
+) {
   const [progress, setProgress] = useState(8);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const hasExternalProgress = typeof progressPercent === "number" && Number.isFinite(progressPercent);
+  const hasExternalProgress =
+    typeof progressPercent === "number" && Number.isFinite(progressPercent);
 
   useEffect(() => {
     if (hasExternalProgress) {
@@ -86,7 +90,8 @@ const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function Scan
 
   const resolvedStageLabels = stageLabels ?? DEFAULT_SCAN_STAGE_LABELS;
   const stageIndex = useMemo(() => getStageIndex(elapsedSeconds), [elapsedSeconds]);
-  const stageLabel = resolvedStageLabels[stageIndex] ?? resolvedStageLabels[resolvedStageLabels.length - 1] ?? "";
+  const stageLabel =
+    resolvedStageLabels[stageIndex] ?? resolvedStageLabels[resolvedStageLabels.length - 1] ?? "";
   const displayProgress = hasExternalProgress
     ? Math.max(0, Math.min(100, Math.floor(progressPercent)))
     : Math.max(8, Math.floor(progress));
@@ -135,4 +140,3 @@ const ScanProgress = forwardRef<HTMLDivElement, ScanProgressProps>(function Scan
 ScanProgress.displayName = "ScanProgress";
 
 export default ScanProgress;
-

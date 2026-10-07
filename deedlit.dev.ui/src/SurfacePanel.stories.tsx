@@ -9,12 +9,12 @@ const meta = {
   args: {
     tone: "default",
     padding: "md",
-    children: "Surface panel content",
+    children: "Surface panel content"
   },
   argTypes: {
     tone: { control: "inline-radio", options: ["default", "soft", "subtle", "strong"] },
-    padding: { control: "inline-radio", options: ["none", "sm", "md", "lg"] },
-  },
+    padding: { control: "inline-radio", options: ["none", "sm", "md", "lg"] }
+  }
 } satisfies Meta<typeof SurfacePanel>;
 
 export default meta;
@@ -38,5 +38,5 @@ export const Tones: Story = {
         strong
       </SurfacePanel>
     </div>
-  ),
+  )
 };

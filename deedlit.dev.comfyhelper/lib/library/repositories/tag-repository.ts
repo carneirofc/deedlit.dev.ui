@@ -12,7 +12,7 @@ export async function upsertTag(
   client: PoolClient,
   rawName: string,
   category: string | null = null,
-  source: string | null = null,
+  source: string | null = null
 ): Promise<string> {
   const name = rawName.trim();
   const normalized = canonicalTagName(rawName);
@@ -22,7 +22,7 @@ export async function upsertTag(
      ON CONFLICT (normalized_name)
        DO UPDATE SET category = COALESCE(tags.category, EXCLUDED.category)
      RETURNING id`,
-    [name, normalized, category, source],
+    [name, normalized, category, source]
   );
   return result.rows[0].id;
 }
@@ -31,21 +31,28 @@ export async function linkImageTag(
   client: PoolClient,
   imageId: string,
   tagId: string,
-  options: { confidence?: number | null; source?: string } = {},
+  options: { confidence?: number | null; source?: string } = {}
 ): Promise<void> {
   await client.query(
     `INSERT INTO image_tags (image_id, tag_id, confidence, source)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (image_id, tag_id, source)
        DO UPDATE SET confidence = EXCLUDED.confidence`,
-    [imageId, tagId, options.confidence ?? null, options.source ?? "prompt"],
+    [imageId, tagId, options.confidence ?? null, options.source ?? "prompt"]
   );
 }
 
 /** Remove every tag attached to an image (used when re-extracting metadata). */
-export async function clearImageTags(client: PoolClient, imageId: string, source?: string): Promise<void> {
+export async function clearImageTags(
+  client: PoolClient,
+  imageId: string,
+  source?: string
+): Promise<void> {
   if (source) {
-    await client.query(`DELETE FROM image_tags WHERE image_id = $1 AND source = $2`, [imageId, source]);
+    await client.query(`DELETE FROM image_tags WHERE image_id = $1 AND source = $2`, [
+      imageId,
+      source
+    ]);
   } else {
     await client.query(`DELETE FROM image_tags WHERE image_id = $1`, [imageId]);
   }
@@ -54,7 +61,7 @@ export async function clearImageTags(client: PoolClient, imageId: string, source
 /** Tags that co-occur most often with the given tag across the library. */
 export async function findRelatedTags(
   tag: string,
-  limit: number,
+  limit: number
 ): Promise<Array<{ name: string; coOccurrence: number }>> {
   const normalized = canonicalTagName(tag);
   return rows<{ name: string; coOccurrence: number }>(
@@ -72,6 +79,6 @@ export async function findRelatedTags(
       GROUP BY t.name
       ORDER BY "coOccurrence" DESC
       LIMIT $2`,
-    [normalized, limit],
+    [normalized, limit]
   );
 }
