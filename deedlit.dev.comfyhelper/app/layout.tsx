@@ -47,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, author-controlled theme bootstrap (no user input); it must run inline before first paint to avoid a theme flash. */}
         <script dangerouslySetInnerHTML={{ __html: initialThemeScript }} />
       </head>
       <body className={`${displayFont.variable} ${monoFont.variable} antialiased`}>

@@ -1,4 +1,4 @@
-import { open } from "node:fs/promises";
+import { type FileHandle, open } from "node:fs/promises";
 import { inflateSync } from "node:zlib";
 
 type TextChunk = {
@@ -148,7 +148,7 @@ function toMetadataObject(chunks: TextChunk[]): unknown {
 export async function readEmbeddedMetadataFromPng(
   imagePath: string
 ): Promise<EmbeddedMetadataResult> {
-  let handle;
+  let handle: FileHandle | undefined;
   try {
     handle = await open(imagePath, "r");
 

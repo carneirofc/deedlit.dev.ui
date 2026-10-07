@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { ensureLibrarySchema } from "@/lib/library/db/migrate";
@@ -18,7 +19,7 @@ import { getLogger } from "@/lib/logger";
 const logger = getLogger({ scope: "library-ingest" });
 
 async function* walk(dir: string, recursive: boolean): AsyncGenerator<string> {
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {

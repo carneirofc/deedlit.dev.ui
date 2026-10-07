@@ -463,7 +463,7 @@ export default function LibraryPage() {
   // Abort outstanding prefetches and rebind the buffer to a new filter signature.
   const resetPrefetch = useCallback(
     (s: typeof filtersRef.current) => {
-      prefetchRef.current.controllers.forEach((c) => c.abort());
+      for (const c of prefetchRef.current.controllers) c.abort();
       prefetchRef.current = {
         sig: prefetchSig(s),
         pages: new Map(),
@@ -479,7 +479,7 @@ export default function LibraryPage() {
   // splices new rows at the head and shifts every offset out from under them.
   const invalidatePrefetchPages = useCallback(() => {
     const pf = prefetchRef.current;
-    pf.controllers.forEach((c) => c.abort());
+    for (const c of pf.controllers) c.abort();
     pf.pages.clear();
     pf.inFlight.clear();
     pf.controllers = [];
@@ -650,7 +650,7 @@ export default function LibraryPage() {
   useEffect(() => {
     return () => {
       fetchController.current?.abort();
-      prefetchRef.current.controllers.forEach((c) => c.abort());
+      for (const c of prefetchRef.current.controllers) c.abort();
     };
   }, []);
 

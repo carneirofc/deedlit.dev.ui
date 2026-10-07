@@ -85,6 +85,12 @@ interface VectorDebug {
 const panel = "rounded-xl border border-ui-border/60 bg-ui-bg-soft/40 p-4";
 const chip = "rounded-full bg-ui-bg px-2 py-0.5 text-ui-2xs text-ui-ink-muted";
 
+/** The `tags` array of a vector payload, or null when it is missing or not an array. */
+function payloadTags(payload: Record<string, unknown> | null): string[] | null {
+  const tags = payload?.tags;
+  return Array.isArray(tags) ? (tags as string[]) : null;
+}
+
 export default function ImageDetailPage() {
   const params = useParams<{ imageId: string }>();
   const imageId = params.imageId;
@@ -881,15 +887,9 @@ export default function ImageDetailPage() {
                           <td className="py-1 pr-3">{String(h.payload?.model_family ?? "—")}</td>
                           <td
                             className="max-w-[20rem] truncate py-1"
-                            title={
-                              Array.isArray(h.payload?.tags)
-                                ? (h.payload?.tags as string[]).join(", ")
-                                : ""
-                            }
+                            title={payloadTags(h.payload)?.join(", ") ?? ""}
                           >
-                            {Array.isArray(h.payload?.tags)
-                              ? (h.payload?.tags as string[]).slice(0, 6).join(", ")
-                              : "—"}
+                            {payloadTags(h.payload)?.slice(0, 6).join(", ") ?? "—"}
                           </td>
                         </tr>
                       ))}

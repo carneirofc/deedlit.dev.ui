@@ -97,8 +97,7 @@ export function parseLorasFromPrompt(prompt: string | null | undefined): Extract
   if (!prompt) return [];
   const out: ExtractedLora[] = [];
   const re = /<(?:lora|lyco):([^:>]+)(?::([0-9.]+))?[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(prompt)) !== null) {
+  for (const match of prompt.matchAll(re)) {
     out.push({ name: match[1].trim(), weight: match[2] ? Number.parseFloat(match[2]) : null });
   }
   return out;

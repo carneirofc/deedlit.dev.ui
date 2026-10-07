@@ -207,7 +207,10 @@ export async function getCombinedSubgraph(imageIds: string[], depth: number): Pr
       if (!nodes.has(n.id)) nodes.set(n.id, n);
       if (n.id !== seedId && n.type !== "Image") {
         let set = refs.get(n.id);
-        if (!set) refs.set(n.id, (set = new Set()));
+        if (!set) {
+          set = new Set();
+          refs.set(n.id, set);
+        }
         set.add(seedId);
       }
     }
