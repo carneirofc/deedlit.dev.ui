@@ -99,8 +99,9 @@ function ComparePageInner() {
                   className="overflow-hidden rounded-xl border border-ui-border/60 hover:border-accent-cyan"
                   data-testid={`compare-image-link-${img.id}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
+                    width={256}
+                    height={256}
                     src={img.imageUrl}
                     alt={img.filename}
                     className="aspect-square w-full bg-ui-bg object-contain"

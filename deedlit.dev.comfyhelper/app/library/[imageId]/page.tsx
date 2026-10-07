@@ -427,7 +427,7 @@ export default function ImageDetailPage() {
           >
             {settings.viewerFullResolution ? "HD · original" : "Thumbnail"}
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* biome-ignore lint/correctness/useImageSize: intrinsic size is unknown (variable aspect); CSS sizes the box, and fixed attributes would distort it before load. */}
           <img src={viewerSrc} alt={detail.filename} className={viewerClass} />
         </div>
 
@@ -707,8 +707,9 @@ export default function ImageDetailPage() {
                   className="group relative overflow-hidden rounded-lg border border-ui-border/60 hover:border-accent-cyan"
                   data-testid={`image-detail-similar-link-${s.imageId}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
+                    width={256}
+                    height={256}
                     src={s.thumbnailUrl}
                     alt={s.summary}
                     loading="lazy"

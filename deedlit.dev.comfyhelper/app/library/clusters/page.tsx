@@ -272,8 +272,9 @@ export default function ClustersPage() {
                   }`}
                 >
                   <div className="relative overflow-hidden rounded-lg">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
+                      width={256}
+                      height={256}
                       src={`/api/library/images/${c.representativeImageId}/thumbnail`}
                       alt={c.label}
                       loading="lazy"
@@ -331,8 +332,9 @@ export default function ClustersPage() {
                       prefetch={false}
                       data-testid={`clusters-image-link-${id}`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
+                        width={256}
+                        height={256}
                         src={`/api/library/images/${id}/thumbnail`}
                         alt=""
                         loading="lazy"

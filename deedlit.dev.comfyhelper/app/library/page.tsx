@@ -1403,7 +1403,7 @@ export default function LibraryPage() {
       onToggleSelect={(r) => toggleSelect(r.imageId)}
       selectOnCtrlClick
       renderMedia={(r, ctx) => (
-        // eslint-disable-next-line @next/next/no-img-element
+        // biome-ignore lint/correctness/useImageSize: intrinsic size is unknown (variable aspect); CSS sizes the box, and fixed attributes would distort it before load.
         <img
           src={r.gridUrl ?? r.thumbnailUrl}
           alt={r.summary}
@@ -1701,8 +1701,9 @@ export default function LibraryPage() {
           {/* Active "similar to" query banner */}
           {similarRef && (
             <div className="flex items-center gap-3 rounded-lg border border-accent-cyan/40 bg-accent-cyan/5 p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
+                width={48}
+                height={48}
                 src={similarRef.thumbUrl}
                 alt=""
                 className="h-12 w-12 shrink-0 rounded-lg border border-ui-border/60 object-cover"
@@ -2298,8 +2299,9 @@ function ImageDropzone({
       }`}
     >
       {preview ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
+          width={80}
+          height={80}
           src={preview}
           alt="query"
           className="h-20 w-20 shrink-0 rounded-lg border border-ui-border/60 object-cover"

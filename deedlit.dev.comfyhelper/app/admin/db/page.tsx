@@ -507,8 +507,9 @@ export default function DbPage() {
                   className="flex min-w-0 flex-1 items-center gap-2 text-left text-ui-xs"
                   data-testid={`db-open-${img.sha256}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
+                    width={40}
+                    height={40}
                     src={`/api/library/images/${img.sha256}/thumbnail`}
                     alt=""
                     loading="lazy"
@@ -550,7 +551,7 @@ export default function DbPage() {
             <p className="text-ui-sm text-ui-ink-muted">Select an image to inspect and edit.</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* biome-ignore lint/correctness/useImageSize: intrinsic size is unknown (variable aspect); CSS sizes the box, and fixed attributes would distort it before load. */}
               <img
                 src={`/api/library/images/${selected.sha256}/thumbnail`}
                 alt={selected.prompt ?? ""}

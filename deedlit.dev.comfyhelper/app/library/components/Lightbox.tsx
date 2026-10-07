@@ -863,7 +863,7 @@ export function Lightbox({
               <p className="text-ui-xs">Failed to load image.</p>
             </div>
           )}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* biome-ignore lint/correctness/useImageSize: intrinsic size is unknown (variable aspect); CSS sizes the box, and fixed attributes would distort it before load. */}
           <img
             key={current.imageId + (fullResolution ? "-hd" : "")}
             src={bigSrc(current, fullResolution)}
@@ -954,8 +954,9 @@ export function Lightbox({
                   : "border-ui-border/50 opacity-70 hover:opacity-100"
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
+                width={256}
+                height={256}
                 src={it.thumbnailUrl}
                 alt=""
                 loading="lazy"
