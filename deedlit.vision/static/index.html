@@ -550,7 +550,7 @@ $("#enc-seg").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-mode]");
   if (!btn) return;
   encMode = btn.dataset.mode;
-  $$all("#enc-seg button").forEach((b) => b.classList.toggle("active", b === btn));
+  for (const b of $$all("#enc-seg button")) b.classList.toggle("active", b === btn);
   $("#enc-text-row").hidden = encMode !== "text";
   $("#enc-image-row").hidden = encMode !== "image";
 });
@@ -591,7 +591,7 @@ $("#enc-copy").addEventListener("click", async () => {
   const btn = $("#enc-copy");
   const prev = btn.textContent;
   btn.textContent = "Copied!";
-  setTimeout(() => (btn.textContent = prev), 1200);
+  setTimeout(() => { btn.textContent = prev; }, 1200);
 });
 
 // ---------------------------------------------------------------- qdrant search
@@ -602,7 +602,7 @@ $("#qd-seg").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-mode]");
   if (!btn) return;
   qdMode = btn.dataset.mode;
-  $$all("#qd-seg button").forEach((b) => b.classList.toggle("active", b === btn));
+  for (const b of $$all("#qd-seg button")) b.classList.toggle("active", b === btn);
   $("#qd-text-label").hidden = qdMode !== "text";
   $("#qd-image-label").hidden = qdMode !== "image";
 });
@@ -713,7 +713,7 @@ $("#qd-form").addEventListener("submit", async (e) => {
       });
     }
     if (!data.results.length) { results.innerHTML = `<div class="kv">No matches.</div>`; }
-    else data.results.forEach((hit, i) => results.appendChild(renderQdrantHit(hit, i + 1)));
+    else data.results.forEach((hit, i) => { results.appendChild(renderQdrantHit(hit, i + 1)); });
   } catch (err) { setErr("qd-err", err); }
   finally { prog.done(); }
 });
