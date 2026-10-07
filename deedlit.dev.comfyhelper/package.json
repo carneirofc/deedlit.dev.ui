@@ -3,20 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build:ui": "npm run build --prefix ../deedlit.dev.ui",
+    "build:ui": "pnpm --filter @carneirofc/ui build",
     "dev": "docker compose up -d redis && next dev",
-    "build": "npm run build:ui && next build",
+    "build": "pnpm run build:ui && next build",
     "start": "node ./scripts/start-production.mjs",
     "lint": "biome lint .",
     "lint:fix": "biome lint . --write",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
-    "@carneirofc/ui": "file:../deedlit.dev.ui",
+    "@carneirofc/ui": "workspace:*",
     "@editorjs/editorjs": "^2.31.7",
     "@editorjs/header": "^2.8.9",
     "@editorjs/list": "^2.0.9",

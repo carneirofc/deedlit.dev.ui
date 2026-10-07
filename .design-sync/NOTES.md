@@ -5,7 +5,7 @@
   workspace, but it sits under the repo root whose `node_modules` holds react,
   react-dom, clsx, tailwind-merge. `deedlit.dev.ui/node_modules` is sparse. Always
   pass `--node-modules node_modules` (repo root), not the package's own.
-- **Entry:** `deedlit.dev.ui/dist/index.js` (built by `npm run build` = tsc + fix-esm-imports).
+- **Entry:** `deedlit.dev.ui/dist/index.js` (built by `pnpm run build` = tsc + fix-esm-imports).
   In the DS's own source repo there is no `node_modules/@carneirofc/ui`, hence `--entry`.
 - **Reference storybook:** built from `deedlit.dev.ui` with `-c .storybook` into
   `.design-sync/sb-reference` (repo-root path). Rebuild whenever DS source changes.

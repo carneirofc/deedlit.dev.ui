@@ -12,6 +12,7 @@ on:
       - 'deedlit.dev.ui/**'
       - 'docs/site/**'
       - 'docs/screenshots/**'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/storybook-pages.yml'
   workflow_dispatch:
 
@@ -31,23 +32,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
-      # The lockfile is generated on Windows and contains no Linux entries for
-      # native optional deps (oxc-*, lightningcss, …; npm/cli#4828) — npm ci and
-      # even npm install against that lock skip them. Resolve fresh instead;
-      # this build is a docs artifact, so lockfile determinism is not critical.
+      # pnpm-lock.yaml records native optional deps for every platform, so the
+      # lock from any OS installs cleanly here (npm's did not; npm/cli#4828).
       - name: Install dependencies
-        run: |
-          rm package-lock.json
-          npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
 
       - name: Build Storybook
-        run: npm run build-storybook --workspace @carneirofc/ui
+        run: pnpm --filter @carneirofc/ui build-storybook
 
       - name: Assemble Pages site (landing page + /ui/storybook)
         run: |

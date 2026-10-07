@@ -18,8 +18,8 @@
 - Keep the app a gateway client — no datastore logic. New backend behavior belongs in the owning FastAPI service, exposed via `deedlit.api`.
 
 ## Verification
-- `npm run lint` (Biome; root `biome.jsonc`) · `npm run build` · `npm run test:e2e` (from repo root: `npm run dev:comfyhelper`).
-- `npm run lint` reports **11 pre-existing errors** here, inherited from the ESLint→Biome migration; this package was already failing its ESLint gate before that. They are real but low-risk (`forEach` callbacks with implicit returns, two implicit-`any` `let`s, two assignments inside expressions, and two `noUnsafeOptionalChaining` hits that are actually guarded by `Array.isArray`). Clearing them is a standalone task — do not fold it into an unrelated change.
+- `pnpm run lint` (Biome; root `biome.jsonc`) · `pnpm run build` · `pnpm run test:e2e` (from repo root: `pnpm run dev:comfyhelper`).
+- `pnpm run lint` reports **160 errors** here under the aggressive Biome config: the 11 inherited from the ESLint→Biome migration, plus rules that used to be demoted to warnings (mostly `useButtonType`, `noFloatingPromises`, `useExhaustiveDependencies`, `useImageSize`). The pre-commit hook only checks staged files, so touching a file means clearing its errors. The original 11 are real but low-risk (`forEach` callbacks with implicit returns, two implicit-`any` `let`s, two assignments inside expressions, and two `noUnsafeOptionalChaining` hits that are actually guarded by `Array.isArray`). Clearing them is a standalone task — do not fold it into an unrelated change.
 
 ## Child Guides
 - None.

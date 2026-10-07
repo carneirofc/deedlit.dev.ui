@@ -53,11 +53,11 @@ This package is the Next.js application for browsing and managing local ComfyUI 
 - Keep queue-like behavior explicit in the current event-driven pipeline. If work is already represented as a worker event, scan job, or replayable stream message, extend that path instead of duplicating state.
 
 ## Common Commands
-- Dev server: `npm run dev`
-- Production build: `npm run build`
-- Unit tests: `npm run test:unit`
-- E2E tests: `npm run test:e2e`
-- Interactive Playwright UI: `npm run test:e2e:ui`
+- Dev server: `pnpm run dev`
+- Production build: `pnpm run build`
+- Unit tests: `pnpm run test:unit`
+- E2E tests: `pnpm run test:e2e`
+- Interactive Playwright UI: `pnpm run test:e2e:ui`
 
 ## Change Boundaries
 - Put app-agnostic UI primitives in `deedlit.dev.ui`, not here.

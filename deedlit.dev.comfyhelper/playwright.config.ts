@@ -1,8 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number(process.env.E2E_PORT ?? 43000);
+const port = Number(process.env.E2E_PORT ?? 43_000);
 const host = process.env.E2E_HOST ?? "127.0.0.1";
-const baseURL = process.env.E2E_BASE_URL ?? `http://${host}:${port}`;
+const baseUrl = process.env.E2E_BASE_URL ?? `http://${host}:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -12,25 +12,25 @@ export default defineConfig({
   workers: Number(process.env.E2E_WORKERS ?? 1),
   timeout: 45_000,
   expect: {
-    timeout: 10_000,
+    timeout: 10_000
   },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL,
+    baseURL: baseUrl,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: "retain-on-failure"
   },
   webServer: {
-    command: `npm run build && npm run start -- -p ${port}`,
-    url: baseURL,
+    command: `pnpm run build && pnpm run start -- -p ${port}`,
+    url: baseUrl,
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    timeout: 180_000
   },
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+      use: { ...devices["Desktop Chrome"] }
+    }
+  ]
 });

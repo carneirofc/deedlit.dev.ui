@@ -25,7 +25,8 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint . --write",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "sideEffects": [
     "./styles/styles.css"

@@ -18,30 +18,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
           registry-url: https://npm.pkg.github.com
           scope: '@carneirofc'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Set version from release tag
+        working-directory: deedlit.dev.ui
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Publishing @carneirofc/ui@${VERSION}"
           npm version "$VERSION" \
-            --workspace @carneirofc/ui \
             --no-git-tag-version \
             --allow-same-version
 
       - name: Build UI package
-        run: npm run build:ui
+        run: pnpm run build:ui
 
       - name: Publish to GitHub Packages
-        run: npm publish --workspace @carneirofc/ui
+        run: pnpm --filter @carneirofc/ui publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

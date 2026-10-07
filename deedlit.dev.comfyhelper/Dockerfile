@@ -11,17 +11,23 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+# pnpm, at the version pinned by the root package.json `packageManager` field.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
 # Install workspace dependencies (root manifest + per-package manifests first
 # so this layer caches across source-only changes).
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY deedlit.dev.ui/package.json deedlit.dev.ui/package.json
-COPY deedlit.dev/package.json deedlit.dev/package.json
 COPY deedlit.dev.comfyhelper/package.json deedlit.dev.comfyhelper/package.json
-RUN npm ci
+# --ignore-scripts skips the root `prepare` (lefthook install), which needs a
+# .git directory the build context does not have; `pnpm rebuild` then runs the
+# dependency build scripts allowed in pnpm-workspace.yaml.
+RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild
 
 # Copy the rest and build the shared UI + comfyhelper app.
 COPY . .
-RUN npm run build:comfyhelper
+RUN pnpm run build:comfyhelper
 
 # ---- runtime -------------------------------------------------------------
 FROM node:22-bookworm-slim AS runtime
@@ -35,4 +41,4 @@ COPY --from=build /app /app
 
 EXPOSE 3000
 WORKDIR /app/deedlit.dev.comfyhelper
-CMD ["npm", "run", "start", "--", "-H", "0.0.0.0"]
+CMD ["node", "./scripts/start-production.mjs", "-H", "0.0.0.0"]

@@ -10,7 +10,7 @@ Version-managed toolchains that are **not** on the bare PATH. Don't go hunting f
   ```powershell
   fnm env --use-on-cd | Out-String | Invoke-Expression
   ```
-  After that, `node`, `npm`, `npx` work. `--use-on-cd` makes fnm honor a repo's `.node-version`/`.nvmrc` on entry. Use `npm` for workspace scripts (see the root [`AGENTS.md`](../../AGENTS.md) Command Reference).
+  After that, `node`, `npm`, `npx` work. `--use-on-cd` makes fnm honor a repo's `.node-version`/`.nvmrc` on entry. Use `pnpm` for workspace scripts (`corepack enable` once to get the pinned version) (see the root [`AGENTS.md`](../../AGENTS.md) Command Reference).
 
 ## Python — managed by **uv**, per-package venvs
 - `uv.exe`: `%USERPROFILE%\.local\bin\uv.exe` (on PATH).

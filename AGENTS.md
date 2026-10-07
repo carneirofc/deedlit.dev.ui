@@ -27,12 +27,15 @@ Root guide for the monorepo: project-wide instructions, global preferences, dura
 - `deedlit.<service>/`: start from `app.py` (FastAPI entry), the package module (`<service>/`), `pyproject.toml`, and `tests/`. Ingest also has `worker.py` (the queue consumer).
 
 ## Command Reference
-- Build shared UI: `npm run build:ui`
-- Run everything (orchestrated): `npm run dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `npm run infra:up`.
-- Run comfyhelper only: `npm run dev:comfyhelper`
-- Build all workspaces: `npm run build`
-- Lint (JS/TS/CSS): `npm run lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `npm run lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
-- Format: `npm run format` reports, `npm run format:write` rewrites. The formatter is configured but has **not** been applied to the tree yet — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change.
+- Build shared UI: `pnpm run build:ui`
+- Run everything (orchestrated): `pnpm run dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `pnpm run infra:up`.
+- Run comfyhelper only: `pnpm run dev:comfyhelper`
+- Build all workspaces: `pnpm run build`
+- Package manager: **pnpm** (version pinned in root `package.json` `packageManager`; `corepack enable` once). Workspace packages are listed in `pnpm-workspace.yaml`; dependency build scripts must be allowed there under `allowBuilds`. Do not reintroduce `package-lock.json`.
+- Lint (JS/TS/CSS): `pnpm run lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo, running the `all` preset plus type-aware promise rules. Every rule switched off there carries its reason; add one only with a reason. `pnpm run lint:fix` applies safe fixes; `pnpm check:fix` also formats and sorts imports. ESLint was removed; do not reintroduce a per-package linter config.
+- Format: `pnpm run format` reports, `pnpm run format:write` rewrites. The formatter has **not** been applied to the whole tree — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change. The pre-commit hook formats the files you stage.
+- Typecheck: `pnpm typecheck` (every workspace package).
+- Git hooks (**lefthook**, `lefthook.yml`, installed by `pnpm install`): pre-commit runs `biome check --write` on staged files and verifies `pnpm-lock.yaml` matches the manifests; commit-msg runs commitlint (Conventional Commits); pre-push runs `biome ci` on files changed since `origin/master` plus `pnpm typecheck`. Skip a run with `LEFTHOOK=0` only for a reason you would put in the commit body.
 - `eslint-disable` comments still in `deedlit.dev.comfyhelper/` and `deedlit.dev.ui/` are inert. Biome uses `// biome-ignore <rule>: <reason>`, and the reason is required.
 
 ## Commit Convention
@@ -101,7 +104,7 @@ Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail 
 - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — canonical triage vocabulary.
 - [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.
 
-### Web apps (npm workspace)
+### Web apps (pnpm workspace)
 - The public Next.js site (:3001) — home, books, gallery, PWA, plus the authenticated `/portal` service dashboard — lives in `carneirofc/deedlit.dev.portal`, not here.
 - [`deedlit.dev.comfyhelper/AGENTS.md`](deedlit.dev.comfyhelper/AGENTS.md) — ComfyHelper image-library UI (:3000), gateway client only.
 - [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md) — shared `@carneirofc/ui` component library + tokens.

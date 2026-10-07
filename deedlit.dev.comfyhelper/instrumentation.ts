@@ -3,7 +3,7 @@
 // HTTP/fetch and exports spans over OTLP to the endpoint named by
 // OTEL_EXPORTER_OTLP_ENDPOINT (Alloy -> Tempo in docker-compose).
 //
-// When that env var is unset (e.g. plain `npm run dev`), no exporter is wired
+// When that env var is unset (e.g. plain `pnpm run dev`), no exporter is wired
 // up and tracing is a no-op, so this is safe to leave registered everywhere.
 //
 // DB-level coverage:
@@ -26,7 +26,7 @@ export async function register() {
   const [{ registerOTel }, { PgInstrumentation }, { AwsInstrumentation }] = await Promise.all([
     import("@vercel/otel"),
     import("@opentelemetry/instrumentation-pg"),
-    import("@opentelemetry/instrumentation-aws-sdk"),
+    import("@opentelemetry/instrumentation-aws-sdk")
   ]);
 
   registerOTel({
@@ -37,9 +37,9 @@ export async function register() {
       new PgInstrumentation({
         // Record the SQL text so slow queries are identifiable in Tempo.
         // Parameter values are NOT captured.
-        enhancedDatabaseReporting: true,
+        enhancedDatabaseReporting: true
       }),
-      new AwsInstrumentation({ suppressInternalInstrumentation: true }),
-    ],
+      new AwsInstrumentation({ suppressInternalInstrumentation: true })
+    ]
   });
 }

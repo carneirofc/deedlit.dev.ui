@@ -1,0 +1,11 @@
+packages:
+  - deedlit.dev.ui
+  - deedlit.dev.comfyhelper
+
+# pnpm blocks dependency lifecycle scripts by default; allow only the ones
+# that need a native build/postinstall step.
+allowBuilds:
+  esbuild: true
+  # Its postinstall only installs the git hooks; the root `prepare` script
+  # already does that.
+  lefthook: false

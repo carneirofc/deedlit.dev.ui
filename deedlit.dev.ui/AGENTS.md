@@ -17,9 +17,9 @@
 - Promote reusable pieces here; keep app-specific behavior out. When a change touches shared UI and an app, build the UI first, then adjust the consumer.
 
 ## Verification
-- `npm run build -w @carneirofc/ui` (type-check via `tsc` + ESM import fix). No unit tests in this package.
-- `npm run lint -w @carneirofc/ui` (Biome; config is the root `biome.jsonc`). Currently zero errors, and the portal pipeline gates on it — this package is built into the portal image, so a regression here breaks that release.
-- `npm run build-storybook -w @carneirofc/ui` for the static Storybook.
+- `pnpm --filter @carneirofc/ui build` (type-check via `tsc` + ESM import fix). No unit tests in this package.
+- `pnpm --filter @carneirofc/ui lint` (Biome; config is the root `biome.jsonc`). It had zero errors under the `recommended` preset; the aggressive config reports **26** (a11y, `useExhaustiveDependencies`, `noArrayIndexKey`, `noFloatingPromises`) that must be cleared before the next release, because the portal pipeline gates on it — this package is built into the portal image, so a regression here breaks that release.
+- `pnpm --filter @carneirofc/ui build-storybook` for the static Storybook.
 
 ## Child Guides
 - None.

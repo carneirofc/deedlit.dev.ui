@@ -14,15 +14,15 @@ data-quality rules are in **[`IMAGE_LIBRARY.md`](./IMAGE_LIBRARY.md)**.
 From the repo root (starts datastores, services, and both web apps):
 
 ```bash
-npm run infra:up        # postgres + neo4j + qdrant + rustfs + rabbitmq + redis + o11y
-npm run dev:migrate     # apply catalog migrations
-npm run dev             # all apps + services via mprocs
+pnpm run infra:up        # postgres + neo4j + qdrant + rustfs + rabbitmq + redis + o11y
+pnpm run dev:migrate     # apply catalog migrations
+pnpm run dev             # all apps + services via mprocs
 ```
 
 ComfyHelper alone (gateway must already be running):
 
 ```bash
-npm run dev:comfyhelper # http://localhost:3000  (redirects to /library)
+pnpm run dev:comfyhelper # http://localhost:3000  (redirects to /library)
 ```
 
 See the root [`README.md`](../README.md) for the full topology and ports.

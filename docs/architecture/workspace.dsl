@@ -21,7 +21,7 @@ workspace "deedlit.dev" "C4 model of the deedlit.dev monorepo: the public landin
         # --- The system -----------------------------------------------------
         deedlit = softwareSystem "deedlit.dev" "Self-hosted generated-image library plus public landing site." {
 
-            # Web apps (npm workspace) --------------------------------------
+            # Web apps (pnpm workspace) --------------------------------------
             ui = container "@carneirofc/ui" "Shared React component library. Build-time only — compiled into the two web apps, not a runtime service." "TypeScript / React (build-time)" {
                 tags "Library"
             }
@@ -130,7 +130,7 @@ workspace "deedlit.dev" "C4 model of the deedlit.dev monorepo: the public landin
         deploymentEnvironment "Local (Docker Compose)" {
             host = deploymentNode "Docker host" "Linux host running the 'deedlit' Compose project (docker compose up)." {
 
-                webNode = deploymentNode "Web apps" "npm workspace (Next.js)" {
+                webNode = deploymentNode "Web apps" "pnpm workspace (Next.js)" {
                     containerInstance deedlit.dev
                     containerInstance deedlit.comfyhelper
                 }

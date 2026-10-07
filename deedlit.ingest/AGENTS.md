@@ -8,7 +8,7 @@
 
 ## Local Contracts
 - Canonical HTTP contract: [`../contracts/ingest.openapi.yaml`](../contracts/ingest.openapi.yaml).
-- Two processes, one image: `app.py` (HTTP surface + in-memory `JobStore`, run via uvicorn) and `worker.py` (AMQP consumer, run via `python worker.py` / `npm run dev:ingest-worker`).
+- Two processes, one image: `app.py` (HTTP surface + in-memory `JobStore`, run via uvicorn) and `worker.py` (AMQP consumer, run via `python worker.py` / `pnpm run dev:ingest-worker`).
 - `broker.py` is the only AMQP seam (topology, publish, retry/DLQ, `run_worker`); `aio-pika` is imported lazily so tests run offline. `pipeline.py` holds per-file/per-stage logic and the outbound HTTP calls; `jobs.py`, `config.py` (live-tunable producer knobs), `fs_browse.py`, `settings_client.py`, `id_scheme.py`.
 - Queue topics (routing key = queue name), each with `.retry` + `.dlq` siblings: `ingest`, `embed.dense`, `embed.sparse`, `index.search` (fan-in), `index.graph`, `label`. The `label` queue is serial (`LABEL_PREFETCH = 1`, exclusive) because the vision-LLM is single-threaded.
 - Outbound calls: `metadata` `/extract`, `vision` `/embed/image` + `/embed/sparse`, optional `labelagent` `/describe` (gated by `LABELAGENT_URL`), plus catalog/search/graph writes.
