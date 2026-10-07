@@ -248,9 +248,9 @@ export function ServiceStatusBoard({
         <p className="text-ui-sm text-ui-ink-muted">No status available.</p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {(loaded ? components : SKELETON).map((c, i) => (
+          {(loaded ? components : SKELETON).map((c) => (
             <div
-              key={c.name + i}
+              key={c.name}
               className="flex flex-col gap-2 rounded-lg border border-ui-border/50 bg-ui-bg p-3"
               data-testid={`status-card-${c.name}`}
             >

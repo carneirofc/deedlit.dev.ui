@@ -796,6 +796,7 @@ export default function ImageDetailPage() {
               {debug.warnings.length > 0 && (
                 <ul className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-300">
                   {debug.warnings.map((w, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static warning strings that may repeat; never reordered.
                     <li key={i}>⚠ {w}</li>
                   ))}
                 </ul>

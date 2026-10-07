@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 type NavItem = {
   href: string;
@@ -377,6 +377,7 @@ function SheetRow({
 export function AppSidebar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const sheetId = useId();
 
   // Esc closes the mobile sheet.
   useEffect(() => {
@@ -390,7 +391,6 @@ export function AppSidebar() {
 
   return (
     <aside
-      id="app-sidebar"
       data-testid="app-sidebar"
       className="pointer-events-none fixed inset-x-0 bottom-4 z-80 flex justify-center px-3 md:inset-x-auto md:bottom-auto md:left-4 md:top-1/2 md:-translate-y-1/2 md:px-0"
     >
@@ -408,7 +408,6 @@ export function AppSidebar() {
         <Link
           href="/library"
           prefetch={false}
-          id="nav-home-link"
           data-testid="nav-home-link"
           aria-label="Go to image library"
           title="Go to image library"
@@ -423,7 +422,7 @@ export function AppSidebar() {
           onClick={() => setMenuOpen((v) => !v)}
           aria-label={menuOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={menuOpen}
-          aria-controls="mobile-nav-sheet"
+          aria-controls={sheetId}
           data-testid="app-sidebar-mobile-menu-toggle"
           className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-ui-ink-muted transition hover:bg-ui-bg-soft hover:text-ui-ink-title md:hidden"
         >
@@ -454,7 +453,6 @@ export function AppSidebar() {
 
         {/* Desktop vertical rail (icons only) */}
         <nav
-          id="primary-navigation"
           data-testid="primary-navigation"
           aria-label="Primary navigation"
           className="hidden md:flex md:flex-col md:items-center md:gap-2"
@@ -471,7 +469,7 @@ export function AppSidebar() {
         {/* Mobile sheet — labeled rows in a popover above the bar */}
         {menuOpen && (
           <div
-            id="mobile-nav-sheet"
+            id={sheetId}
             className="app-sidebar-shell absolute bottom-[calc(100%+0.75rem)] left-1/2 w-[min(92vw,22rem)] -translate-x-1/2 rounded-2xl border p-2 shadow-panel-lg backdrop-blur-xl md:hidden"
           >
             <p className="px-2 pb-1.5 pt-1 text-ui-2xs font-medium uppercase tracking-wide text-ui-ink-muted">

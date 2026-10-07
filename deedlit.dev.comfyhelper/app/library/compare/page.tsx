@@ -180,6 +180,7 @@ function ComparePageInner() {
                       </th>
                       {f.values.map((v, i) => (
                         <td
+                          // biome-ignore lint/suspicious/noArrayIndexKey: column i is image i; columns never reorder within a row.
                           key={i}
                           className={`py-1.5 pr-3 align-top ${f.allEqual ? "text-ui-ink-muted" : "text-ui-ink"}`}
                         >

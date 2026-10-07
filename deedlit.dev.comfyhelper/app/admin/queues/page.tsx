@@ -603,6 +603,7 @@ export default function QueuesPage() {
                                 </li>
                               )}
                               {peek_.messages.map((m, i) => (
+                                // biome-ignore lint/suspicious/noArrayIndexKey: peeked messages carry no id; the list is a read-only snapshot in queue order.
                                 <MessageCard key={i} m={m} index={i} />
                               ))}
                             </ul>
@@ -690,6 +691,7 @@ export default function QueuesPage() {
                   <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
                     {msgs.length === 0 && <li className="text-ui-2xs text-ui-ink-muted">empty</li>}
                     {msgs.map((m, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: peeked messages carry no id; the list is a read-only snapshot in queue order.
                       <MessageCard key={i} m={m} index={i} />
                     ))}
                   </ul>
