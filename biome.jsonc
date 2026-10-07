@@ -114,6 +114,9 @@
         // Design tokens and Tailwind arbitrary values are literal by nature.
         "noHexColors": "off",
         "noMagicNumbers": "off",
+        // Bare boolean props (`asChild`, `disabled`) are idiomatic JSX; the
+        // "fix" rewrites them to `={true}`.
+        "noImplicitBoolean": "off",
         "useFilenamingConvention": {
           "level": "error",
           "options": {
