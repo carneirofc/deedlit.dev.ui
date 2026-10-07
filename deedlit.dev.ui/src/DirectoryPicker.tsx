@@ -93,10 +93,12 @@ export function DirectoryPicker({
 
   // On open: load the roots view first (always succeeds, populates drive
   // shortcuts), then try to descend into the current value if there is one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per open; initialPath is read at open time on purpose, not tracked.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    (async () => {
+    // browse() handles its own errors and loading state.
+    void (async () => {
       await browse(null);
       if (!cancelled && initialPath && initialPath.trim()) {
         await browse(initialPath.trim());
@@ -105,8 +107,6 @@ export function DirectoryPicker({
     return () => {
       cancelled = true;
     };
-    // Intentionally only re-run when the modal opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const current = data?.path ?? null;
@@ -154,7 +154,7 @@ export function DirectoryPicker({
               value={manual}
               onChange={(event) => setManual(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") browse(manual.trim() || null);
+                if (event.key === "Enter") void browse(manual.trim() || null);
               }}
               placeholder="Type or paste a folder path…"
               spellCheck={false}

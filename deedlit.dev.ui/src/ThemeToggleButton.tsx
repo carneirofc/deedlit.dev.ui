@@ -182,7 +182,6 @@ export default function ThemeToggleButton({
     <button
       ref={buttonRef}
       type="button"
-      id="theme-toggle-button"
       data-testid="theme-toggle-button"
       onClick={handleClick}
       onPointerDown={handlePointerDown}
@@ -199,7 +198,7 @@ export default function ThemeToggleButton({
         .join(" ")}
       style={style}
       title="Toggle light/dark theme — drag to reposition"
-      suppressHydrationWarning
+      suppressHydrationWarning={true}
     >
       <svg aria-hidden="true" viewBox="0 0 24 24" className={ICON_CLASS} strokeWidth="1.9">
         <path d="M21 12.8A8.9 8.9 0 1 1 11.2 3a7.3 7.3 0 0 0 9.8 9.8z" />

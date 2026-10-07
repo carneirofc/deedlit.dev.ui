@@ -18,7 +18,7 @@
 
 ## Verification
 - `pnpm --filter @carneirofc/ui build` (type-check via `tsc` + ESM import fix). No unit tests in this package.
-- `pnpm --filter @carneirofc/ui lint` (Biome; config is the root `biome.jsonc`). It had zero errors under the `recommended` preset; the aggressive config reports **26** (a11y, `useExhaustiveDependencies`, `noArrayIndexKey`, `noFloatingPromises`) that must be cleared before the next release, because the portal pipeline gates on it — this package is built into the portal image, so a regression here breaks that release.
+- `pnpm --filter @carneirofc/ui lint` (Biome; config is the root `biome.jsonc`). It had zero errors under the `recommended` preset; it has zero errors under the aggressive config too (warnings remain), and must stay that way, because the portal pipeline gates on it — this package is built into the portal image, so a regression here breaks that release.
 - `pnpm --filter @carneirofc/ui build-storybook` for the static Storybook.
 
 ## Child Guides

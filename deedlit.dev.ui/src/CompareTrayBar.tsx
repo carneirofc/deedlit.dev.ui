@@ -80,13 +80,15 @@ export function CompareTrayBar({
               className="group relative"
               data-testid={`compare-tray-item-${item.id}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.thumbnailUrl}
+                width={44}
+                height={44}
                 alt={item.alt ?? ""}
                 className="h-11 w-11 rounded-lg border border-ui-border/60 object-cover"
               />
               <button
+                type="button"
                 onClick={() => onRemove(item.id)}
                 className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full border border-ui-border/70 bg-ui-bg text-ui-2xs text-ui-ink-muted transition hover:text-rose-500"
                 aria-label={removeLabel}
@@ -98,6 +100,7 @@ export function CompareTrayBar({
           ))}
           {Array.from({ length: Math.max(0, max - items.length) }).map((_, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty placeholder slots have no identity beyond their position.
               key={`slot-${i}`}
               className="h-11 w-11 rounded-lg border border-dashed border-ui-border/50"
               aria-hidden="true"
@@ -105,6 +108,7 @@ export function CompareTrayBar({
           ))}
         </div>
         <button
+          type="button"
           onClick={onClear}
           className="rounded-lg border border-ui-border/70 px-2.5 py-2 text-ui-xs text-ui-ink-muted transition hover:text-ui-ink"
           data-testid="compare-tray-clear"

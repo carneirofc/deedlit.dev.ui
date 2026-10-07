@@ -71,6 +71,7 @@ export const LargeBodyScroll: Story = {
         <DialogBody>
           <div className="space-y-2">
             {Array.from({ length: 40 }).map((_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: generated filler rows; the index is the identity.
               <p key={index} className="text-ui-sm text-[color:var(--ui-ink-secondary)]">
                 Row {index + 1}: indexed 24 images, 0 errors.
               </p>

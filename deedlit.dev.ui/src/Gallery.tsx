@@ -98,6 +98,7 @@ function SelectCheck({ checked }: { checked: boolean }) {
       aria-hidden="true"
     >
       <svg
+        aria-hidden="true"
         viewBox="0 0 24 24"
         className="h-3.5 w-3.5"
         fill="none"
@@ -240,6 +241,7 @@ export function Gallery<T>({
   // A new result set (or a head splice that changes the first item) re-anchors the
   // window to the top; otherwise re-derive it from scroll. Layout effect so the
   // window + spacers are right before paint (no flash, no premature load-more).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: viewMode is not read here, but switching it changes the grid geometry, so the window must be re-derived.
   useLayoutEffect(() => {
     if (!enabled) {
       setRange((prev) =>

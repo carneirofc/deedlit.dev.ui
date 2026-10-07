@@ -34,6 +34,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
         aria-hidden="true"
       >
         <svg
+          aria-hidden="true"
           className="h-3 w-3 opacity-0 transition-opacity duration-180 ease-in-out peer-checked:group-[]/cb:opacity-100 [input:checked~span>&]:opacity-100"
           viewBox="0 0 12 12"
           fill="none"

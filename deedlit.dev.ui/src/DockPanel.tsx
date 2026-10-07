@@ -98,7 +98,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel(
   const baseId = testIdPrefix ?? `dock-panel-${generatedId}`;
 
   useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
+    if (!(isOpen && closeOnEscape)) return;
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -190,6 +190,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel(
 
       {/* Backdrop overlay */}
       {isOpen && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only dismiss affordance; keyboard users close with Escape or the toggle.
         <div
           role="presentation"
           onClick={() => onOpenChange(false)}

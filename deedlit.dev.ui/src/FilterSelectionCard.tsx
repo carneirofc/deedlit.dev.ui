@@ -68,13 +68,14 @@ const FilterSelectionCard = forwardRef<HTMLDivElement, FilterSelectionCardProps>
           >
             {items.map((item, index) => (
               <OutlineButton
+                // biome-ignore lint/suspicious/noArrayIndexKey: items are caller-supplied strings that may repeat; the item text already discriminates.
                 key={`${item}-${index}`}
                 onClick={() => onRemoveItem(item)}
                 className={cn(DEFAULT_CHIP_CLASS, chipClassName)}
                 title={`${removeTitlePrefix}: ${item}`}
               >
                 <span className={cn("max-w-[180px] truncate", itemLabelClassName)}>{item}</span>
-                <span aria-hidden className={removeIconClassName}>
+                <span aria-hidden={true} className={removeIconClassName}>
                   ×
                 </span>
               </OutlineButton>

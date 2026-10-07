@@ -68,6 +68,7 @@ const ConfirmationDialog = forwardRef<HTMLDivElement, ConfirmationDialogProps>(
               <ul className="mt-2 space-y-1">
                 {dialog.details.map((line, index) => (
                   <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static text lines, never reordered, and may repeat.
                     key={`detail:${index}`}
                     className={cn("rounded-md bg-ui-bg-muted", SPACING_PATTERNS.controlXs)}
                   >
@@ -82,6 +83,7 @@ const ConfirmationDialog = forwardRef<HTMLDivElement, ConfirmationDialogProps>(
               <ul className="mt-2 space-y-1">
                 {dialog.outcomes.map((line, index) => (
                   <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static text lines, never reordered, and may repeat.
                     key={`outcome:${index}`}
                     className={cn("rounded-md bg-ui-bg-info", SPACING_PATTERNS.controlXs)}
                   >

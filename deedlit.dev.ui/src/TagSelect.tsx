@@ -79,7 +79,7 @@ function TagSelect({
   // Live server-backed suggestions: debounce the draft and fetch while the
   // dropdown is open. The latest result wins; a stale in-flight one is dropped.
   useEffect(() => {
-    if (!fetchSuggestions || !open) return;
+    if (!(fetchSuggestions && open)) return;
     let alive = true;
     const handle = setTimeout(() => {
       fetchSuggestions(draft.trim())
@@ -154,6 +154,8 @@ function TagSelect({
 
   return (
     <div className={cn("relative", className)} data-testid={testId}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer convenience that focuses the input, which is itself keyboard-reachable. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: same; the input handles all keyboard interaction. */}
       <div
         className={cn(
           "flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-lg border border-ui-border/70 bg-ui-bg px-2 py-1.5 text-ui-sm outline-none transition",
@@ -201,18 +203,27 @@ function TagSelect({
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
+          aria-activedescendant={
+            open && active < filtered.length ? `${listId}-option-${active}` : undefined
+          }
           aria-autocomplete="list"
         />
       </div>
 
       {open && filtered.length > 0 && (
-        <ul
+        <div
           id={listId}
           role="listbox"
           className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-ui-border/70 bg-ui-bg-soft p-1 shadow-lg"
         >
           {filtered.map((s, i) => (
-            <li key={s} role="option" aria-selected={i === active}>
+            <div
+              key={s}
+              id={`${listId}-option-${i}`}
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === active}
+            >
               <button
                 type="button"
                 onMouseDown={(e) => {
@@ -228,9 +239,9 @@ function TagSelect({
               >
                 {s}
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
