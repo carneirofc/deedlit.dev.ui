@@ -19,7 +19,7 @@
 
 ## Verification
 - `pnpm run lint` (Biome; root `biome.jsonc`) · `pnpm run build` · `pnpm run test:e2e` (from repo root: `pnpm run dev:comfyhelper`).
-- `pnpm run lint` reports **160 errors** here under the aggressive Biome config: the 11 inherited from the ESLint→Biome migration, plus rules that used to be demoted to warnings (mostly `useButtonType`, `noFloatingPromises`, `useExhaustiveDependencies`, `useImageSize`). The pre-commit hook only checks staged files, so touching a file means clearing its errors. The original 11 are real but low-risk (`forEach` callbacks with implicit returns, two implicit-`any` `let`s, two assignments inside expressions, and two `noUnsafeOptionalChaining` hits that are actually guarded by `Array.isArray`). Clearing them is a standalone task — do not fold it into an unrelated change.
+- `pnpm run lint` reports zero errors here under the aggressive Biome config (warnings and infos remain as the backlog); keep it that way. The pre-commit hook lints every staged file, so a new error blocks the commit. Suppressions use `// biome-ignore <rule>: <reason>` and must state why the code is intentional.
 
 ## Child Guides
 - None.

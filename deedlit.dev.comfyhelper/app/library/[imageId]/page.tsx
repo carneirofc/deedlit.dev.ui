@@ -459,7 +459,7 @@ export default function ImageDetailPage() {
             </div>
 
             {/* Star rating */}
-            <div className="mt-2 flex items-center gap-0.5" role="group" aria-label="Rating">
+            <fieldset className="mt-2 flex items-center gap-0.5" aria-label="Rating">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
@@ -491,7 +491,7 @@ export default function ImageDetailPage() {
                   ✕
                 </button>
               )}
-            </div>
+            </fieldset>
 
             <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-ui-xs text-ui-ink-muted">
               <dt>Model</dt>

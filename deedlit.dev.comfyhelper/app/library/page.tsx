@@ -1601,9 +1601,8 @@ export default function LibraryPage() {
               ))}
             </select>
           </label>
-          <div
+          <fieldset
             className="flex gap-0.5 rounded-lg border border-ui-border/60 bg-ui-bg p-0.5"
-            role="group"
             aria-label="Result layout"
           >
             {(
@@ -1628,7 +1627,7 @@ export default function LibraryPage() {
                 {label}
               </button>
             ))}
-          </div>
+          </fieldset>
         </div>
       </header>
 
@@ -2295,6 +2294,7 @@ function ImageDropzone({
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: drop/paste target; the "Choose file" button inside is the keyboard path.
     <div
       onDragOver={(e) => {
         e.preventDefault();

@@ -117,17 +117,26 @@ function EntitySuggest({
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-activedescendant={
+          open && !disabled && active < options.length ? `${listId}-option-${active}` : undefined
+        }
         aria-autocomplete="list"
         data-testid="graph-filter-entity-input"
       />
       {open && !disabled && options.length > 0 && (
-        <ul
+        <div
           id={listId}
           role="listbox"
           className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-ui-border/70 bg-ui-bg-soft p-1 shadow-lg"
         >
           {options.map((o, i) => (
-            <li key={o} role="option" aria-selected={i === active}>
+            <div
+              key={o}
+              id={`${listId}-option-${i}`}
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === active}
+            >
               <button
                 type="button"
                 onMouseDown={(e) => {
@@ -142,9 +151,9 @@ function EntitySuggest({
               >
                 {o}
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

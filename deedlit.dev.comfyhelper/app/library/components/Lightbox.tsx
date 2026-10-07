@@ -589,7 +589,7 @@ export function Lightbox({
 
           {/* Star rating */}
           {onRating && (
-            <div className="flex h-9 items-center gap-0.5" role="group" aria-label="Rating">
+            <fieldset className="flex h-9 items-center gap-0.5" aria-label="Rating">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
@@ -607,7 +607,7 @@ export function Lightbox({
                   ★
                 </button>
               ))}
-            </div>
+            </fieldset>
           )}
 
           {/* Notes toggle */}
@@ -797,6 +797,8 @@ export function Lightbox({
       {/* Stage — image area + details panel */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Click the empty area to close; swipe horizontally to page (mobile). */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer/touch affordances; keyboard users close with Escape and page with the arrow keys. */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: same; the lightbox-wide key handler covers Escape and the arrows. */}
         <div
           className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-2"
           onClick={(e) => {

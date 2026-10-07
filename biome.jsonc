@@ -75,6 +75,24 @@
     "rules": {
       "preset": "all",
 
+      "a11y": {
+        // These @carneirofc/ui components render a native input/select/
+        // textarea, so a <label> wrapping one is labelled correctly.
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": [
+              "Checkbox",
+              "PathInput",
+              "SelectInput",
+              "TagSelect",
+              "TextAreaInput",
+              "TextInput"
+            ]
+          }
+        }
+      },
+
       "complexity": {
         // Used deliberately to mark fire-and-forget promises, which
         // nursery/noFloatingPromises asks for. The two rules conflict.
