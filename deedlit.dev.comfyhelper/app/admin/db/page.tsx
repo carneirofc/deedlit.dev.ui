@@ -170,7 +170,7 @@ export default function DbPage() {
 
   // Re-query from the top whenever a filter changes (mirrors the prior auto-load).
   useEffect(() => {
-    fetchPage(true);
+    void fetchPage(true);
   }, [tag, safety, favorite, fetchPage]);
 
   // Infinite scroll: pull the next page as the sentinel nears the bottom of the
@@ -181,7 +181,7 @@ export default function DbPage() {
     if (!el) return;
     const ob = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loadingMore) loadMore();
+        if (entries[0].isIntersecting && !loadingMore) void loadMore();
       },
       { root: listScrollRef.current, rootMargin: "400px" }
     );
@@ -246,7 +246,7 @@ export default function DbPage() {
       setNotice("Saved.");
       setSelected(updated);
       setEdit(editFrom(updated));
-      load();
+      void load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -283,7 +283,7 @@ export default function DbPage() {
       setNotice("Deleted everywhere.");
       setSelected(null);
       setEdit(null);
-      load();
+      void load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed");
     }

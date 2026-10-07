@@ -626,7 +626,7 @@ export default function LibraryPage() {
       return null;
     });
     setMode("browse");
-    doFetch(false, { mode: "browse", similarRef: null, imageFile: null });
+    void doFetch(false, { mode: "browse", similarRef: null, imageFile: null });
   }, [doFetch]);
 
   const loadMore = useCallback(() => doFetch(true), [doFetch]);
@@ -954,7 +954,7 @@ export default function LibraryPage() {
       const ref: SimilarRef = { id, thumbUrl, summary };
       setSimilarRef(ref);
       setMode("similar");
-      doFetch(false, { mode: "similar", similarRef: ref });
+      void doFetch(false, { mode: "similar", similarRef: ref });
     },
     [doFetch]
   );
@@ -962,7 +962,7 @@ export default function LibraryPage() {
   const clearSimilar = useCallback(() => {
     setSimilarRef(null);
     setMode("browse");
-    doFetch(false, { mode: "browse", similarRef: null });
+    void doFetch(false, { mode: "browse", similarRef: null });
   }, [doFetch]);
 
   // Accept an external image (paste / drop / file pick) and immediately search.
@@ -975,7 +975,7 @@ export default function LibraryPage() {
         return URL.createObjectURL(file);
       });
       setMode("image");
-      doFetch(false, { mode: "image", imageFile: file, similarRef: null });
+      void doFetch(false, { mode: "image", imageFile: file, similarRef: null });
     },
     [doFetch]
   );
@@ -989,7 +989,7 @@ export default function LibraryPage() {
       return null;
     });
     setMode("browse");
-    doFetch(false, { mode: "browse", imageFile: null });
+    void doFetch(false, { mode: "browse", imageFile: null });
   }, [doFetch]);
 
   // Global clipboard paste while the image panel is open — paste a screenshot.
@@ -1021,7 +1021,7 @@ export default function LibraryPage() {
           if (j.jobs) setJobs(j.jobs);
         })
         .catch(() => {});
-    pollJobs();
+    void pollJobs();
     const id = setInterval(pollJobs, 3000);
     return () => {
       clearInterval(id);
@@ -1094,7 +1094,7 @@ export default function LibraryPage() {
     const lookahead = Math.round((typeof window !== "undefined" ? window.innerHeight : 800) * 1.5);
     const ob = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading) loadMore();
+        if (entries[0].isIntersecting && !loading) void loadMore();
       },
       { rootMargin: `${lookahead}px 0px` }
     );
@@ -1356,7 +1356,7 @@ export default function LibraryPage() {
     setKey("sortMode", next);
     // Browse ordering lives on the server, so a change must re-page from the top;
     // the vector path only needs the client reorder above.
-    if (browsePath) doFetch(false, { sort: next });
+    if (browsePath) void doFetch(false, { sort: next });
   };
 
   // Consume a `?view=` deep link: once results are in, open the viewer on the
@@ -1760,7 +1760,7 @@ export default function LibraryPage() {
                           ? tags.filter((x) => x.toLowerCase() !== t.toLowerCase())
                           : [...tags, t];
                         setTags(next);
-                        doFetch(false, { tags: next });
+                        void doFetch(false, { tags: next });
                       }}
                       className={`rounded-full border px-2.5 py-1 text-ui-2xs font-medium transition ${
                         on
@@ -1797,7 +1797,7 @@ export default function LibraryPage() {
                 checked={favorites}
                 onChange={(e) => {
                   setFavorites(e.target.checked);
-                  doFetch(false, { favorites: e.target.checked });
+                  void doFetch(false, { favorites: e.target.checked });
                 }}
                 className="rounded"
               />
@@ -1810,7 +1810,7 @@ export default function LibraryPage() {
               onChange={(e) => {
                 const v = Number(e.target.value);
                 setMinRating(v);
-                doFetch(false, { minRating: v });
+                void doFetch(false, { minRating: v });
               }}
               aria-label="Minimum rating"
             >
@@ -1838,7 +1838,7 @@ export default function LibraryPage() {
                   onClick={() => {
                     const next = on ? safety.filter((x) => x !== c) : [...safety, c];
                     setSafety(next);
-                    doFetch(false, { safety: next });
+                    void doFetch(false, { safety: next });
                   }}
                   className={`rounded-full border px-2.5 py-1 text-ui-2xs font-medium transition ${
                     on
@@ -1857,7 +1857,7 @@ export default function LibraryPage() {
             relatedImageId={similarRef?.id}
             onChange={(scope) => {
               setGraphScope(scope);
-              doFetch(false, { graphScope: scope });
+              void doFetch(false, { graphScope: scope });
             }}
           />
 

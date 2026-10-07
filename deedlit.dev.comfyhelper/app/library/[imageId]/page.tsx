@@ -166,7 +166,7 @@ export default function ImageDetailPage() {
   useEffect(() => {
     // Cancel the detail fetch if the user navigates away before it lands.
     const ac = new AbortController();
-    load(ac.signal);
+    void load(ac.signal);
     return () => ac.abort();
   }, [load]);
 
@@ -295,23 +295,29 @@ export default function ImageDetailPage() {
     if (!text || noteSaving) return;
     setNoteSaving(true);
     try {
-      const res = await fetch("/api/library/notes", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] })
-      });
-      if (res.ok) {
+      await track("Add note", async () => {
+        const res = await fetch("/api/library/notes", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: text, blocks: {}, imageRefs: [imageId] })
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error ?? "Failed to add note");
+        }
         setNoteDraft("");
         const r2 = await fetch(`/api/library/notes/by-image/${encodeURIComponent(imageId)}`);
         if (r2.ok) {
           const j = await r2.json();
           setNotes(Array.isArray(j) ? j : []);
         }
-      }
+      });
+    } catch {
+      // Surfaced by the activity dock/toast; the draft is kept for a retry.
     } finally {
       setNoteSaving(false);
     }
-  }, [imageId, noteDraft, noteSaving]);
+  }, [imageId, noteDraft, noteSaving, track]);
 
   const toggleFavorite = useCallback(async () => {
     if (!detail) return;
@@ -755,7 +761,7 @@ export default function ImageDetailPage() {
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") addNote();
+              if (e.key === "Enter") void addNote();
             }}
             disabled={noteSaving}
             data-testid="image-detail-note-input"

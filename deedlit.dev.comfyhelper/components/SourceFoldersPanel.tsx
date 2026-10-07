@@ -243,7 +243,7 @@ export function SourceFoldersPanel() {
     if (!Number.isFinite(minutes)) return;
     const seconds = Math.max(0, Math.round(minutes * 60));
     if (seconds !== folder.scan_interval_seconds) {
-      patchFolder(folder.id, { scan_interval_seconds: seconds });
+      void patchFolder(folder.id, { scan_interval_seconds: seconds });
     }
   };
 

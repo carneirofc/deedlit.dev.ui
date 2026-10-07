@@ -52,7 +52,7 @@ function ComparePageInner() {
   }, []);
 
   useEffect(() => {
-    load(ids);
+    void load(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsParam]);
 

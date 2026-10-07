@@ -59,11 +59,11 @@ function withBase(url: string | undefined, fn: () => Promise<void> | void) {
 // Base URL resolution
 // ---------------------------------------------------------------------------
 
-test("base URL defaults to localhost:8088 and strips trailing slashes", () => {
-  withBase("http://gw.test:9000/", () => {
+test("base URL defaults to localhost:8088 and strips trailing slashes", async () => {
+  await withBase("http://gw.test:9000/", () => {
     expect(getGatewayBaseUrl()).toBe("http://gw.test:9000");
   });
-  withBase(undefined, () => {
+  await withBase(undefined, () => {
     expect(getGatewayBaseUrl()).toBe("http://localhost:8088");
   });
 });
