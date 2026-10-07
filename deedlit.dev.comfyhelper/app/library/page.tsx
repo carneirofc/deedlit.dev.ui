@@ -427,43 +427,53 @@ export default function LibraryPage() {
     exhausted: boolean; // a fetched page came back short — no pages beyond it
   }>({ sig: "", pages: new Map(), inFlight: new Set(), controllers: [], exhausted: false });
 
-  const prefetchSig = (s: typeof filtersRef.current): string =>
-    JSON.stringify({
-      mode: s.mode,
-      query: s.query,
-      tags: s.tags,
-      excludeTags: s.excludeTags,
-      modelFamily: s.modelFamily,
-      checkpoint: s.checkpoint,
-      loras: s.loras,
-      sourceTool: s.sourceTool,
-      pathFilter: s.pathFilter,
-      favorites: s.favorites,
-      minRating: s.minRating,
-      safety: s.safety,
-      limit: s.limit,
-      minScore: s.minScore,
-      similar: s.similarRef?.id ?? null,
-      image: !!s.imageFile,
-      graphScope: s.graphScope,
-      sort: s.sort
-    });
+  // Pure; memoised only so the prefetch callbacks below can list it.
+  const prefetchSig = useCallback(
+    (s: typeof filtersRef.current): string =>
+      JSON.stringify({
+        mode: s.mode,
+        query: s.query,
+        tags: s.tags,
+        excludeTags: s.excludeTags,
+        modelFamily: s.modelFamily,
+        checkpoint: s.checkpoint,
+        loras: s.loras,
+        sourceTool: s.sourceTool,
+        pathFilter: s.pathFilter,
+        favorites: s.favorites,
+        minRating: s.minRating,
+        safety: s.safety,
+        limit: s.limit,
+        minScore: s.minScore,
+        similar: s.similarRef?.id ?? null,
+        image: !!s.imageFile,
+        graphScope: s.graphScope,
+        sort: s.sort
+      }),
+    []
+  );
 
   // by-image returns a single relevance-ranked window (no offset), so there are
   // no further pages to warm. Similar now pages by rank offset like browse/search.
-  const paginates = (s: typeof filtersRef.current): boolean => !(s.mode === "image" && s.imageFile);
+  const paginates = useCallback(
+    (s: typeof filtersRef.current): boolean => !(s.mode === "image" && s.imageFile),
+    []
+  );
 
   // Abort outstanding prefetches and rebind the buffer to a new filter signature.
-  const resetPrefetch = useCallback((s: typeof filtersRef.current) => {
-    prefetchRef.current.controllers.forEach((c) => c.abort());
-    prefetchRef.current = {
-      sig: prefetchSig(s),
-      pages: new Map(),
-      inFlight: new Set(),
-      controllers: [],
-      exhausted: false
-    };
-  }, []);
+  const resetPrefetch = useCallback(
+    (s: typeof filtersRef.current) => {
+      prefetchRef.current.controllers.forEach((c) => c.abort());
+      prefetchRef.current = {
+        sig: prefetchSig(s),
+        pages: new Map(),
+        inFlight: new Set(),
+        controllers: [],
+        exhausted: false
+      };
+    },
+    [prefetchSig]
+  );
 
   // Drop buffered pages but keep the signature — used when the freshness poll
   // splices new rows at the head and shifts every offset out from under them.
@@ -478,13 +488,16 @@ export default function LibraryPage() {
 
   // Pull a warmed page if it matches the current filters; consuming removes it
   // so a shifted offset can't re-serve it.
-  const takePrefetched = useCallback((s: typeof filtersRef.current, pageIndex: number) => {
-    const pf = prefetchRef.current;
-    if (pf.sig !== prefetchSig(s)) return null;
-    const hit = pf.pages.get(pageIndex);
-    if (hit) pf.pages.delete(pageIndex);
-    return hit ?? null;
-  }, []);
+  const takePrefetched = useCallback(
+    (s: typeof filtersRef.current, pageIndex: number) => {
+      const pf = prefetchRef.current;
+      if (pf.sig !== prefetchSig(s)) return null;
+      const hit = pf.pages.get(pageIndex);
+      if (hit) pf.pages.delete(pageIndex);
+      return hit ?? null;
+    },
+    [prefetchSig]
+  );
 
   // Warm up to PREFETCH_AHEAD pages beyond what's loaded. Sequential so we stop
   // the moment a short page reveals the end. Fire-and-forget.
@@ -515,7 +528,7 @@ export default function LibraryPage() {
         }
       })();
     },
-    [fetchPage]
+    [fetchPage, prefetchSig, paginates]
   );
 
   const doFetch = useCallback(

@@ -169,6 +169,7 @@ export default function DbPage() {
   const loadMore = useCallback(() => fetchPage(false), [fetchPage]);
 
   // Re-query from the top whenever a filter changes (mirrors the prior auto-load).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fetchPage reads the filters through filtersRef; they are listed as the re-query trigger.
   useEffect(() => {
     void fetchPage(true);
   }, [tag, safety, favorite, fetchPage]);

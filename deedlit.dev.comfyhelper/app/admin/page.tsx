@@ -228,6 +228,7 @@ export default function AdminPage() {
   }, [refreshJobs]);
 
   // Load detail for the expanded job (and keep it fresh while jobs poll).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: jobs is the refresh trigger — each poll re-fetches the expanded job's detail.
   useEffect(() => {
     if (!expanded) {
       setDetail(null);

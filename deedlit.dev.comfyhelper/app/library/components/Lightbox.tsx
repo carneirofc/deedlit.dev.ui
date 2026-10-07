@@ -157,6 +157,7 @@ export function Lightbox({
   const index =
     found !== -1 ? found : Math.min(Math.max(0, initialIndex), Math.max(0, items.length - 1));
   const current = items[index];
+  const shownId = current?.imageId;
 
   // Latest values for the slideshow timer, which closes over its first render.
   const live = useRef({ index, items, hasMore, slideshow, currentId });
@@ -222,22 +223,24 @@ export function Lightbox({
   useEffect(() => {
     onCurrentChangeRef.current = onCurrentChange;
   });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the id, not the object, so a re-render with a new item object for the same image does not re-report it.
   useEffect(() => {
     if (current) onCurrentChangeRef.current?.(current);
-  }, [current?.imageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shownId]);
 
   // Reset the load state whenever the displayed image changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: shownId and fullResolution are the reset triggers (they change the image src).
   useEffect(() => {
     setImgLoaded(false);
     setImgError(false);
-  }, [current?.imageId, fullResolution]);
+  }, [shownId, fullResolution]);
 
   // Fetch notes for the current image when the notes panel is open.
   useEffect(() => {
-    if (!notesOpen || !fetchNotes || !current) return;
+    if (!(notesOpen && fetchNotes && shownId)) return;
     let alive = true;
     setNotesLoading(true);
-    fetchNotes(current.imageId)
+    fetchNotes(shownId)
       .then((n) => {
         if (alive) setNotes(n);
       })
@@ -248,10 +251,11 @@ export function Lightbox({
     return () => {
       alive = false;
     };
-  }, [notesOpen, current?.imageId, fetchNotes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notesOpen, shownId, fetchNotes]);
 
   // Reset notes + any pending delete confirmation when navigating to a new
   // image (stale data / a primed confirm from the old one).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: shownId is the reset trigger.
   useEffect(() => {
     setNotes([]);
     setNoteDraft("");
@@ -260,12 +264,12 @@ export function Lightbox({
 
   // Fetch image detail when the details panel is open or the image changes.
   useEffect(() => {
-    if (!detailsOpen || !current) return;
+    if (!(detailsOpen && shownId)) return;
     let alive = true;
     setDetailLoading(true);
     setDetail(null);
     setDetailError(false);
-    fetch(`/api/library/images/${current.imageId}`)
+    fetch(`/api/library/images/${shownId}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(await r.text().catch(() => r.statusText));
         return r.json();
@@ -282,7 +286,7 @@ export function Lightbox({
     return () => {
       alive = false;
     };
-  }, [detailsOpen, current?.imageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detailsOpen, shownId]);
 
   // Preload the neighbours for smooth stepping / slideshow.
   useEffect(() => {

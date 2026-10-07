@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { LibraryGraph } from "@/app/library/components/LibraryGraph";
 import type { CompareResult } from "@/lib/library/schemas";
@@ -19,10 +19,14 @@ function ComparePageInner() {
   const router = useRouter();
   const tray = useCompareTray();
   const idsParam = params.get("ids") ?? "";
-  const ids = idsParam
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const ids = useMemo(
+    () =>
+      idsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [idsParam]
+  );
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +57,7 @@ function ComparePageInner() {
 
   useEffect(() => {
     void load(ids);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsParam]);
+  }, [ids, load]);
 
   const score = (a: string, b: string): number | null => {
     const hit = data?.pairwiseSimilarity.find(

@@ -171,6 +171,7 @@ export default function ImageDetailPage() {
   }, [load]);
 
   // Decide whether to auto-fetch suggestions for this image.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: imageId is the trigger — the decision is re-made for every image navigated to.
   useEffect(() => {
     if (!hydrated) return;
     setSuggestRequested(settings.autoLoadSuggestions);
