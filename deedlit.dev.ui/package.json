@@ -8,7 +8,7 @@
   "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/carneirofc/deedlit.dev.git",
+    "url": "git+https://github.com/carneirofc/deedlit.dev.ui.git",
     "directory": "deedlit.dev.ui"
   },
   "publishConfig": {

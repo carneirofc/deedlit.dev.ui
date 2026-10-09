@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Changed
+- Repo split: this repo is now `carneirofc/deedlit.dev.ui` and contains only `@carneirofc/ui` and its CI. ComfyHelper, the FastAPI services, contracts, id-scheme, observability, docker-compose and mprocs moved to `carneirofc/deedlit.dev.comfyhelper`. Storybook now deploys at the Pages root (`https://carneirofc.github.io/deedlit.dev.ui/`). The monorepo landing page and screenshots were dropped.
 - JS workspace migrated from npm to pnpm: `pnpm-workspace.yaml` + `packageManager: pnpm@11.13.1`, `pnpm-lock.yaml` replaces both `package-lock.json` files, `@carneirofc/ui` linked via `workspace:*`; root scripts, mprocs, comfyhelper Dockerfile (corepack), GitHub workflows (`pnpm/action-setup`, frozen lockfile — no more Windows-lockfile workaround for Storybook) and docs now use `pnpm`.
 - `deedlit.dev.comfyhelper`: `test:unit` script wired to `playwright.unit.config.ts`.
 - `deedlit.dev.comfyhelper`: all props and data derived from zod schemas, route handlers/stores/fetches parse at the boundary, large pages (`library`, `[imageId]`, `admin`, `admin/db`, `compare`, `settings`, `Lightbox`) split into hooks and subcomponents.

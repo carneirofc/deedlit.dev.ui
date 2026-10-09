@@ -1,10 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
 
-  // One config for the whole monorepo. Biome replaced ESLint: `deedlit.dev`
-  // ran `next lint`, which Next 16 removed, and comfyhelper had its own
-  // eslint-config-next flat config. Neither package needs a linter config of
-  // its own now — do not add one back.
+  // One config for the whole repo. Biome replaced ESLint — do not add a
+  // per-package linter config back.
 
   "vcs": {
     "enabled": true,
@@ -28,8 +26,6 @@
       "!**/playwright-report",
       "!**/test-results",
       "!**/coverage",
-      "!deedlit.dev.comfyhelper/lib/generated",
-      "!deedlit.dev.comfyhelper/library",
       "!**/*.min.js",
       "!pnpm-lock.yaml"
     ]

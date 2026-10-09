@@ -1,61 +1,42 @@
-# Deedlit Monorepo Agent Guide
+# deedlit.dev.ui Agent Guide
 
-Root guide for the monorepo: project-wide instructions, global preferences, durable workflow rules, and the index of nested `AGENTS.md` guides. Each package's own `AGENTS.md` is the local contract for its subtree; this file holds repo-wide rules and points to the rest. See [Maintaining These Guides](#maintaining-these-guides) before editing any `AGENTS.md`.
+Root guide for `carneirofc/deedlit.dev.ui`: the shared `@carneirofc/ui` component library and the CI that builds, publishes and documents it. Each nested `AGENTS.md` is the local contract for its subtree. See [Maintaining These Guides](#maintaining-these-guides) before editing any `AGENTS.md`.
 
 ## Start Here
-- The repo root is a workspace orchestrator, not the primary home of application logic.
-- Check `package.json` at the repo root for workspace-level commands, then move into the package that owns the task.
-- Read the nearest package-local `.github/copilot-instructions.md` before editing code.
-- Toolchain not on the bare PATH: Node is via **fnm** (`fnm env --use-on-cd | Out-String | Invoke-Expression`), Python via **uv** (`uv run …`) — full details in [`docs/agents/toolchain.md`](docs/agents/toolchain.md).
+- The repo root is a thin pnpm workspace around one package, `deedlit.dev.ui/`.
+- Toolchain: Node via **fnm**, see [`docs/agents/toolchain.md`](docs/agents/toolchain.md).
 
 ## Package Ownership
-- The marketing site, home page, books, gallery presentation, and authenticated `/portal` service dashboard live in the separate `carneirofc/deedlit.dev.portal` repo — not in this monorepo. It consumes `@carneirofc/ui` as a published GitHub Packages dependency (see `.github/workflows/publish-ui.yml`).
-- `deedlit.dev.comfyhelper/`: generated-image library **UI** (Next.js) — talks to the `deedlit.api` gateway. See `deedlit.dev.comfyhelper/IMAGE_LIBRARY.md` for the backend architecture.
-- `deedlit.dev.ui/`: shared UI components, icons, tokens, CSS variables, and app-agnostic presentation primitives. Published to GitHub Packages as `@carneirofc/ui` for `deedlit.dev.portal` to consume; also used in-tree by `deedlit.dev.comfyhelper`.
-- `deedlit.<service>/`: FastAPI image-library services (`api`, `catalog`, `search`, `graph`, `ingest`, `metadata`, `labelagent`, `vision`) — database-per-service, HTTP-only, `uv`-managed. Each owns its store and is the sole writer of it.
+- `deedlit.dev.ui/`: shared UI components, icons, tokens, CSS variables and app-agnostic presentation primitives, published to GitHub Packages as `@carneirofc/ui`.
+- Consumers live in other repos and install released versions:
+  - `carneirofc/deedlit.dev.comfyhelper`: the image-library app, the FastAPI services and the docker-compose stack.
+  - `carneirofc/deedlit.dev.portal`: the public site.
+- Do not add app code, services or infrastructure here.
 
 ## Working Rules
-- Make the smallest package-local change that solves the task.
-- Do not duplicate shared UI between apps; promote reusable pieces into `deedlit.dev.ui`.
-- Do not move app-specific domain behavior into `deedlit.dev.ui`.
-- Treat package-level docs and source layout as more trustworthy than old summary docs when they disagree.
-- When a task spans packages, keep ownership clear: shared primitive in `deedlit.dev.ui`, integration in the consuming app.
+- Do not move app-specific domain behavior into `@carneirofc/ui`.
+- The `src/index.ts` export surface is a public contract. Follow semver; breaking changes need a major release.
+- A change reaches consumers only after a GitHub Release (`vX.Y.Z`) runs `.github/workflows/publish-ui.yml`, followed by a version bump in the consuming repo.
 
 ## Code Quality Rules
-- TypeScript: every type (data, config, props) is `z.infer<typeof XSchema>` from a zod schema — never hand-written `interface`/`type {…}` or inline object types.
-- Python: data shapes are pydantic models (I/O) or dataclasses (internal) — never `TypedDict`, `NamedTuple`, or `dict[str, Any]` records.
-- Never use `any` / `Any`; use `unknown` + zod parse, `JsonValue`, a `Protocol`, or a union.
+- Every type (data, config, props) is `z.infer<typeof XSchema>` from a zod schema. Never hand-write an `interface`, a `type {…}` or an inline object type.
+- Never use `any`; use `unknown` plus a zod parse, or a union.
 - Keep functions small (~40 lines, components ~60) with one responsibility.
-- Details, examples, and lint enforcement: [`docs/agents/code-style.md`](docs/agents/code-style.md).
-
-## Package Entry Points
-- `deedlit.dev.comfyhelper/`: start from `app/`, `lib/`, `prisma/`, and `.github/instructions/`.
-- `deedlit.dev.ui/`: start from `src/`, `styles/`, and the package exports in `package.json`.
-- `deedlit.<service>/`: start from `app.py` (FastAPI entry), the package module (`<service>/`), `pyproject.toml`, and `tests/`. Ingest also has `worker.py` (the queue consumer).
+- Details and lint enforcement: [`docs/agents/code-style.md`](docs/agents/code-style.md).
 
 ## Command Reference
-- Build shared UI: `pnpm build:ui`
-- Run everything (orchestrated): `pnpm dev` — starts all services via `mprocs` (see `mprocs.yaml`); one pane per service, `r` restarts one, `q` tears everything down with clean process-tree kill (no orphaned ports on Windows). Start datastores first with `pnpm infra:up`.
-- Run comfyhelper only: `pnpm dev:comfyhelper`
-- Build all workspaces: `pnpm build`
-- Lint (JS/TS/CSS): `pnpm lint` — **Biome**, one config at `biome.jsonc` for the whole monorepo. `pnpm lint:fix` applies safe fixes. ESLint was removed; do not reintroduce a per-package linter config.
-- Format: `pnpm format` reports, `pnpm format:write` rewrites. The formatter is configured but has **not** been applied to the tree yet — running it rewrites ~230 files, so treat it as its own commit, never as a side effect of another change.
-- `eslint-disable` comments still in `deedlit.dev.comfyhelper/` and `deedlit.dev.ui/` are inert. Biome uses `// biome-ignore <rule>: <reason>`, and the reason is required.
+- Build: `pnpm build` (tsc + ESM import fix → `deedlit.dev.ui/dist`).
+- Lint: `pnpm lint` runs **Biome** with the single config in `biome.jsonc`. `pnpm lint:fix` applies safe fixes. Biome suppressions use `// biome-ignore <rule>: <reason>`, and the reason is required.
+- Format: `pnpm format` reports and `pnpm format:write` rewrites. Apply the formatter only in its own commit.
+- Storybook: `pnpm storybook` serves on :6006. `pnpm build-storybook` builds the static site, which `.github/workflows/storybook-pages.yml` deploys to <https://carneirofc.github.io/deedlit.dev.ui/>.
 
 ## Commit Convention
 
-All commits must follow **[Conventional Commits](https://www.conventionalcommits.org/)**:
-
-```
-<type>(optional scope): <description>
-```
-
-Common types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `style`, `perf`.
+All commits must follow **[Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(optional scope): <description>`.
 
 ## Agent Skills
-- **Issue tracker** — issues live as GitHub issues on `carneirofc/deedlit.dev` via the `gh` CLI. See [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
-- **Triage labels** — canonical vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
-- **Domain docs** — single-context monorepo (root `CONTEXT.md` + `docs/adr/`, with authoritative package-local docs). See [`docs/agents/domain.md`](docs/agents/domain.md).
+- **Issue tracker**: issues are GitHub issues on `carneirofc/deedlit.dev.ui`, managed with the `gh` CLI. See [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
+- **Triage labels**: [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
 
 ## Maintaining These Guides
 
@@ -100,34 +81,8 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ## Child Guides
 
-Each nested `AGENTS.md` is the local contract for its subtree. Ownership detail lives in the child; this index is the map.
-
-### Agent operating docs (`docs/agents/`)
-- [`docs/agents/toolchain.md`](docs/agents/toolchain.md) — fnm/uv toolchain locations & activation (Windows/PowerShell).
-- [`docs/agents/code-style.md`](docs/agents/code-style.md) — zod/pydantic typing, no `any`, small functions, and their lint enforcement.
-- [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — GitHub-issue workflow via `gh`.
-- [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — canonical triage vocabulary.
-- [`docs/agents/domain.md`](docs/agents/domain.md) — domain-doc reading order and glossary rules.
-
-### Web apps (pnpm workspace)
-- The public Next.js site (:3001) — home, books, gallery, PWA, plus the authenticated `/portal` service dashboard — lives in `carneirofc/deedlit.dev.portal`, not here.
-- [`deedlit.dev.comfyhelper/AGENTS.md`](deedlit.dev.comfyhelper/AGENTS.md) — ComfyHelper image-library UI (:3000), gateway client only.
-- [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md) — shared `@carneirofc/ui` component library + tokens.
-
-### Gateway & FastAPI services (`uv` per-package)
-- [`deedlit.api/AGENTS.md`](deedlit.api/AGENTS.md) — gateway / BFF (:8088); stateless.
-- [`deedlit.catalog/AGENTS.md`](deedlit.catalog/AGENTS.md) — canonical truth (:8001); sole writer of Postgres + RustFS.
-- [`deedlit.search/AGENTS.md`](deedlit.search/AGENTS.md) — hybrid vector search (:8002); sole writer of Qdrant.
-- [`deedlit.graph/AGENTS.md`](deedlit.graph/AGENTS.md) — relationship graph (:8003); sole writer of Neo4j.
-- [`deedlit.ingest/AGENTS.md`](deedlit.ingest/AGENTS.md) — ingest DAG orchestrator + worker (:8004); stateless, RabbitMQ publisher.
-- [`deedlit.metadata/AGENTS.md`](deedlit.metadata/AGENTS.md) — PNG metadata extraction (:8005); stateless.
-- [`deedlit.labelagent/AGENTS.md`](deedlit.labelagent/AGENTS.md) — vision-LLM labeling (:8006); stateless.
-- [`deedlit.vision/AGENTS.md`](deedlit.vision/AGENTS.md) — CLIP/SPLADE embeddings (:8000, GPU); stateless.
-
-> Ownership note: only `catalog`, `search`, and `graph` own datastores. `api`, `ingest`, `metadata`, `labelagent`, and `vision` are stateless.
-
-### Cross-cutting
-- [`contracts/AGENTS.md`](contracts/AGENTS.md) — OpenAPI design sketches + `validate.py` invariants.
-- [`id-scheme/AGENTS.md`](id-scheme/AGENTS.md) — frozen SHA-256 / uuid5 cross-service identity + test vectors.
-- [`observability/AGENTS.md`](observability/AGENTS.md) — Alloy/Loki/Tempo/Grafana config (Compose profile).
-- [`docs/AGENTS.md`](docs/AGENTS.md) — ADRs, agent workflow docs, screenshots, Pages landing site.
+- [`deedlit.dev.ui/AGENTS.md`](deedlit.dev.ui/AGENTS.md): the `@carneirofc/ui` component library and its tokens.
+- [`docs/agents/toolchain.md`](docs/agents/toolchain.md): fnm toolchain locations.
+- [`docs/agents/code-style.md`](docs/agents/code-style.md): zod typing, no `any`, small functions, lint enforcement.
+- [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md): GitHub issue workflow via `gh`.
+- [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md): canonical triage vocabulary.

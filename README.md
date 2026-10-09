@@ -1,238 +1,50 @@
-# deedlit.dev — Monorepo
+# deedlit.dev.ui
 
-A self-hosted library for the images you generate locally with ComfyUI and
-Automatic1111. **ComfyHelper** ingests a folder of outputs, parses the
-metadata embedded in each file (prompt, tags, parameters, model/LoRA
-references), and lets you filter by those fields and find similar images
-through hybrid vector search.
+Home of **`@carneirofc/ui`**: the shared React component library, design tokens and
+styles for the deedlit.dev apps. The package lives in [`deedlit.dev.ui/`](./deedlit.dev.ui/)
+(see its [README](./deedlit.dev.ui/README.md)).
 
-The public deedlit.dev landing site now lives in its own repo,
-[`carneirofc/deedlit.dev.portal`](https://github.com/carneirofc/deedlit.dev.portal),
-and consumes `@carneirofc/ui` from this repo as a published GitHub Packages
-dependency.
+- **Storybook:** <https://carneirofc.github.io/deedlit.dev.ui/>
+- **Package:** published to GitHub Packages as `@carneirofc/ui`
 
-The web apps are an pnpm workspace; the image-library backend is a mesh of standalone
-**FastAPI** services (database-per-service, HTTP-only) managed with `uv`.
+## Consumers
 
-## Architecture
+These repos install released versions of the package:
 
-The frontends talk only to the `deedlit.api` gateway (BFF). Each owning service is
-the sole writer of its datastore and they never call each other — `search` and
-`graph` are rebuildable projections of `catalog` (the canonical truth). See
-[`deedlit.dev.comfyhelper/IMAGE_LIBRARY.md`](./deedlit.dev.comfyhelper/IMAGE_LIBRARY.md)
-for the full design.
-
-For a layered [C4 model](https://c4model.com/) of the same architecture (System
-Context, Container, ingest/read Dynamic, and Docker Compose Deployment views), see
-the [Structurizr workspace](./docs/architecture/workspace.dsl). View it locally
-with [Structurizr Lite](https://structurizr.com/help/lite):
-
-```bash
-docker run -it --rm -p 8080:8080 \
-  -v "$PWD/docs/architecture:/usr/local/structurizr" structurizr/lite
-# then open http://localhost:8080
-```
-
-The inline Mermaid diagrams below stay as the quick at-a-glance view.
-
-```mermaid
-flowchart LR
-    subgraph apps["Web apps (pnpm workspace)"]
-        ch["ComfyHelper<br/>:3000"]
-        ui["@carneirofc/ui"]
-    end
-    ui -. components .-> ch
-    ui -. "published package" .-> dev["deedlit.dev.portal<br/>(separate repo)"]
-
-    ch --> api
-
-    subgraph services["FastAPI services"]
-        api["deedlit.api :8088<br/>gateway / BFF"]
-        catalog["catalog :8001"]
-        search["search :8002"]
-        graphsvc["graph :8003"]
-        ingest["ingest :8004<br/>+ workers"]
-        metadata["metadata :8005"]
-        labelagent["labelagent :8006"]
-        vision["vision :8000"]
-    end
-    api --> catalog & search & graphsvc & ingest & metadata & labelagent
-
-    subgraph stores["Datastores"]
-        pg[("Postgres")]
-        rustfs[("RustFS S3")]
-        qd[("Qdrant")]
-        neo[("Neo4j")]
-        mq[("RabbitMQ")]
-    end
-    catalog --> pg & rustfs
-    search --> qd
-    graphsvc --> neo
-    ingest <--> mq
-
-    ingest -. "DAG stages call" .-> vision & catalog & search & graphsvc & metadata & labelagent
-```
-
-### Web apps (pnpm workspace)
-
-| Package | Port | Description |
-|---|---|---|
-| [`deedlit.dev.comfyhelper`](./deedlit.dev.comfyhelper/) | 3000 | ComfyHelper UI for the image library |
-| [`deedlit.dev.ui`](./deedlit.dev.ui/) | — | Shared `@carneirofc/ui` component library — [live Storybook](https://carneirofc.github.io/deedlit.dev/ui/storybook/) |
-
-The public landing site (home, books, gallery, services) lives in
-[`carneirofc/deedlit.dev.portal`](https://github.com/carneirofc/deedlit.dev.portal).
-
-#### ComfyHelper — image library
-
-Library browser with hybrid search, tag/safety filters and a Neo4j graph filter;
-admin page for ingestion, source folders, cache and maintenance jobs:
-
-| Image library | Backend admin |
+| Repo | What |
 |---|---|
-| ![ComfyHelper library](./docs/screenshots/comfyhelper-library.png) | ![ComfyHelper admin](./docs/screenshots/comfyhelper-admin.png) |
+| [`carneirofc/deedlit.dev.comfyhelper`](https://github.com/carneirofc/deedlit.dev.comfyhelper) | ComfyHelper image-library app, FastAPI services, docker-compose stack |
+| [`carneirofc/deedlit.dev.portal`](https://github.com/carneirofc/deedlit.dev.portal) | Public deedlit.dev site |
 
-#### @carneirofc/ui — Storybook
+To install the package, add this to the consumer's `.npmrc`:
 
-Every shared component is documented in Storybook — browse it live at
-[carneirofc.github.io/deedlit.dev/ui/storybook](https://carneirofc.github.io/deedlit.dev/ui/storybook/)
-(see [GitHub Pages](#github-pages)):
-
-![@carneirofc/ui Storybook](./docs/screenshots/ui-storybook.png)
-
-### Services (FastAPI, `uv` per-package venv)
-
-| Service | Port | Owns | Responsibility |
-|---|---|---|---|
-| [`deedlit.api`](./deedlit.api/) | 8088 | — | Gateway/BFF: aggregate detail pages, host MCP, dispatch ingest jobs |
-| [`deedlit.catalog`](./deedlit.catalog/) | 8001 | Postgres + RustFS | Canonical: images, tags, params, references, ratings, notes, collections, thumbnails, cached vectors |
-| [`deedlit.search`](./deedlit.search/) | 8002 | Qdrant | Dense (CLIP) + sparse (SPLADE) hybrid vector search |
-| [`deedlit.graph`](./deedlit.graph/) | 8003 | Neo4j | Shared-asset, tag co-occurrence, lineage edges |
-| [`deedlit.ingest`](./deedlit.ingest/) | 8004 | — | Scan, hash, thumbnail; publishes the per-stage ingest DAG |
-| [`deedlit.metadata`](./deedlit.metadata/) | 8005 | — | Bytes → embedded prompt/tags/params + resolved reference graph |
-| [`deedlit.labelagent`](./deedlit.labelagent/) | 8006 | — | Vision-LLM describe/safety/tags (local llama-server) |
-| [`deedlit.vision`](./deedlit.vision/) | 8000 | — | CLIP dense + SPLADE sparse embeddings (GPU) |
-
-Ingest is fully queue-driven over RabbitMQ as a per-stage DAG (catalog write is the
-durability boundary; projections converge via idempotent rebuilds). See
-[ADR 0001](./docs/adr/0001-async-queues-for-labelling-and-indexing.md) and
-[ADR 0002](./docs/adr/0002-per-stage-ingest-dag.md). The cross-service id is the
-SHA-256 of the image bytes — see [`id-scheme/`](./id-scheme/README.md).
-
-```mermaid
-flowchart TD
-    scan["folder-scan (producer)<br/>per file: sha / phash / thumb / metadata"]
-    scan -->|"catalog POST /images — VISIBLE"| cat[("catalog<br/>(rendezvous)")]
-    scan --> ed(["embed.dense (GPU)"]) & es(["embed.sparse"]) & ig(["index.graph"]) & lb(["label (vision-LLM)"])
-
-    ed -->|"PUT blob embedding"| cat
-    es -->|"PUT blob sparse"| cat
-    ed --> is(["index.search (fan-in)"])
-    es --> is
-    is -->|"both blobs present → upsert point"| qd[("Qdrant")]
-    ig -->|"refs / tags / lineage edges"| neo[("Neo4j")]
-
-    lb -->|"patch description / safety / tags"| cat
-    lb -->|"text changed"| es
-    lb -->|"tags changed"| ig
+```ini
+@carneirofc:registry=https://npm.pkg.github.com
 ```
 
-Each queue stage persists its output to catalog truth, then publishes its
-successors (choreography, no orchestrator). `index.search` is the only fan-in:
-whichever of `embed.dense`/`embed.sparse` finishes second finds both blobs in
-the catalog and writes the Qdrant point — catalog presence is the latch.
-
-### Infrastructure & observability (Docker Compose)
-
-| Component | Port | Role |
-|---|---|---|
-| PostgreSQL | 5432 | Catalog (canonical truth) |
-| Neo4j | 7474 / 7687 | Relationship graph |
-| Qdrant | 6333 / 6334 | Vector store |
-| RustFS (S3) | 9000 / 9001 | Thumbnails + cached embeddings |
-| RabbitMQ | 5672 / 15672 | Ingest DAG broker + management UI |
-| Redis | 6379 | Cache |
-| Grafana / Loki / Tempo / Alloy | 3002 / 3100 / 3200 / 12345 | Logs, traces, OTLP collection, dashboards |
-
-## Prerequisites
-
-- **Node** managed by [fnm](https://github.com/Schniz/fnm); pnpm 11+ (via corepack or `npm i -g pnpm`)
-- **Python** managed by [uv](https://docs.astral.sh/uv/) (per-service venvs)
-- **Docker** (Compose) for datastores and observability
-
-On Windows/PowerShell, activate Node per session: `fnm env --use-on-cd | Out-String | Invoke-Expression`.
-See [`AGENTS.md`](./AGENTS.md) for the full toolchain layout.
-
-## Getting started
+You also need a token with `read:packages` in user-level config:
 
 ```bash
-pnpm install                # install all JS workspaces
-pnpm infra:up           # start datastores + observability (waits for health)
-pnpm dev:migrate        # apply catalog Alembic migrations
-pnpm dev                # start every app + service via mprocs (one pane each)
+pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 ```
 
-`pnpm dev` runs [`mprocs`](./mprocs.yaml): one pane per process, `r` restarts
-one, `q` tears the whole tree down cleanly. `predev` runs `infra:up` + `dev:migrate`
-for you. Run a single piece with `pnpm dev:<name>` (e.g.
-`dev:comfyhelper`, `dev:api`, `dev:catalog`, …) or all services without the web
-apps via `pnpm dev:services`.
-
-## Building
+## Development
 
 ```bash
-pnpm build:ui           # shared UI only
-pnpm build:comfyhelper  # ComfyHelper (+ UI)
-pnpm build              # everything
+pnpm install
+pnpm build              # tsc + ESM import fix → deedlit.dev.ui/dist
+pnpm lint               # Biome (biome.jsonc)
+pnpm storybook          # dev server on :6006
+pnpm build-storybook    # static build → deedlit.dev.ui/storybook-static
 ```
 
-Python services build via their per-package `Dockerfile`; `docker compose up`
-brings up the full stack (see [`docker-compose.yml`](./docker-compose.yml), the
-single compose file for the repo).
+## CI
 
-## GitHub Pages
-
-The repo publishes a single GitHub Pages site via
-[`storybook-pages.yml`](./.github/workflows/storybook-pages.yml):
-
-- **<https://carneirofc.github.io/deedlit.dev/>** — the monorepo landing page
-  (source: [`docs/site/index.html`](./docs/site/index.html)), showcasing the apps,
-  services, architecture and screenshots.
-- **<https://carneirofc.github.io/deedlit.dev/ui/storybook/>** — the
-  `@carneirofc/ui` Storybook.
-
-The workflow runs on every push to `master` that touches `deedlit.dev.ui/`,
-`docs/site/` or `docs/screenshots/` (or manually via *workflow dispatch*), builds
-the static Storybook and assembles both into one Pages artifact — the landing
-page at the root and Storybook under `/ui/storybook`.
-
-One-time repo setup: **Settings → Pages → Source: GitHub Actions**.
-
-Run it locally instead with:
-
-```bash
-pnpm --filter @carneirofc/ui storybook          # dev server on :6006
-pnpm --filter @carneirofc/ui build-storybook    # static build → deedlit.dev.ui/storybook-static
-```
-
-## Project structure
-
-```
-deedlit.dev.comfyhelper/  ← ComfyHelper image-library UI (Next.js)
-deedlit.dev.ui/           ← shared component library (@carneirofc/ui)
-deedlit.<service>/        ← FastAPI services (api, catalog, search, graph,
-                            ingest, metadata, labelagent, vision)
-contracts/                ← OpenAPI design sketches per service surface
-id-scheme/                ← frozen cross-service id helper + test vectors
-docs/adr/                 ← architecture decision records
-docs/agents/              ← agent workflow docs (issue tracker, triage, domain)
-docs/architecture/        ← Structurizr C4 workspace (workspace.dsl)
-docker-compose.yml        ← the one compose file (datastores + services + o11y)
-mprocs.yaml               ← local dev orchestrator
-```
+- [`publish-ui.yml`](./.github/workflows/publish-ui.yml) runs when a GitHub Release is published. The release tag (`vX.Y.Z`) sets the npm version that gets published.
+- [`storybook-pages.yml`](./.github/workflows/storybook-pages.yml) runs on pushes to `master` that touch `deedlit.dev.ui/`, and deploys Storybook to GitHub Pages. This needs a one-time setting: **Settings → Pages → Source: GitHub Actions**.
 
 ## Contributing
 
-This repo uses **[Conventional Commits](https://www.conventionalcommits.org/)**:
-`<type>(optional scope): <description>`. Common types: `feat`, `fix`, `docs`,
-`chore`, `refactor`, `test`, `style`, `perf`.
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/).
+Agent and code-style rules are in [`AGENTS.md`](./AGENTS.md) and
+[`docs/agents/code-style.md`](./docs/agents/code-style.md).

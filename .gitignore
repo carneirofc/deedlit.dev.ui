@@ -20,8 +20,6 @@ dist/
 __pycache__/
 *.py[cod]
 
-# Comfyhelper generated data
-deedlit.dev.comfyhelper/data/thumbnails/
 run.go
 start-prod.ps1
 graphify-out/.graphify_labels.json

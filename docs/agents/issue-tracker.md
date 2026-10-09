@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues on `carneirofc/deedlit.dev`.
+Issues and PRDs for this repo live as GitHub issues on `carneirofc/deedlit.dev.ui`.
 Use the `gh` CLI for all operations.
 
 ## Conventions

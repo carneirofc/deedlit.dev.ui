@@ -4,26 +4,17 @@
     {
       "name": "ui-storybook",
       "runtimeExecutable": "C:\\Users\\claud\\AppData\\Roaming\\fnm\\node-versions\\v24.13.1\\installation\\node.exe",
-      "runtimeArgs": ["C:\\Users\\claud\\__Code__\\deedlit.dev\\node_modules\\storybook\\dist\\bin\\dispatcher.js", "dev", "-p", "6006", "-c", "deedlit.dev.ui/.storybook", "--no-open", "--ci"],
+      "runtimeArgs": [
+        "C:\\Users\\claud\\__Code__\\deedlit.dev\\node_modules\\storybook\\dist\\bin\\dispatcher.js",
+        "dev",
+        "-p",
+        "6006",
+        "-c",
+        "deedlit.dev.ui/.storybook",
+        "--no-open",
+        "--ci"
+      ],
       "port": 6006
-    },
-    {
-      "name": "deedlit.dev",
-      "runtimeExecutable": "C:\\Users\\claud\\AppData\\Roaming\\fnm\\node-versions\\v24.13.1\\installation\\node.exe",
-      "runtimeArgs": ["C:\\Users\\claud\\__Code__\\deedlit.dev\\node_modules\\next\\dist\\bin\\next", "dev", "deedlit.dev", "-p", "3001"],
-      "port": 3001
-    },
-    {
-      "name": "deedlit.dev.comfyhelper",
-      "runtimeExecutable": "C:\\Users\\claud\\AppData\\Roaming\\fnm\\node-versions\\v24.13.1\\installation\\node.exe",
-      "runtimeArgs": ["C:\\Users\\claud\\__Code__\\deedlit.dev\\node_modules\\next\\dist\\bin\\next", "dev", "deedlit.dev.comfyhelper", "-p", "3000"],
-      "port": 3000
-    },
-    {
-      "name": "deedlit.vision",
-      "runtimeExecutable": "C:\\Users\\claud\\.local\\bin\\uv.exe",
-      "runtimeArgs": ["run", "--directory", "deedlit.vision", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "8000", "--reload"],
-      "port": 8000
     }
   ]
 }

@@ -1,17 +1,11 @@
-name: Deploy site + Storybook to GitHub Pages
+name: Deploy Storybook to GitHub Pages
 
-# Publishes the deedlit.dev GitHub Pages site (https://carneirofc.github.io/deedlit.dev/):
-#   /                 → the monorepo landing page (docs/site/index.html)
-#   /ui/storybook/    → the @carneirofc/ui Storybook
-# Both are assembled into a single Pages artifact so the root and Storybook read
-# as one cohesive site.
+# Publishes the @carneirofc/ui Storybook at https://carneirofc.github.io/deedlit.dev.ui/
 on:
   push:
     branches: [master]
     paths:
       - 'deedlit.dev.ui/**'
-      - 'docs/site/**'
-      - 'docs/screenshots/**'
       - '.github/workflows/storybook-pages.yml'
   workflow_dispatch:
 
@@ -46,19 +40,10 @@ jobs:
       - name: Build Storybook
         run: pnpm --filter @carneirofc/ui build-storybook
 
-      - name: Assemble Pages site (landing page + /ui/storybook)
-        run: |
-          mkdir -p _site/ui
-          mv deedlit.dev.ui/storybook-static _site/ui/storybook
-          cp docs/site/index.html _site/index.html
-          cp docs/site/icon.svg _site/icon.svg
-          cp -r docs/screenshots _site/screenshots
-          touch _site/.nojekyll
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: deedlit.dev.ui/storybook-static
 
   deploy:
     needs: build

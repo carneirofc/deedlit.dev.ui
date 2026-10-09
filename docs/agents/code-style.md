@@ -1,9 +1,9 @@
 # Code Style: Types & Function Size
 
-Repo-wide rules for every TypeScript and Python package. Enforced by `biome.jsonc` (TS) and `ruff.toml` + basedpyright (Python). Package guides link here instead of restating the rules.
+Repo-wide TypeScript rules. Enforced by `biome.jsonc`. Package guides link here instead of restating the rules.
 
 ## TypeScript — zod is the only source of types
-- Every type is derived from a zod schema: `const XSchema = z.object({...})` then `export type X = z.infer<typeof XSchema>`. Reference: `deedlit.dev.comfyhelper/lib/library/schemas.ts`.
+- Every type is derived from a zod schema: `const XSchema = z.object({...})` then `export type X = z.infer<typeof XSchema>`. Reference: any component in `deedlit.dev.ui/src/`.
 - This includes component props:
   ```ts
   export const ButtonPropsSchema = z.object({
@@ -20,14 +20,6 @@ Repo-wide rules for every TypeScript and Python package. Enforced by `biome.json
 - Parse at trust boundaries only: fetch responses, JSON files, env vars, URL/search params, `localStorage`. Inside the app, `z.infer` types are enough.
 - Allowed: generics and utility types over inferred types (`Pick<X, "a">`, `Partial<X>`, `React.ComponentProps<typeof Foo>`), unions of inferred types, and third-party `*.d.ts` augmentation.
 
-## Python — pydantic models or dataclasses only
-- Data crossing I/O (HTTP bodies, queue messages, DB rows, JSON files, external APIs) is a `pydantic.BaseModel`; validate with `Model.model_validate(...)`.
-- Internal value objects are `@dataclass(frozen=True, slots=True)`.
-- Never use `typing.Any`, `TypedDict`, `NamedTuple`, or `dict[str, Any]` as a record type.
-- Genuinely opaque JSON (e.g. a ComfyUI prompt graph) is typed `pydantic.JsonValue`; parse the parts you need into models.
-- Replace `Any` parameters with a `Protocol`, a union, or a `TypeVar`.
-- Every function has full parameter and return annotations.
-
 ## Functions stay small
 - Target at most ~40 lines / 25 statements and cyclomatic complexity 10; one responsibility per function.
 - React components: at most ~60 lines — split into subcomponents or custom hooks.
@@ -35,5 +27,4 @@ Repo-wide rules for every TypeScript and Python package. Enforced by `biome.json
 
 ## Enforcement
 - TS (Biome): `suspicious/noExplicitAny`; the GritQL plugin `biome-plugins/no-hand-written-types.grit` (bans `TsInterfaceDeclaration` / `TsObjectType`); `complexity/noExcessiveLinesPerFunction` (40 lines, 60 in `*.tsx`); `complexity/noExcessiveCognitiveComplexity` (15, warning only — Biome has no cyclomatic rule). Size rules are off in tests, stories and e2e; the plugin skips those plus `*.d.ts`. A justified exception uses `// biome-ignore lint/plugin: <reason>`.
-- Python: ruff `ANN`, `TID251` (bans `typing.Any` / `TypedDict` / `NamedTuple`), `C90`, `PLR0915`; basedpyright `strict` with `reportAny` / `reportExplicitAny`. Tests relax annotation and size rules.
-- Run: `pnpm lint` (Biome, whole repo) and `pnpm lint:py`.
+- Run: `pnpm lint` (Biome, whole repo).
