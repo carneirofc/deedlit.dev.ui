@@ -57,7 +57,7 @@ export default function CollapsiblePanel({
         <ChevronDownIcon
           size="h-4 w-4"
           className={cn(
-            "transition-transform duration-200 group-data-[state=open]/cp:rotate-180",
+            "transition-transform duration-200 motion-reduce:transition-none group-data-[state=open]/cp:rotate-180",
             chevronClassName
           )}
         />

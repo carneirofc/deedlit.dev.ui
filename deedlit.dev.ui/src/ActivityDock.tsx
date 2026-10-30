@@ -58,7 +58,7 @@ function statusLabel(status: ActivityStatus): string {
 function Spinner({ className = "" }: { className?: string }) {
   return (
     <span
-      className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
+      className={`inline-block motion-safe:animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
       aria-hidden="true"
     />
   );
@@ -120,7 +120,7 @@ function ActivityRow({ a, onDismiss }: { a: Activity; onDismiss: (id: string) =>
       {percent === null ? (
         active ? (
           <div className="h-1 overflow-hidden rounded-full bg-ui-bg-soft">
-            <div className="h-full w-1/3 animate-pulse rounded-full bg-accent-cyan/70" />
+            <div className="h-full w-1/3 motion-safe:animate-pulse rounded-full bg-accent-cyan/70" />
           </div>
         ) : null
       ) : (
@@ -209,7 +209,7 @@ export function ActivityDock({ activities, onDismiss, onClearFinished }: Activit
         aria-expanded={open}
       >
         {active > 0 ? (
-          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+          <span className="inline-block h-3 w-3 motion-safe:animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
         ) : errors > 0 ? (
           <span className="h-2 w-2 rounded-full bg-rose-500" />
         ) : (

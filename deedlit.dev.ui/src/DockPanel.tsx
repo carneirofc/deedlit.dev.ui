@@ -153,7 +153,7 @@ const DockPanel = forwardRef<HTMLElement, DockPanelProps>(function DockPanel(
     // Structure (z-index via inline style)
     "fixed overflow-hidden rounded-2xl border-ui bg-[color:var(--ui-bg)] shadow-2xl",
     // Transition
-    "transition-all duration-200",
+    "transition-all duration-200 motion-reduce:transition-none",
     // Default positioning: mobile bottom-sheet, desktop right-side panel
     "inset-x-2 bottom-4 max-h-[70vh] min-h-[22rem]",
     "md:inset-x-auto md:top-3 md:right-3 md:bottom-auto md:max-h-[calc(100vh-1.5rem)] md:min-h-[28rem] md:max-w-[92vw]",

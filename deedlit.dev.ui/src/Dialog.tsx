@@ -98,7 +98,7 @@ export const DialogContent = forwardRef<ElementRef<typeof RadixDialog.Content>, 
             <RadixDialog.Close
               aria-label={closeLabel}
               title={closeLabel}
-              className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-ui-soft text-ui-ink-subtle transition hover:bg-ui-bg-soft hover:text-ui-ink-strong active:scale-95"
+              className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-ui-soft text-ui-ink-subtle transition hover:bg-ui-bg-soft hover:text-ui-ink-strong motion-safe:active:scale-95"
             >
               <svg
                 aria-hidden="true"
