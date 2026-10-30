@@ -757,6 +757,8 @@ body::after {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    translate 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    scale 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
     filter 160ms ease;
 }
 .ob-btn:hover:not(:disabled) {
@@ -828,7 +830,9 @@ body::after {
     background-color 160ms ease,
     border-color 160ms ease,
     box-shadow 160ms ease,
-    transform 120ms cubic-bezier(0.2, 0.8, 0.3, 1);
+    transform 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    translate 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    scale 120ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .cyber-icon-btn:hover:not(:disabled) {
   border-color: var(--panel-border-strong);
@@ -1139,6 +1143,8 @@ body::after {
 .product-card {
   transition:
     transform 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    translate 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    scale 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
     border-color 180ms ease,
     box-shadow 180ms ease,
     opacity 180ms ease;
@@ -1158,6 +1164,8 @@ body::after {
 .gallery-tile {
   transition:
     transform 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    translate 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    scale 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
     border-color 180ms ease,
     box-shadow 180ms ease;
 }
@@ -1313,5 +1321,10 @@ body::after {
   .gallery-tile:hover img {
     transform: none;
     transition: none;
+  }
+  .cyber-button:hover,
+  .app-sidebar-nav-item:active,
+  .app-sidebar-home-link:active {
+    transform: none;
   }
 }

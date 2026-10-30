@@ -15,6 +15,9 @@ Usage:
   The form-control defaults (`button, input, select, textarea`: `font: inherit` and the
   shared transition) live in `@layer base`, so any Tailwind utility on those elements
   (`text-xs`, `font-*`, `transition-*`, `duration-*`) wins without `!`.
+- Motion respects `prefers-reduced-motion`: hover lifts, press scales and spinners are
+  `motion-safe:`-gated, and the base transition drops `transform`/`translate`/`scale`
+  under `reduce`.
 
 Conventions:
 - Prefer `testId` for test selectors (mapped to `data-testid`).
