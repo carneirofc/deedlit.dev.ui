@@ -21,7 +21,7 @@ export type OutlineButtonSize = "xs" | "sm" | "md" | "lg" | "icon";
  * look: `className={buttonVariants({ variant: "accent" })}`.
  */
 export const buttonVariants = cva(
-  "inline-flex cursor-pointer select-none items-center justify-center gap-1 whitespace-nowrap border font-medium leading-none transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--ui-bg)] focus-visible:border-[color:var(--ui-border-focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+  "inline-flex cursor-pointer select-none items-center justify-center gap-1 whitespace-nowrap border font-medium leading-none transition-[color,background-color,border-color,box-shadow,transform,translate,scale,opacity] duration-150 ease-out motion-safe:hover:-translate-y-px motion-safe:active:translate-y-0 motion-safe:active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--ui-bg)] focus-visible:border-[color:var(--ui-border-focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -96,7 +96,7 @@ const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function
 ) {
   const inferredLabel = extractTextLabel(children);
   const resolvedTooltip = tooltip ?? title ?? label ?? ariaLabel ?? inferredLabel;
-  const resolvedAriaLabel = label ?? ariaLabel ?? (!inferredLabel ? resolvedTooltip : undefined);
+  const resolvedAriaLabel = label ?? ariaLabel ?? (inferredLabel ? undefined : resolvedTooltip);
 
   const Comp = asChild ? Slot.Root : "button";
 
