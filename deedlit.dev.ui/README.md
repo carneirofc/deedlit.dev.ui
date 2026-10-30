@@ -4,7 +4,17 @@ This package contains app-agnostic UI building blocks and the shared visual syst
 
 Usage:
 - Import components from `@carneirofc/ui`.
-- Import the design system stylesheet from `@carneirofc/ui/styles.css` once in your app shell.
+- Import the design system stylesheet from `@carneirofc/ui/styles.css` once in your app shell,
+  after `@import "tailwindcss";` and without a `layer()`:
+
+  ```css
+  @import "tailwindcss";
+  @import "@carneirofc/ui/styles.css";
+  ```
+
+  The form-control defaults (`button, input, select, textarea`: `font: inherit` and the
+  shared transition) live in `@layer base`, so any Tailwind utility on those elements
+  (`text-xs`, `font-*`, `transition-*`, `duration-*`) wins without `!`.
 
 Conventions:
 - Prefer `testId` for test selectors (mapped to `data-testid`).

@@ -622,21 +622,41 @@ body::after {
   background: color-mix(in oklab, var(--accent-cyan) 74%, white);
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  font-variant-ligatures: var(--ui-ligatures);
-  font-feature-settings:
-    "liga" 1,
-    "calt" 1;
-  transition:
-    color 180ms ease,
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+/* Form-control defaults. Kept in `@layer base` (the layer Tailwind's
+ * preflight uses) so any utility on the element — `text-*`, `font-*`,
+ * `transition-*`, `duration-*` — wins without `!`. Tailwind v4's
+ * `translate-*` / `scale-*` utilities set the individual `translate` /
+ * `scale` properties, so those are listed alongside `transform`. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    font-variant-ligatures: var(--ui-ligatures);
+    font-feature-settings:
+      "liga" 1,
+      "calt" 1;
+    transition:
+      color 180ms ease,
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      opacity 180ms ease,
+      transform 180ms ease,
+      translate 180ms ease,
+      scale 180ms ease;
+  }
+
+  /* Reduced motion: keep the colour fades, drop the animated movement. */
+  @media (prefers-reduced-motion: reduce) {
+    button,
+    input,
+    select,
+    textarea {
+      transition-property: color, background-color, border-color, box-shadow, opacity;
+    }
+  }
 }
 
 .cyber-panel {
