@@ -103,6 +103,21 @@
   --scanline: rgba(20, 32, 57, 0.06);
   --shadow-lg: 0 28px 78px -52px rgba(20, 30, 54, 0.45);
   --shadow-sm: 0 10px 28px -20px rgba(20, 30, 54, 0.38);
+  /* Hover-lift shadow: larger and softer than --shadow-sm, so a lifted
+   * element reads as rising off the surface rather than sinking into it. */
+  --shadow-lift: 0 22px 44px -24px rgba(20, 30, 54, 0.46);
+
+  /* Interaction effects. Scaled by `data-ui-intensity`, switched by
+   * `data-ui-hover` / `data-ui-cursor` / `data-ui-motion` (see "Effects
+   * settings" below). Without those attributes these defaults apply. */
+  --ui-cursor-interactive: pointer;
+  --ui-fx-duration: 180ms;
+  --ui-fx-press-duration: 70ms;
+  --ui-fx-ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ui-fx-lift: -2px;
+  --ui-fx-press: 0.97;
+  --ui-fx-glow: 0.16;
+  --ui-fx-glow-size: 220px;
   --admin-muted: var(--ui-ink-muted);
   --ui-ink-strong: #241f31;
   --ui-ink-title: #2b2439;
@@ -255,6 +270,7 @@ html[data-theme="dark"] {
   --scanline: rgba(192, 246, 255, 0.07);
   --shadow-lg: 0 34px 94px -52px rgba(0, 0, 0, 0.82);
   --shadow-sm: 0 16px 32px -24px rgba(0, 0, 0, 0.7);
+  --shadow-lift: 0 26px 52px -26px rgba(0, 0, 0, 0.86);
   --admin-muted: var(--ui-ink-muted);
   --ui-ink-strong: var(--text-0);
   --ui-ink-title: var(--text-0);
@@ -354,6 +370,70 @@ html[data-theme="dark"] {
   --neutral-muted-text: var(--text-2);
 }
 
+/* ── Effects settings ──────────────────────────────────────────────────
+ * `EffectsSettingsProvider` writes these attributes on <html>; they can be
+ * set by hand too (or server-rendered), so none of this needs JS. Absent
+ * attributes mean the defaults: hover effects on, pointer cursor, motion
+ * follows `prefers-reduced-motion`, normal intensity.
+ *   data-ui-hover="on|off"                 decorative hover lift/shadow/glow
+ *   data-ui-cursor="pointer|system"        pointer vs. OS default on controls
+ *   data-ui-motion="system|reduce|full"    drives motion-safe / motion-reduce
+ *   data-ui-intensity="subtle|normal|strong" scales lift, press and glow */
+[data-ui-cursor="system"] {
+  --ui-cursor-interactive: default;
+}
+
+[data-ui-intensity="subtle"] {
+  --ui-fx-lift: -1px;
+  --ui-fx-press: 0.985;
+  --ui-fx-glow: 0.09;
+  --ui-fx-glow-size: 160px;
+}
+
+[data-ui-intensity="strong"] {
+  --ui-fx-lift: -3px;
+  --ui-fx-press: 0.95;
+  --ui-fx-glow: 0.26;
+  --ui-fx-glow-size: 300px;
+}
+
+/* `motion-safe` / `motion-reduce` are redefined so the user's choice in
+ * `data-ui-motion` wins over the OS setting: "reduce" and "full" force it,
+ * "system" (or no attribute) keeps the stock `prefers-reduced-motion`
+ * behaviour. `:where()` keeps the utilities' specificity unchanged. */
+@custom-variant motion-safe {
+  @media (prefers-reduced-motion: no-preference) {
+    &:not(:where([data-ui-motion="reduce"], [data-ui-motion="reduce"] *)) {
+      @slot;
+    }
+  }
+  &:where([data-ui-motion="full"], [data-ui-motion="full"] *) {
+    @slot;
+  }
+}
+
+@custom-variant motion-reduce {
+  @media (prefers-reduced-motion: reduce) {
+    &:not(:where([data-ui-motion="full"], [data-ui-motion="full"] *)) {
+      @slot;
+    }
+  }
+  &:where([data-ui-motion="reduce"], [data-ui-motion="reduce"] *) {
+    @slot;
+  }
+}
+
+/* Decorative hover (lift, lift shadow, glow, image zoom): real hover-capable
+ * pointers only, and off under `data-ui-hover="off"`. Plain `hover:` stays
+ * for colour/border feedback, which is state information, not decoration. */
+@custom-variant fx-hover {
+  @media (hover: hover) {
+    &:hover:not(:where([data-ui-hover="off"], [data-ui-hover="off"] *)) {
+      @slot;
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--bg-0);
   --color-foreground: var(--text-0);
@@ -434,6 +514,7 @@ html[data-theme="dark"] {
 
   --shadow-panel-sm: var(--shadow-sm);
   --shadow-panel-lg: var(--shadow-lg);
+  --shadow-panel-lift: var(--shadow-lift);
   --shadow-ui-card: var(--ui-shadow-card);
   --shadow-ui-strong: var(--ui-shadow-strong);
 }
@@ -646,15 +727,119 @@ body::after {
       transform 180ms ease,
       translate 180ms ease,
       scale 180ms ease;
+
+    /* Reduced motion: keep the colour fades, drop the animated movement. */
+    @variant motion-reduce {
+      transition-property: color, background-color, border-color, box-shadow, opacity;
+    }
   }
 
-  /* Reduced motion: keep the colour fades, drop the animated movement. */
-  @media (prefers-reduced-motion: reduce) {
-    button,
-    input,
-    select,
-    textarea {
-      transition-property: color, background-color, border-color, box-shadow, opacity;
+  /* Cursor affordance. Tailwind v4's preflight leaves <button> on the UA
+   * `cursor: default`; restore the pointer for everything activatable here,
+   * once, instead of `cursor-pointer` on each component. The pointer is the
+   * `--ui-cursor-interactive` token so `data-ui-cursor="system"` can turn it
+   * back into the OS default. Text inputs keep the UA `text` cursor. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):not(
+    [aria-disabled="true"],
+    [data-disabled]
+  ),
+  summary,
+  label[for],
+  label:has(> input:is([type="checkbox"], [type="radio"]):not(:disabled)),
+  select:not(:disabled),
+  input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="file"],
+    [type="range"],
+    [type="color"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):not(:disabled) {
+    cursor: var(--ui-cursor-interactive);
+  }
+
+  :is(button, input, select, textarea):disabled,
+  :is([role="button"], [role="option"]):is([aria-disabled="true"]),
+  label:has(> input:is([type="checkbox"], [type="radio"]):disabled) {
+    cursor: not-allowed;
+  }
+}
+
+/* ── Shared interaction layer ──────────────────────────────────────────
+ * Opt-in classes the components compose. In `@layer components`, so any
+ * Tailwind utility a caller passes (`transition-none`, `hover:shadow-*`,
+ * `translate-y-0`, …) still wins.
+ *   .ui-interactive  transition list + timing (drops movement on reduce)
+ *   .ui-lift         hover lift + --shadow-lift, press scale
+ *   .ui-press        press scale only (tabs, segments, list rows)
+ *   .ui-spotlight    pointer-follow glow; pair with `useSpotlight()` */
+@layer components {
+  .ui-interactive {
+    transition-property:
+      color, background-color, border-color, outline-color, box-shadow, opacity, filter, transform,
+      translate, scale;
+    transition-duration: var(--ui-fx-duration);
+    transition-timing-function: var(--ui-fx-ease);
+
+    @variant motion-reduce {
+      transition-property:
+        color, background-color, border-color, outline-color, box-shadow, opacity, filter;
+    }
+  }
+
+  .ui-lift:not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    @variant fx-hover {
+      box-shadow: var(--shadow-lift);
+
+      @variant motion-safe {
+        translate: 0 var(--ui-fx-lift);
+      }
+    }
+  }
+
+  :is(.ui-lift, .ui-press):not(:disabled, [aria-disabled="true"], [data-disabled]):active {
+    @variant motion-safe {
+      translate: 0 0;
+      scale: var(--ui-fx-press);
+      transition-duration: var(--ui-fx-press-duration);
+    }
+  }
+
+  .ui-spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* Painted under the content (negative z-index inside the isolated
+   * stacking context) but above the element's own background. */
+  .ui-spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      var(--ui-fx-glow-size) circle at var(--ui-spot-x, 50%) var(--ui-spot-y, 50%),
+      color-mix(in oklab, var(--accent-cyan) 70%, var(--accent-pink)),
+      transparent 70%
+    );
+    opacity: 0;
+    transition: opacity var(--ui-fx-duration) ease;
+  }
+
+  .ui-spotlight {
+    @variant fx-hover {
+      @variant motion-safe {
+        &::before {
+          opacity: var(--ui-fx-glow);
+        }
+      }
     }
   }
 }
@@ -701,8 +886,15 @@ body::after {
     var(--shadow-sm);
 }
 
+.cyber-button {
+  @variant fx-hover {
+    @variant motion-safe {
+      transform: translateY(-1px);
+    }
+  }
+}
+
 .cyber-button:hover {
-  transform: translateY(-1px);
   box-shadow:
     inset 0 1px 0 color-mix(in oklab, white 20%, transparent),
     0 0 0 1px color-mix(in oklab, var(--panel-border-strong) 30%, transparent),
@@ -761,12 +953,18 @@ body::after {
     scale 120ms cubic-bezier(0.2, 0.8, 0.3, 1),
     filter 160ms ease;
 }
-.ob-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+.ob-btn:not(:disabled) {
+  @variant fx-hover {
+    @variant motion-safe {
+      transform: translateY(-1px);
+    }
+  }
 }
 .ob-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.95);
-  transition-duration: 60ms;
+  @variant motion-safe {
+    transform: translateY(0) scale(0.95);
+    transition-duration: 60ms;
+  }
 }
 .ob-btn:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent-cyan) 70%, transparent);
@@ -824,7 +1022,7 @@ body::after {
 /* Small icon / utility buttons (copy, dialog close, gallery nav, theme
  * toggle) — same hover-lift / press / focus language as OutlineButton. */
 .cyber-icon-btn {
-  cursor: pointer;
+  cursor: var(--ui-cursor-interactive);
   transition:
     color 160ms ease,
     background-color 160ms ease,
@@ -838,23 +1036,23 @@ body::after {
   border-color: var(--panel-border-strong);
   background: color-mix(in oklab, var(--surface-0) 70%, var(--accent-cyan) 30%);
   color: var(--text-0);
-  transform: translateY(-1px);
+}
+.cyber-icon-btn:not(:disabled) {
+  @variant fx-hover {
+    @variant motion-safe {
+      transform: translateY(-1px);
+    }
+  }
 }
 .cyber-icon-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.9);
-  transition-duration: 60ms;
+  @variant motion-safe {
+    transform: translateY(0) scale(0.9);
+    transition-duration: 60ms;
+  }
 }
 .cyber-icon-btn:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent-cyan) 70%, transparent);
   outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .cyber-icon-btn,
-  .cyber-icon-btn:hover,
-  .cyber-icon-btn:active {
-    transform: none;
-    transition: none;
-  }
 }
 
 .cyber-input::placeholder {
@@ -878,7 +1076,9 @@ body::after {
 }
 
 .app-sidebar-nav-item:active {
-  transform: translateY(1px) scale(0.97);
+  @variant motion-safe {
+    transform: translateY(1px) scale(0.97);
+  }
   box-shadow: 0 6px 16px -14px color-mix(in oklab, var(--accent-cyan) 42%, transparent);
 }
 
@@ -910,7 +1110,9 @@ body::after {
 }
 
 .app-sidebar-home-link:active {
-  transform: translateY(1px) scale(0.97);
+  @variant motion-safe {
+    transform: translateY(1px) scale(0.97);
+  }
   filter: brightness(1.02);
 }
 
@@ -1149,16 +1351,24 @@ body::after {
     box-shadow 180ms ease,
     opacity 180ms ease;
 }
+.product-card {
+  @variant fx-hover {
+    @variant motion-safe {
+      transform: translateY(-2px);
+    }
+  }
+}
 .product-card:hover {
-  transform: translateY(-2px);
   border-color: var(--panel-border-strong);
   box-shadow:
     var(--shadow-lg),
     0 0 0 1px color-mix(in oklab, var(--accent-cyan) 18%, transparent);
 }
 .product-card:active {
-  transform: translateY(0) scale(0.99);
-  transition-duration: 80ms;
+  @variant motion-safe {
+    transform: translateY(0) scale(0.99);
+    transition-duration: 80ms;
+  }
 }
 
 .gallery-tile {
@@ -1169,14 +1379,22 @@ body::after {
     border-color 180ms ease,
     box-shadow 180ms ease;
 }
+.gallery-tile {
+  @variant fx-hover {
+    @variant motion-safe {
+      transform: translateY(-2px);
+    }
+  }
+}
 .gallery-tile:hover {
-  transform: translateY(-2px);
   border-color: var(--panel-border-strong);
   box-shadow: var(--shadow-lg);
 }
 .gallery-tile:active {
-  transform: translateY(0) scale(0.99);
-  transition-duration: 80ms;
+  @variant motion-safe {
+    transform: translateY(0) scale(0.99);
+    transition-duration: 80ms;
+  }
 }
 .gallery-tile:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent-cyan) 70%, transparent);
@@ -1185,8 +1403,14 @@ body::after {
 .gallery-tile img {
   transition: transform 320ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
-.gallery-tile:hover img {
-  transform: scale(1.04);
+.gallery-tile {
+  @variant fx-hover {
+    @variant motion-safe {
+      & img {
+        transform: scale(1.04);
+      }
+    }
+  }
 }
 
 /* ── Radix primitive transitions ─────────────────────────────────────
@@ -1298,33 +1522,19 @@ body::after {
   animation: ui-collapsible-up 200ms cubic-bezier(0.4, 0, 0.6, 1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-in {
+/* Reduced motion (OS setting or data-ui-motion="reduce"): no enter/exit
+ * animations. Hover lifts and press scales are already motion-safe-gated
+ * where they are declared. */
+.animate-in {
+  @variant motion-reduce {
     animation: none;
   }
-  .ui-anim-overlay,
-  .ui-anim-dialog,
-  .ui-anim-popover,
-  .ui-anim-collapsible {
+}
+.ui-anim-overlay,
+.ui-anim-dialog,
+.ui-anim-popover,
+.ui-anim-collapsible {
+  @variant motion-reduce {
     animation: none !important;
-  }
-  .ob-btn,
-  .ob-btn:hover,
-  .ob-btn:active,
-  .product-card,
-  .product-card:hover,
-  .product-card:active,
-  .gallery-tile,
-  .gallery-tile:hover,
-  .gallery-tile:active,
-  .gallery-tile img,
-  .gallery-tile:hover img {
-    transform: none;
-    transition: none;
-  }
-  .cyber-button:hover,
-  .app-sidebar-nav-item:active,
-  .app-sidebar-home-link:active {
-    transform: none;
   }
 }
