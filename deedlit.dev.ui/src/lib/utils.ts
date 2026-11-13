@@ -1,5 +1,16 @@
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// `text-ui-*` are this package's font-size classes (styles.css). Stock
+// tailwind-merge reads them as text colours, so a later `text-[color:…]`
+// silently dropped the size (e.g. SegmentedControl's `text-ui-2xs`).
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ "text-ui": ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "display"] }]
+    }
+  }
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
