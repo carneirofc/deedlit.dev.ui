@@ -52,6 +52,18 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from "./DropdownMenu";
+export type {
+  EffectsSettingsContextValue,
+  EffectsSettingsProviderProps,
+  EffectsSettingsUpdate
+} from "./EffectsSettings";
+export {
+  EffectsSettingsContext,
+  EffectsSettingsProvider,
+  useEffectsSettings
+} from "./EffectsSettings";
+export type { EffectsSettingsPanelProps } from "./EffectsSettingsPanel";
+export { default as EffectsSettingsPanel } from "./EffectsSettingsPanel";
 export type { EmptyStateProps, EmptyStateTone } from "./EmptyState";
 export { default as EmptyState, emptyStateVariants } from "./EmptyState";
 export type { FilterSelectionCardProps } from "./FilterSelectionCard";
@@ -84,6 +96,26 @@ export type { InfoChipProps } from "./InfoChip";
 export { default as InfoChip } from "./InfoChip";
 export type { KeyValueFieldProps } from "./KeyValueField";
 export { default as KeyValueField } from "./KeyValueField";
+export type {
+  CursorStyle,
+  EffectiveMotion,
+  EffectsIntensity,
+  EffectsSettings,
+  ReducedMotionPreference
+} from "./lib/effects-settings";
+export {
+  areEffectsSettingsEqual,
+  CURSOR_STYLES,
+  DEFAULT_EFFECTS_SETTINGS,
+  EFFECTS_DATA_ATTRIBUTES,
+  EFFECTS_INTENSITIES,
+  EFFECTS_SETTINGS_STORAGE_KEY,
+  effectsDataAttributes,
+  parseEffectsSettings,
+  REDUCED_MOTION_PREFERENCES,
+  resolveEffectiveMotion,
+  serializeEffectsSettings
+} from "./lib/effects-settings";
 export { useControllableState } from "./lib/use-controllable-state";
 export { useSpotlight } from "./lib/use-spotlight";
 export type { MediaStageProps } from "./MediaStage";
