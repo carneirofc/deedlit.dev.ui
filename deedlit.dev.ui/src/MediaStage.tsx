@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "./Icons";
-import { cn } from "./utils";
+import { cn, INTERACTION_PATTERNS } from "./utils";
 
 export type MediaStageProps = {
   children: ReactNode;
@@ -60,13 +60,14 @@ export default function MediaStage({
               aria-label={previousLabel}
               data-testid="media-stage-previous"
               className={cn(
-                "group absolute inset-y-0 left-0 flex h-full w-1/3 cursor-pointer items-center justify-start pl-3 transition hover:bg-linear-to-r hover:from-black/25",
+                "group absolute inset-y-0 left-0 flex h-full w-1/3 items-center justify-start pl-3 ui-interactive hover:bg-linear-to-r hover:from-black/25",
+                INTERACTION_PATTERNS.focusRingInset,
                 previousOverlayClassName
               )}
             >
               <span
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition",
+                  "ui-interactive flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm group-hover:bg-black/45 group-focus-visible:opacity-100 motion-safe:group-active:scale-(--ui-fx-press)",
                   navigationIconClassName
                 )}
               >
@@ -79,13 +80,14 @@ export default function MediaStage({
               aria-label={nextLabel}
               data-testid="media-stage-next"
               className={cn(
-                "group absolute inset-y-0 right-0 flex h-full w-1/3 cursor-pointer items-center justify-end pr-3 transition hover:bg-linear-to-l hover:from-black/25",
+                "group absolute inset-y-0 right-0 flex h-full w-1/3 items-center justify-end pr-3 ui-interactive hover:bg-linear-to-l hover:from-black/25",
+                INTERACTION_PATTERNS.focusRingInset,
                 nextOverlayClassName
               )}
             >
               <span
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition",
+                  "ui-interactive flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm group-hover:bg-black/45 group-focus-visible:opacity-100 motion-safe:group-active:scale-(--ui-fx-press)",
                   navigationIconClassName
                 )}
               >

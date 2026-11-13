@@ -180,7 +180,7 @@ function TagSelect({
               }}
               aria-label={`Remove ${tag}`}
               data-testid={testId ? `${testId}-remove-${tag}` : undefined}
-              className="opacity-70 transition hover:opacity-100"
+              className="ui-interactive ui-press rounded-sm opacity-70 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
             >
               ×
             </button>
@@ -233,7 +233,7 @@ function TagSelect({
                 onMouseEnter={() => setActive(i)}
                 data-testid={testId ? `${testId}-suggestion-${s}` : undefined}
                 className={cn(
-                  "w-full truncate rounded-md px-2 py-1 text-left text-ui-xs transition",
+                  "ui-interactive w-full truncate rounded-md px-2 py-1 text-left text-ui-xs",
                   i === active ? "bg-accent-cyan/15 text-accent-cyan" : "text-ui-ink hover:bg-ui-bg"
                 )}
               >

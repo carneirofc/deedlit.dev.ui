@@ -3,6 +3,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, type HTMLAttributes } from "react";
 
+import { useSpotlight } from "./lib/use-spotlight";
 import { cn } from "./utils";
 
 export type SurfacePanelTone = "default" | "soft" | "subtle" | "strong";
@@ -30,17 +31,30 @@ export const surfacePanelVariants = cva("rounded-xl border", {
 });
 
 export type SurfacePanelProps = HTMLAttributes<HTMLDivElement> &
-  VariantProps<typeof surfacePanelVariants>;
+  VariantProps<typeof surfacePanelVariants> & {
+    /**
+     * Pointer-follow glow on hover (`.ui-spotlight`). Decorative: it follows
+     * the effects settings and is off for touch, reduced motion and
+     * `data-ui-hover="off"`.
+     */
+    spotlight?: boolean;
+  };
 
 const SurfacePanel = forwardRef<HTMLDivElement, SurfacePanelProps>(function SurfacePanel(
-  { className, tone, padding, ...props },
+  { className, tone, padding, spotlight = false, onPointerMove, ...props },
   ref
 ) {
+  const trackSpotlight = useSpotlight(onPointerMove);
   return (
     <div
       ref={ref}
       data-slot="surface-panel"
-      className={cn(surfacePanelVariants({ tone, padding }), className)}
+      className={cn(
+        surfacePanelVariants({ tone, padding }),
+        spotlight && "ui-spotlight",
+        className
+      )}
+      onPointerMove={spotlight ? trackSpotlight : onPointerMove}
       {...props}
     />
   );

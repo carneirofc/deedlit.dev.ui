@@ -74,7 +74,7 @@ export function PathInput({
         />
         <button
           type="button"
-          className={buttonClassName}
+          className={["ui-interactive ui-press", buttonClassName].filter(Boolean).join(" ")}
           onClick={() => setPickerOpen(true)}
           disabled={disabled}
           title="Browse folders"

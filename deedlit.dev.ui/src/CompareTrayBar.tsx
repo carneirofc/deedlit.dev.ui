@@ -31,7 +31,8 @@ export type CompareTrayBarProps = {
   renderCompareAction: (opts: { className: string; disabled: boolean; count: number }) => ReactNode;
 };
 
-const COMPARE_ACTION_BASE = "rounded-lg px-3 py-2 text-ui-xs font-medium transition";
+const COMPARE_ACTION_BASE =
+  "ui-interactive ui-lift rounded-lg px-3 py-2 text-ui-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]";
 const COMPARE_ACTION_ENABLED = "bg-accent-cyan text-ui-bg-deep hover:opacity-90";
 const COMPARE_ACTION_DISABLED =
   "pointer-events-none border border-ui-border/50 text-ui-ink-muted opacity-50";
@@ -90,7 +91,7 @@ export function CompareTrayBar({
               <button
                 type="button"
                 onClick={() => onRemove(item.id)}
-                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full border border-ui-border/70 bg-ui-bg text-ui-2xs text-ui-ink-muted transition hover:text-rose-500"
+                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full border border-ui-border/70 bg-ui-bg text-ui-2xs text-ui-ink-muted ui-interactive ui-press hover:border-rose-400 hover:text-rose-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
                 aria-label={removeLabel}
                 data-testid={`compare-tray-remove-${item.id}`}
               >
@@ -110,7 +111,7 @@ export function CompareTrayBar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded-lg border border-ui-border/70 px-2.5 py-2 text-ui-xs text-ui-ink-muted transition hover:text-ui-ink"
+          className="ui-interactive ui-press rounded-lg border border-ui-border/70 px-2.5 py-2 text-ui-xs text-ui-ink-muted hover:border-ui-border hover:text-ui-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
           data-testid="compare-tray-clear"
         >
           {clearLabel}

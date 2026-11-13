@@ -3,7 +3,7 @@
 import { forwardRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { cn } from "./utils";
+import { cn, INTERACTION_PATTERNS } from "./utils";
 
 export type ToastTone = "info" | "success" | "warn" | "error";
 export type ToastRole = "status" | "alert";
@@ -76,7 +76,11 @@ const Toast = forwardRef<HTMLDivElement, ToastProps>(function Toast(
             title={closeLabel}
             onClick={onClose}
             data-testid={testId ? `${testId}-dismiss` : undefined}
-            className="absolute top-2 right-2 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-md text-[color:var(--ui-ink-subtle)] transition hover:bg-[color:var(--ui-bg-soft)] hover:text-[color:var(--ui-ink-strong)] motion-safe:active:scale-95"
+            className={cn(
+              "absolute top-2 right-2 inline-flex h-5 w-5 items-center justify-center rounded-md text-[color:var(--ui-ink-subtle)] hover:bg-[color:var(--ui-bg-soft)] hover:text-[color:var(--ui-ink-strong)]",
+              INTERACTION_PATTERNS.press,
+              INTERACTION_PATTERNS.focusRing
+            )}
           >
             <span aria-hidden="true" className="text-ui-sm leading-none">
               x

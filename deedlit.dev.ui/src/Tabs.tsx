@@ -3,7 +3,7 @@
 import { Tabs as RadixTabs } from "radix-ui";
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
 
-import { cn } from "./utils";
+import { cn, INTERACTION_PATTERNS } from "./utils";
 
 /**
  * Accessible tabs built on Radix `Tabs`. Triggers expose `role="tab"` with
@@ -48,11 +48,12 @@ export const TabsTrigger = forwardRef<
     <RadixTabs.Trigger
       ref={ref}
       className={cn(
-        "cursor-pointer rounded-md border border-transparent bg-transparent px-2 py-0.5 text-ui-2xs text-[color:var(--ui-ink-secondary)] outline-none transition-colors",
-        "hover:bg-[color:var(--ui-bg-soft)]",
+        "rounded-md border border-transparent bg-transparent px-2 py-0.5 text-ui-2xs text-[color:var(--ui-ink-secondary)] outline-none",
+        INTERACTION_PATTERNS.press,
+        "enabled:hover:bg-[color:var(--ui-bg-soft)]",
         "focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklab,var(--accent-cyan)_45%,transparent)]",
         "data-[state=active]:border-ui-active data-[state=active]:bg-[color:var(--ui-bg-active)] data-[state=active]:text-[color:var(--ui-ink-highlight)]",
-        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
         className
       )}
       {...props}

@@ -1,12 +1,19 @@
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
 
-import { BORDER_PATTERNS, cn, SPACING_PATTERNS } from "./utils";
+import { BORDER_PATTERNS, cn, INTERACTION_PATTERNS, SPACING_PATTERNS } from "./utils";
 
 export type TableProps = ComponentPropsWithoutRef<"table">;
 export type TableHeaderProps = ComponentPropsWithoutRef<"thead">;
 export type TableBodyProps = ComponentPropsWithoutRef<"tbody">;
 export type TableFooterProps = ComponentPropsWithoutRef<"tfoot">;
-export type TableRowProps = ComponentPropsWithoutRef<"tr">;
+export type TableRowProps = ComponentPropsWithoutRef<"tr"> & {
+  /**
+   * The row is clickable (it has an `onClick` / navigates). Adds the hover
+   * background, pointer cursor and an inset focus ring; keyboard access
+   * (`tabIndex`, `onKeyDown`) stays the caller's job.
+   */
+  interactive?: boolean;
+};
 export type TableHeadProps = ComponentPropsWithoutRef<"th">;
 export type TableCellProps = ComponentPropsWithoutRef<"td">;
 export type TableCaptionProps = ComponentPropsWithoutRef<"caption">;
@@ -61,10 +68,25 @@ const TableFooter = forwardRef<ElementRef<"tfoot">, TableFooterProps>(function T
 });
 
 const TableRow = forwardRef<ElementRef<"tr">, TableRowProps>(function TableRow(
-  { className, ...props },
+  { className, interactive = false, ...props },
   ref
 ) {
-  return <tr ref={ref} className={cn(BORDER_PATTERNS.topFaint, className)} {...props} />;
+  return (
+    <tr
+      ref={ref}
+      data-interactive={interactive ? "" : undefined}
+      className={cn(
+        BORDER_PATTERNS.topFaint,
+        interactive && [
+          "ui-interactive hover:bg-[color:var(--ui-bg-soft)]",
+          INTERACTION_PATTERNS.cursor,
+          INTERACTION_PATTERNS.focusRingInset
+        ],
+        className
+      )}
+      {...props}
+    />
+  );
 });
 
 const TableHead = forwardRef<ElementRef<"th">, TableHeadProps>(function TableHead(

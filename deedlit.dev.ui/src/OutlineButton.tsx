@@ -21,18 +21,25 @@ export type OutlineButtonSize = "xs" | "sm" | "md" | "lg" | "icon";
  * look: `className={buttonVariants({ variant: "accent" })}`.
  */
 export const buttonVariants = cva(
-  "inline-flex cursor-pointer select-none items-center justify-center gap-1 whitespace-nowrap border font-medium leading-none transition-[color,background-color,border-color,box-shadow,transform,translate,scale,opacity] duration-150 ease-out motion-safe:hover:-translate-y-px motion-safe:active:translate-y-0 motion-safe:active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--ui-bg)] focus-visible:border-[color:var(--ui-border-focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 disabled:active:scale-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+  "ui-interactive inline-flex select-none items-center justify-center gap-1 whitespace-nowrap border font-medium leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--ui-bg)] focus-visible:border-[color:var(--ui-border-focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
   {
     variants: {
       variant: {
         neutral:
-          "border-ui-strong bg-panel text-[color:var(--ui-ink-accent)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--ui-border-active)_45%,transparent)] hover:border-ui-active hover:bg-[color:var(--ui-bg-soft)] hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--ui-border-active)_62%,transparent)] active:bg-[color:var(--ui-bg-active)]",
+          "border-ui-strong bg-panel text-[color:var(--ui-ink-accent)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--ui-border-active)_45%,transparent)] hover:border-ui-active hover:bg-[color:var(--ui-bg-soft)] fx-hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--ui-border-active)_62%,transparent)] active:bg-[color:var(--ui-bg-active)]",
         danger:
-          "border-rose-300 bg-[color:var(--ui-bg-card)] text-rose-700 shadow-[0_10px_24px_-18px_rgba(225,29,72,0.35)] hover:border-rose-400 hover:bg-error hover:shadow-[0_16px_28px_-20px_rgba(225,29,72,0.5)] active:bg-rose-100",
+          "border-rose-300 bg-[color:var(--ui-bg-card)] text-rose-700 shadow-[0_10px_24px_-18px_rgba(225,29,72,0.35)] hover:border-rose-400 hover:bg-error fx-hover:shadow-[0_16px_28px_-20px_rgba(225,29,72,0.5)] active:bg-rose-100",
         ghost:
-          "cyber-button-ghost border-ui-strong bg-[color:var(--surface-0)]/55 text-[color:var(--ui-ink)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--ui-border-active)_38%,transparent)] hover:border-ui-active hover:bg-[color:var(--ui-bg-soft)] hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--ui-border-active)_54%,transparent)] active:bg-[color:var(--ui-bg-soft)]",
+          "cyber-button-ghost border-ui-strong bg-[color:var(--surface-0)]/55 text-[color:var(--ui-ink)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--ui-border-active)_38%,transparent)] hover:border-ui-active hover:bg-[color:var(--ui-bg-soft)] fx-hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--ui-border-active)_54%,transparent)] active:bg-[color:var(--ui-bg-soft)]",
         accent:
-          "cyber-button border-transparent text-[color:var(--text-0)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--panel-border-strong)_45%,transparent)] hover:border-transparent hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--panel-border-strong)_62%,transparent)] active:bg-[color:color-mix(in_oklab,var(--surface-0)_55%,var(--accent-cyan)_45%)]"
+          "cyber-button border-transparent text-[color:var(--text-0)] shadow-[0_10px_24px_-18px_color-mix(in_oklab,var(--panel-border-strong)_45%,transparent)] hover:border-transparent fx-hover:shadow-[0_16px_28px_-20px_color-mix(in_oklab,var(--panel-border-strong)_62%,transparent)] active:bg-[color:color-mix(in_oklab,var(--surface-0)_55%,var(--accent-cyan)_45%)]"
+      },
+      // Hover/press motion. Lives in `.ui-lift` / `.ui-press` (styles.css), so it
+      // follows the effects settings (`data-ui-hover`, `-motion`, `-intensity`).
+      effect: {
+        lift: "ui-lift",
+        press: "ui-press",
+        none: ""
       },
       controlSize: {
         xs: "rounded-md px-2 py-1 text-ui-xs",
@@ -44,6 +51,7 @@ export const buttonVariants = cva(
     },
     defaultVariants: {
       variant: "neutral",
+      effect: "lift",
       controlSize: "sm"
     }
   }
@@ -80,6 +88,7 @@ function extractTextLabel(content: ReactNode): string | undefined {
 const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function OutlineButton(
   {
     variant,
+    effect,
     controlSize,
     className,
     type = "button",
@@ -109,7 +118,7 @@ const OutlineButton = forwardRef<HTMLButtonElement, OutlineButtonProps>(function
       title={resolvedTooltip}
       aria-label={resolvedAriaLabel}
       suppressHydrationWarning={suppressHydrationWarning ?? true}
-      className={cn(buttonVariants({ variant, controlSize }), className)}
+      className={cn(buttonVariants({ variant, effect, controlSize }), className)}
       {...props}
     >
       {children}

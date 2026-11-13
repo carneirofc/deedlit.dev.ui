@@ -30,7 +30,7 @@ export const DropdownMenuSub = RadixDropdownMenu.Sub;
 export const DropdownMenuSubTrigger = RadixDropdownMenu.SubTrigger;
 
 const ITEM_CLASS_NAME =
-  "flex w-full cursor-pointer select-none items-center gap-2 px-3 py-1.5 text-left text-ui-xs text-ui-ink-title outline-none transition-colors data-[highlighted]:bg-ui-bg-soft data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+  "ui-interactive flex w-full select-none items-center gap-2 px-3 py-1.5 text-left text-ui-xs text-ui-ink-title outline-none data-[highlighted]:bg-ui-bg-soft data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
 
 export const DropdownMenuContent = forwardRef<
   ElementRef<typeof RadixDropdownMenu.Content>,

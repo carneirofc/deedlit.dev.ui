@@ -71,6 +71,7 @@ const FilterSelectionCard = forwardRef<HTMLDivElement, FilterSelectionCardProps>
                 // biome-ignore lint/suspicious/noArrayIndexKey: items are caller-supplied strings that may repeat; the item text already discriminates.
                 key={`${item}-${index}`}
                 onClick={() => onRemoveItem(item)}
+                effect="press"
                 className={cn(DEFAULT_CHIP_CLASS, chipClassName)}
                 title={`${removeTitlePrefix}: ${item}`}
               >

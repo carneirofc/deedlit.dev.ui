@@ -179,7 +179,7 @@ export function DirectoryPicker({
                   type="button"
                   onClick={() => browse(root.path)}
                   data-testid={`directory-picker-root-${root.path}`}
-                  className="rounded-full border border-ui-border bg-ui-bg-soft px-2.5 py-1 font-mono text-ui-2xs text-ui-ink-muted transition hover:border-accent-cyan hover:text-accent-cyan"
+                  className="rounded-full border border-ui-border bg-ui-bg-soft px-2.5 py-1 font-mono text-ui-2xs text-ui-ink-muted ui-interactive ui-press hover:border-accent-cyan hover:text-accent-cyan focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
                 >
                   {root.label}
                 </button>
@@ -204,7 +204,7 @@ export function DirectoryPicker({
                         type="button"
                         onClick={() => browse(entry.path)}
                         data-testid={`directory-picker-entry-${entry.path}`}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-ui-sm text-ui-ink transition hover:bg-accent-cyan/10"
+                        className="ui-interactive flex w-full items-center gap-2 px-3 py-2 text-left text-ui-sm text-ui-ink hover:bg-accent-cyan/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--ui-ring-focus)]"
                       >
                         <FolderIcon className="h-4 w-4 text-accent-cyan" />
                         <span className="truncate">{entry.name}</span>

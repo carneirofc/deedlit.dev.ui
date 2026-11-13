@@ -84,3 +84,27 @@ export const BORDER_PATTERNS = {
   /** Active state border */
   active: "border border-ui-active"
 } as const;
+
+/**
+ * Shared interaction recipes. The motion itself lives in `styles/styles.css`
+ * (`.ui-interactive`, `.ui-lift`, `.ui-press`), gated by the effects
+ * settings attributes on `<html>`; these strings only compose it.
+ */
+export const INTERACTION_PATTERNS = {
+  /** Visible keyboard focus ring in the theme's focus colour. */
+  focusRing:
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--ui-bg)]",
+
+  /** Focus ring drawn inside the box, for full-bleed rows and triggers. */
+  focusRingInset:
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--ui-ring-focus)]",
+
+  /** Raised control: transition + hover lift/shadow + press scale. */
+  lift: "ui-interactive ui-lift",
+
+  /** Flat control (tabs, segments, chips, list rows): transition + press scale. */
+  press: "ui-interactive ui-press",
+
+  /** Pointer cursor that honours `data-ui-cursor` on non-button elements. */
+  cursor: "cursor-(--ui-cursor-interactive)"
+} as const;

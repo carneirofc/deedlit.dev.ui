@@ -30,7 +30,7 @@ const CopyButton = forwardRef<HTMLButtonElement, CopyButtonProps>(function CopyB
       ref={ref}
       type="button"
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-[color:var(--ui-border-strong)] bg-[color:var(--ui-bg)] px-2 py-1 text-ui-xs font-medium text-[color:var(--ui-ink-secondary)] transition hover:bg-[color:var(--ui-bg-soft)]",
+        "inline-flex items-center gap-1 rounded-md border border-[color:var(--ui-border-strong)] bg-[color:var(--ui-bg)] px-2 py-1 text-ui-xs font-medium text-[color:var(--ui-ink-secondary)] hover:bg-[color:var(--ui-bg-soft)]",
         className
       )}
       {...props}

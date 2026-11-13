@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./Collapsible";
 import { ChevronDownIcon } from "./Icons";
-import { cn } from "./utils";
+import { cn, INTERACTION_PATTERNS } from "./utils";
 
 export type CollapsiblePanelProps = {
   label: ReactNode;
@@ -49,7 +49,8 @@ export default function CollapsiblePanel({
       <CollapsibleTrigger
         data-testid={testId ? `${testId}-trigger` : undefined}
         className={cn(
-          "group/cp flex w-full items-center justify-between px-4 py-2.5 text-ui-sm font-medium text-ui-ink-secondary transition hover:bg-ui-bg-soft",
+          "group/cp ui-interactive flex w-full items-center justify-between px-4 py-2.5 text-ui-sm font-medium text-ui-ink-secondary hover:bg-ui-bg-soft hover:text-ui-ink-strong",
+          INTERACTION_PATTERNS.focusRingInset,
           triggerClassName
         )}
       >

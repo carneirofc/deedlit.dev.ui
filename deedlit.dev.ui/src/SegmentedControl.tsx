@@ -67,6 +67,7 @@ function SegmentedControlFn<TValue extends string = string>(
             disabled={option.disabled}
             onClick={() => onValueChange(option.value)}
             aria-pressed={isActive}
+            effect="press"
             className={cn(
               "rounded-md px-2 py-0.5 text-ui-2xs",
               optionClassName,

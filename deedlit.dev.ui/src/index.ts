@@ -85,6 +85,7 @@ export { default as InfoChip } from "./InfoChip";
 export type { KeyValueFieldProps } from "./KeyValueField";
 export { default as KeyValueField } from "./KeyValueField";
 export { useControllableState } from "./lib/use-controllable-state";
+export { useSpotlight } from "./lib/use-spotlight";
 export type { MediaStageProps } from "./MediaStage";
 export { default as MediaStage } from "./MediaStage";
 export type { MetadataInfoBlockProps } from "./MetadataInfoBlock";
@@ -151,6 +152,12 @@ export { default as ThemeToggleButton } from "./ThemeToggleButton";
 export type { ToastProps, ToastRole, ToastTone } from "./Toast";
 export { default as Toast } from "./Toast";
 // ── Styling utilities & variant recipes ──────────────────────────────
-export { BORDER_PATTERNS, cn, LAYOUT_PATTERNS, SPACING_PATTERNS } from "./utils";
+export {
+  BORDER_PATTERNS,
+  cn,
+  INTERACTION_PATTERNS,
+  LAYOUT_PATTERNS,
+  SPACING_PATTERNS
+} from "./utils";
 export type { WarningListProps } from "./WarningList";
 export { default as WarningList } from "./WarningList";

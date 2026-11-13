@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { cn } from "./utils";
+import { cn, INTERACTION_PATTERNS } from "./utils";
 
 export type GalleryViewMode = "grid" | "masonry" | "list";
 
@@ -90,7 +90,7 @@ function SelectCheck({ checked }: { checked: boolean }) {
   return (
     <span
       className={cn(
-        "flex h-5 w-5 items-center justify-center rounded border transition",
+        "ui-interactive flex h-5 w-5 items-center justify-center rounded border",
         checked
           ? "border-accent-cyan bg-accent-cyan text-ui-bg-deep"
           : "border-ui-border/80 bg-ui-bg/80 text-transparent backdrop-blur-sm"
@@ -385,8 +385,9 @@ export function Gallery<T>({
 
         const mediaInner = renderMedia(item, ctx);
         // When armed (Ctrl/Cmd held, not yet in select mode) advertise the click:
-        // pointer cursor + a hover hint. `cursor-pointer` is last so twMerge wins
-        // over the app's cursor-zoom-in.
+        // pointer cursor + a hover hint. The cursor class is last so twMerge wins
+        // over the app's cursor-zoom-in; it is the --ui-cursor-interactive token
+        // so `data-ui-cursor="system"` is honoured.
         const armTitle = armed ? "Ctrl/Cmd-click to select" : undefined;
         const media = href ? (
           <a
@@ -394,7 +395,13 @@ export function Gallery<T>({
             onClick={onMediaClick}
             title={armTitle}
             data-testid={`gallery-item-media-${itemKey}`}
-            className={cn("block", list && "shrink-0", mediaClassName, armed && "cursor-pointer")}
+            className={cn(
+              "block",
+              INTERACTION_PATTERNS.focusRing,
+              list && "shrink-0",
+              mediaClassName,
+              armed && INTERACTION_PATTERNS.cursor
+            )}
           >
             {mediaInner}
           </a>
@@ -406,9 +413,10 @@ export function Gallery<T>({
             data-testid={`gallery-item-media-${itemKey}`}
             className={cn(
               "block text-left",
+              INTERACTION_PATTERNS.focusRing,
               list && "shrink-0",
               mediaClassName,
-              armed && "cursor-pointer"
+              armed && INTERACTION_PATTERNS.cursor
             )}
           >
             {mediaInner}
@@ -435,7 +443,11 @@ export function Gallery<T>({
             aria-pressed={selected}
             aria-label={selected ? "Deselect" : "Select"}
             data-testid={`gallery-item-select-${itemKey}`}
-            className={list ? "shrink-0" : "absolute left-1.5 top-1.5 z-10"}
+            className={cn(
+              "ui-press rounded",
+              INTERACTION_PATTERNS.focusRing,
+              list ? "shrink-0" : "absolute left-1.5 top-1.5 z-10"
+            )}
           >
             <SelectCheck checked={selected} />
           </button>

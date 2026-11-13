@@ -108,7 +108,7 @@ function ActivityRow({ a, onDismiss }: { a: Activity; onDismiss: (id: string) =>
         <button
           type="button"
           onClick={() => onDismiss(a.id)}
-          className="shrink-0 rounded text-ui-2xs text-ui-ink-muted transition hover:text-ui-ink"
+          className="ui-interactive ui-press shrink-0 rounded text-ui-2xs text-ui-ink-muted hover:text-ui-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
           aria-label="Dismiss"
           data-testid={`activity-dismiss-${a.id}`}
         >
@@ -186,7 +186,7 @@ export function ActivityDock({ activities, onDismiss, onClearFinished }: Activit
               <button
                 type="button"
                 onClick={onClearFinished}
-                className="rounded-md border border-ui-border/70 px-2 py-0.5 text-ui-2xs text-ui-ink-muted transition hover:bg-accent-cyan/10"
+                className="ui-interactive ui-press rounded-md border border-ui-border/70 px-2 py-0.5 text-ui-2xs text-ui-ink-muted hover:bg-accent-cyan/10 hover:text-ui-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
                 data-testid="activity-clear"
               >
                 Clear finished
@@ -204,7 +204,7 @@ export function ActivityDock({ activities, onDismiss, onClearFinished }: Activit
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-ui-border/70 bg-ui-bg/95 px-3 py-2 text-ui-xs font-medium shadow-panel-lg backdrop-blur-xl transition hover:border-accent-cyan/60"
+        className="pointer-events-auto flex items-center gap-2 rounded-full border border-ui-border/70 bg-ui-bg/95 px-3 py-2 text-ui-xs font-medium shadow-panel-lg backdrop-blur-xl ui-interactive ui-lift hover:border-accent-cyan/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ui-ring-focus)]"
         data-testid="activity-pill"
         aria-expanded={open}
       >
