@@ -101,7 +101,7 @@ function writeStored(key: string, value: string): void {
  * Place it once near the root, e.g. in a Next.js `app/layout.tsx`:
  *
  * ```tsx
- * <html lang="en" suppressHydrationWarning>
+ * <html lang="en">
  *   <body>
  *     <EffectsSettingsProvider>{children}</EffectsSettingsProvider>
  *   </body>
